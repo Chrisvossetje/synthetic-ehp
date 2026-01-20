@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html data-theme="light">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Synthetic EHP</title>
+  <link rel="icon" type="image/x-icon" href="./favicon.ico">
+  <script type="module" src="./index.js"></script>
+  <link rel="stylesheet" href="pico.min.css">
+  <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+  <!-- Top Bar -->
+  <div style="height: 40px; width: 100%; min-width: 100%; align-items: center; display: flex; margin: 10px;">
+    <div style="flex: 1;"></div>
+    <div style="border-radius: 10px; background-color: rgb(220 220 220 / 50%);">
+      <p style="margin: 8px; font-size: 1.4em; ">EHP - Synthetic SS</p>
+    </div>
+
+    <div style="flex: 1;">
+    </div>
+    <div style="border-radius: 10px; background-color: rgb(220 220 220 / 50%); align-items: center; display: flex; padding: 4px;">
+
+      <div style="width: 10px;"></div>
+      <label style="margin: 0px;">All Diffs:
+        <input type="checkbox" name="valid" id="all-diff-checkbox" checked/>
+      </label>
+      <div style="width: 10px;"></div>
+
+      <p style="margin: 0px;">Page:</p>
+      <div style="width: 10px;"></div>
+      <select style="width: 80px; margin: 0px;" name="Pages" aria-label="Select SS page" id="ss-page">
+        <option value = 1000>E∞</option>
+        <option value = 1 selected>E1</option>
+        <option value = 2>E2</option>
+        <option value = 3>E3</option>
+        <option value = 4>E4</option>
+        <option value = 5>E5</option>
+        <option value = 6>E6</option>
+        <option value = 7>E7</option>
+        <option value = 8>E8</option>
+        <option value = 9>E9</option>
+        <option value = 10>E10</option>
+        <option value = 11>E11</option>
+        <option value = 12>E12</option>
+      </select>
+      <div style="width: 10px;"></div>
+
+      <p style="margin: 0px;">Category:</p>
+      <div style="width: 10px;"></div>
+      <select style="width: 125px; margin: 0px;" name="Pages" aria-label="Select Category to look in" id="ss-category">
+        <option value = 0>Synthetic</option>
+        <option value = 1>Algebraic</option>
+        <option value = 2>Classical</option>
+      </select>
+      <div style="width: 10px;"></div>
+      <label style="margin: 0px;">Truncation:
+        <input type="checkbox" name="valid" id="truncation-checkbox"/>
+      </label>
+      <div style="width: 70px;">
+        <input style="margin: 0px;" type="number" min="1" max="50" name="Truncation" value="5" aria-label="Text">
+      </div>
+    </div>
+    <div style="width: 20px;"></div>
+  </div>
+
+  <!-- Bottom Left Info -->
+  <div class="floating-box" id="floatingBox" hidden>
+    <span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">×</span>
+    <h4>Need help?</h4>
+    <p>Chat with us or check our FAQ.</p>
+    <button>Contact Support</button>
+  </div>
+
+  <!-- Real Chart -->
+  <div class="visualizer" id="svgchart">
+
+  </div>
+</div>
+</body>
