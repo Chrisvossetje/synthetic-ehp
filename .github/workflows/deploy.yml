@@ -3,7 +3,7 @@ run-name: ${{ github.actor }} called this workflow 🚀
 on:  
   push:
     branches:
-      - master
+      - main
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
