@@ -272,6 +272,9 @@ export function update_chart() {
         if (!gens[d.from] || !gens[d.to]) {
             return false;
         }
+        if (!viewSettings.allDiffs && d.d != viewSettings.page) {
+            return false;
+        }
         if (gens[d.from][0] == undefined || gens[d.from][0] > 0) {
             if (gens[d.to][0] == undefined || gens[d.to][0] > 0) {
                 return true;
@@ -287,7 +290,10 @@ export function update_chart() {
         }
     });
     real_diffs.forEach((d) => {
-        const torsion = gens[d.from] ? gens[d.from][0] : null;
+        let torsion = d.coeff;
+        if (viewSettings.category != 0) {
+            torsion = 0;
+        }
         currentChart.display_diff(d.from, d.to, true, torsion);
     });
 

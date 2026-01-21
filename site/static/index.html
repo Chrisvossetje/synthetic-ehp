@@ -66,11 +66,26 @@
   </div>
 
   <!-- Bottom Left Info -->
-  <div class="floating-box" id="floatingBox" hidden>
-    <span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">×</span>
-    <h4>Need help?</h4>
-    <p>Chat with us or check our FAQ.</p>
-    <button>Contact Support</button>
+  <div class="floating-box" id="floatingBox">
+    <span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>
+    <h4>Legend</h4>
+    <pre style="background-color: #00000000; margin: 0;">
+A filled dot represents a class which 
+    survives the spectral sequences.
+
+Coloring for dots:
+
+<span style="color: black;">black</span> = F2[τ]
+<span style="color: #0080ff;">blue</span> = F2[τ]/τ
+<span style="color: red;">red</span> = F2[τ]/τ^2
+<span style="color: mediumseagreen;">green</span> = F2[τ]/τ^3
+
+For coefficients of differentials: 
+
+<span style="color: black">black</span> = 1
+<span style="color: #0080ff;">blue</span> = τ
+<span style="color: red;">red</span> = τ^2
+<span style="color: mediumseagreen;">green</span> = τ^3</pre>
   </div>
 
   <!-- Real Chart -->

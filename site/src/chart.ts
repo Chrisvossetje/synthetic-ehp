@@ -4,7 +4,7 @@ import { Differential, Generators, Multiplication } from "./types";
 
 type Point = [number, number];
 
-const TorsionColor = ["black", "cyan", "red", "darkgreen", ""];
+const TorsionColor = ["black", "#0080ff", "red", "mediumseagreen", "cyan", "purple"];
 
 export class Chart {
     public svgchart: SvgChart;
@@ -84,7 +84,7 @@ export class Chart {
         }
     }
 
-    display_diff(diff_from: string, diff_to: string, display: boolean) {
+    display_diff(diff_from: string, diff_to: string, display: boolean, torsion: number | null = null) {
         const key = `${diff_from}-${diff_to}`;
         const el = this.diffElements.get(key);
 
@@ -95,6 +95,9 @@ export class Chart {
         } else {
             el.style.visibility = "hidden";
         }
+
+        if (torsion == null) {torsion = 0};
+        el.style.stroke = TorsionColor[torsion];
     }
 
     display_mult(mult_from: string, mult_to: string, display: boolean) {
