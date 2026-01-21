@@ -4,7 +4,6 @@
   },
   "scripts": {
     "init": "rm -r -f ./_site && rm -r -f ./site/pkg && cp -r ./site/static ./_site",
-    "copy_folders": "cp -r ./rust-logic/pkg ./_site/pkg && cp -r ./rust-logic/pkg ./site/pkg",
     "build": "npm run init && esbuild ./site/src/main.ts --bundle --outfile=./_site/index.js --format=esm --target=es2016",
     "minify": "npm run init && esbuild ./site/src/main.ts --bundle --outfile=./_site/index.js --format=esm --target=es2016 --minify",
     "minify_alt": "esbuild ./site/src/main.ts --bundle --outfile=./_site/index.js --format=esm --target=es2016 --minify",

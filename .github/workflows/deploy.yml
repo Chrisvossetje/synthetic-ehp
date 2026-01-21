@@ -23,7 +23,6 @@ jobs:
           node-version: 18
       - run: npm ci
       - run: npm run init
-      - run: npm run copy_folders
       - run: npm run test
 
 
