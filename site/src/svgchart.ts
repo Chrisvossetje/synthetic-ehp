@@ -11,21 +11,15 @@ const CHART_CSS = `
 
 /* Generator dot styles */    
 .generator-dot {
-    fill: black;
-    r: 0.025;
+    r: 0.022;
     cursor: pointer;
     transition: all 0.15s ease;
-}
-
-.generator-dot-permanent {
-    fill: white;
-    stroke: black;
-    stroke-width: 0.012;
+    stroke-width: 0.01;
 }
 
 .generator-dot:hover {
     fill: #555;
-    r: 0.04;
+    r: 0.03;
     filter: drop-shadow(0 0 0.08 rgba(0,0,0,0.4));
 }
 
@@ -36,14 +30,14 @@ const CHART_CSS = `
 /* Differential line styles */
 .differential-line {
     stroke: #555;
-    stroke-width: 0.01;
+    stroke-width: 0.008;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .differential-line:hover {
     stroke: #666 !important;
-    stroke-width: 0.020 !important;
+    stroke-width: 0.016 !important;
     filter: drop-shadow(0 0 0.08 rgba(0,0,0,0.4));
 }
 
@@ -65,6 +59,22 @@ const CHART_CSS = `
     font-size: 0.035px;
     fill: #666;
     font-family: monospace;
+}
+
+/* Multiplication line styles - internal (softer color) */
+.multiplication-line-internal {
+    stroke: #8888;
+    stroke-width: 0.008;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* Multiplication line styles - external (more prominent) */
+.multiplication-line-external {
+    stroke: #444;
+    stroke-width: 0.01;
+    pointer-events: none;
+    opacity: 0.8;
 }
 `;
 

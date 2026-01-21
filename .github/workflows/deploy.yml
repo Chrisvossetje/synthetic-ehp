@@ -18,21 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          version: 'latest'
-
       - uses: actions/setup-node@v4
         with:
           node-version: 18
       - run: npm ci
-      - run: npm run init_dir
-      - name: Build with wasm-pack (env RUSTFLAGS)
-        run: wasm-pack build --release --target web
-        working-directory: ./rust-logic
-        env:
-          RUSTFLAGS: '--cfg getrandom_backend="wasm_js"'
+      - run: npm run init
       - run: npm run copy_folders
       - run: npm run test
 

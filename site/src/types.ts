@@ -17,7 +17,14 @@ export type Differential = {
     "proof": string | undefined,
 }
 
+export type Multiplication = {
+    "from": string,
+    "to": string,
+    "internal": boolean
+}
+
 export type SyntheticEHP = {
     "generators": Generators[],
-    "differentials": Differential[]
+    "differentials": Differential[],
+    "multiplications": Multiplication[]
 }

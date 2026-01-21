@@ -1,6 +1,6 @@
 import { ToStringMap } from "./stringmap";
 import { SvgChart } from "./svgchart";
-import { Differential, Generators } from "./types";
+import { Differential, Generators, Multiplication } from "./types";
 
 type Point = [number, number];
 
@@ -15,12 +15,14 @@ export class Chart {
     // All generators and differentials (complete data set)
     public generators: Generators[] = [];
     public differentials: Differential[] = [];
+    public multiplications: Multiplication[] = [];
 
     // Cached element references
     private dotElements: Map<string, SVGCircleElement> = new Map();
     private labelElements: Map<string, SVGTextElement> = new Map();
     private filtrationElements: Map<string, SVGTextElement> = new Map();
     private diffElements: Map<string, SVGLineElement> = new Map();
+    private multElements: Map<string, SVGLineElement> = new Map();
 
     // Track current bounds to avoid unnecessary zoom resets
     private currentBounds: [number, number, number, number] | null = null;
@@ -46,6 +48,11 @@ export class Chart {
         this.differentials = differentials;
     }
 
+    // Set all multiplications (complete data set)
+    set_all_multiplications(multiplications: Multiplication[]) {
+        this.multiplications = multiplications;
+    }
+
     display_dot(gen_name: string, display: boolean, permanent: boolean, torsion: number | null, filtration?: number) {
         const el = this.dotElements.get(gen_name);
         const labelEl = this.labelElements.get(gen_name);
@@ -67,19 +74,32 @@ export class Chart {
             if (filtrationEl) filtrationEl.style.visibility = "hidden";
         }
 
-        if (permanent) {
-            el.classList.add("generator-dot-permanent");
-        } else {
-            el.classList.remove("generator-dot-permanent");
-        }
-
         if (torsion == null) {torsion = 0};
-        el.style.fill = TorsionColor[torsion];
+        if (permanent) {
+            el.style.fill = TorsionColor[torsion];
+            el.style.stroke = "";
+        } else {
+            el.style.fill = "white";
+            el.style.stroke = TorsionColor[torsion];
+        }
     }
 
     display_diff(diff_from: string, diff_to: string, display: boolean) {
         const key = `${diff_from}-${diff_to}`;
         const el = this.diffElements.get(key);
+
+        if (!el) return;
+
+        if (display) {
+            el.style.visibility = "visible";
+        } else {
+            el.style.visibility = "hidden";
+        }
+    }
+
+    display_mult(mult_from: string, mult_to: string, display: boolean) {
+        const key = `${mult_from}-${mult_to}`;
+        const el = this.multElements.get(key);
 
         if (!el) return;
 
@@ -123,6 +143,11 @@ export class Chart {
         return `<line class="differential-line" id="diff-${from}-${to}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="${style}" onclick="window.chartInstance.handleLineClickEvent('${from}', '${to}')"/>`;
     }
 
+    generate_mult(x1: number, y1: number, x2: number, y2: number, from: string, to: string, internal: boolean, style: string = "") {
+        const className = internal ? "multiplication-line-internal" : "multiplication-line-external";
+        return `<line class="${className}" id="mult-${from}-${to}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="${style}"/>`;
+    }
+
     generate_label(x: number, y: number, name: string) {
         // Position the label to the left of the dot using SVG text
         const labelX = x - 0.05; // Position to the left
@@ -142,6 +167,7 @@ export class Chart {
     init() {
         let dots = this.init_dots();
         let lines = this.init_diffs();
+        let mults = this.init_multiplications();
 
         // Calculate bounds from name_to_location
         let locations = Array.from(this.name_to_location.values());
@@ -167,7 +193,7 @@ export class Chart {
             this.currentBounds = newBounds;
         }
 
-        this.svgchart.replace_inner(lines + dots);
+        this.svgchart.replace_inner(lines + mults + dots);
 
         // Cache element references after SVG is populated
         this.cacheElementReferences();
@@ -179,6 +205,7 @@ export class Chart {
         this.labelElements.clear();
         this.filtrationElements.clear();
         this.diffElements.clear();
+        this.multElements.clear();
 
         // Cache dot, label, and filtration elements for each generator
         this.generators.forEach(gen => {
@@ -199,6 +226,16 @@ export class Chart {
             const diffEl = this.svgchart.shadowRoot.getElementById(`diff-${diff.from}-${diff.to}`) as unknown as SVGLineElement;
 
             if (diffEl) this.diffElements.set(key, diffEl);
+        });
+
+        // Cache multiplication line elements
+        this.multiplications.forEach(mult => {
+            if (!mult.from || !mult.to) return;
+
+            const key = `${mult.from}-${mult.to}`;
+            const multEl = this.svgchart.shadowRoot.getElementById(`mult-${mult.from}-${mult.to}`) as unknown as SVGLineElement;
+
+            if (multEl) this.multElements.set(key, multEl);
         });
     }
 
@@ -256,6 +293,23 @@ export class Chart {
             }
 
             return this.generate_diff(from_loc[0], from_loc[1], to_loc[0], to_loc[1], diff.from, diff.to, "");
+        }).join("\n");
+    }
+
+    init_multiplications(): string {
+        // Draw ALL multiplications
+        return this.multiplications.map(mult => {
+            if (!mult.from || !mult.to) return "";
+
+            let from_loc = this.name_to_location.get(mult.from);
+            let to_loc = this.name_to_location.get(mult.to);
+
+            if (!from_loc || !to_loc) {
+                console.warn(`Multiplication ${mult.from} -> ${mult.to} missing location`);
+                return "";
+            }
+
+            return this.generate_mult(from_loc[0], from_loc[1], to_loc[0], to_loc[1], mult.from, mult.to, mult.internal, "");
         }).join("\n");
     }
 

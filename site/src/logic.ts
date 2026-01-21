@@ -29,7 +29,8 @@ import { Differential, Generators, SyntheticEHP } from "./types";
 
 export let data: SyntheticEHP = {
     generators: [],
-    differentials: []
+    differentials: [],
+    multiplications: []
 };
 
 // Current view settings
@@ -76,6 +77,18 @@ function verify_integrity(): boolean {
         }
         if (diff.to && !names.has(diff.to)) {
             console.error(`Differential references unknown 'to' generator: ${diff.to}`);
+            return false;
+        }
+    }
+
+    // Each multiplication maps to / from a generator
+    for (const mult of data.multiplications) {
+        if (mult.from && !names.has(mult.from)) {
+            console.error(`Multiplication references unknown 'from' generator: ${mult.from}`);
+            return false;
+        }
+        if (mult.to && !names.has(mult.to)) {
+            console.error(`Multiplication references unknown 'to' generator: ${mult.to}`);
             return false;
         }
     }
@@ -210,6 +223,7 @@ export function fill_chart(chart: Chart) {
     // Set all generators and differentials (complete data set)
     chart.set_all_generators(data.generators);
     chart.set_all_differentials(data.differentials);
+    chart.set_all_multiplications(data.multiplications);
 
     chart.init();
 
@@ -229,18 +243,30 @@ export function update_chart() {
     data.differentials.forEach((d) => {
         currentChart.display_diff(d.from, d.to, false);
     });
+    data.multiplications.forEach((m) => {
+        currentChart.display_mult(m.from, m.to, false);
+    });
 
     const [gens, diffs] = get_filtered_data(false);
     const [perm_classes, _] = get_filtered_data(true);
 
     Object.entries(gens).forEach(([name, [torsion, filtration]]) => {
         if (torsion == undefined || torsion > 0) {
-            let perm = perm_classes[name] != undefined;
+            let perm = perm_classes[name] != undefined && (perm_classes[name][0] == undefined || perm_classes[name][0] > 0);
             currentChart.display_dot(name, true, perm, torsion, filtration);
         }
     });
     diffs.forEach((d) => {
         currentChart.display_diff(d.from, d.to, true);
+    });
+
+    // Display multiplications only when both generators are alive
+    data.multiplications.forEach((m) => {
+        const fromAlive = gens[m.from] && (gens[m.from][0] == undefined || gens[m.from][0] > 0);
+        const toAlive = gens[m.to] && (gens[m.to][0] == undefined || gens[m.to][0] > 0);
+        if (fromAlive && toAlive) {
+            currentChart.display_mult(m.from, m.to, true);
+        }
     });
 }
 

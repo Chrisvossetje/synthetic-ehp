@@ -4,8 +4,6 @@
   },
   "scripts": {
     "init": "npm run init_dir",
-    "init_dir": "rm -r -f ./_site && rm -r -f ./site/pkg && cp -r ./site/static ./_site",
-    "rust_build": "cd ./rust-logic && wasm-pack build --release --target web && cd ../ && npm run copy_folders",
     "copy_folders": "cp -r ./rust-logic/pkg ./_site/pkg && cp -r ./rust-logic/pkg ./site/pkg",
     "build": "npm run init && esbuild ./site/src/main.ts --bundle --outfile=./_site/index.js --format=esm --target=es2016",
     "minify": "npm run init && esbuild ./site/src/main.ts --bundle --outfile=./_site/index.js --format=esm --target=es2016 --minify",
