@@ -138,21 +138,21 @@ function get_differentials_for_page(page: number, allDiffs: boolean): Differenti
 /**
  * Get the filtered view based on current settings
  */
-export function get_filtered_data(perm_classes: boolean): [Object, Differential[]] {
+export function get_filtered_data(perm_classes: boolean, category: number, truncation: number | undefined, page: number, allDiffs: boolean): [Object, Differential[]] {
     // name -> torsion + adams filtration
     const torsion = new Object();
 
     data.generators.forEach((g) => {
-        if (!viewSettings.truncation || g.y < viewSettings.truncation) {
-            if (g.purely_algebraic && viewSettings.category == 1) { // Special Algebraic
+        if (!truncation || g.y < truncation) {
+            if (g.purely_algebraic && category == 1) { // Special Algebraic
                 torsion[g.name] = [undefined, g.adams_filtration];
             }
-            if (viewSettings.category == 2) { // Classical
+            if (category == 2) { // Classical
                 if (g.torsion == undefined) {
                     torsion[g.name] = [undefined, g.adams_filtration];
                 } 
             } else { 
-                if (viewSettings.category == 0) { // Synthetic 
+                if (category == 0) { // Synthetic 
                     torsion[g.name] = [g.torsion, g.adams_filtration];
                 } else { // Algebraic
                     torsion[g.name] = [undefined, g.adams_filtration];
@@ -161,42 +161,60 @@ export function get_filtered_data(perm_classes: boolean): [Object, Differential[
         }
     });
 
+    let diffs = [];
+
     // Find all generators killed by differentials before this page
     for (const diff of data.differentials) {
 
         // Make sure the elements exist
         if (torsion[diff.from] && torsion[diff.to]) {
 
-            if (diff.d < viewSettings.page || perm_classes) {
+            // Only calculate diffs which would have elemented before
+            if (diff.d < page || perm_classes) {
                 // Do it for synthetic
-                if (viewSettings.category == 0) {
+                if (category == 0) {
                     if (torsion[diff.to][0] == undefined) {
                         torsion[diff.from][0] = 0;
                         torsion[diff.to][0] = diff.coeff;
+                        diffs.push(diff);              
                     } else {
-                        if (torsion[diff.from] != undefined) {
-                            alert("Mapping from torsion to another torsion element, not yet supported");
+                        if (torsion[diff.from][0] > 0) {
+                            console.error(`For ${diff.from} -> ${diff.to}, ${torsion[diff.from]} | ${torsion[diff.to]}  Mapping from torsion to another torsion element, not yet supported`);
                         }
-                        torsion[diff.from][1] = torsion[diff.from][1] + (torsion[diff.to][0] - diff.coeff);
+
+                        if (torsion[diff.to][0] != 0) {
+                            console.log(torsion[diff.from])
+                            console.log(torsion[diff.to])
+                            torsion[diff.from][1] += torsion[diff.to][0];
+                            torsion[diff.to][0] = 0
+                            diffs.push(diff);              
+                            console.log(torsion[diff.from])
+                        }
                     }
-                } else { // Algebraic / Synthetic
-                    torsion[diff.from][0] = 0;
-                    torsion[diff.to][0] = 0;                    
+                } else if (category == 1) { // Algebraic
+                    if (diff.coeff == 0) {
+                        if (torsion[diff.to][0] || torsion[diff.to][0] != 0) {
+                            torsion[diff.from][0] = 0;
+                            torsion[diff.to][0] = 0;
+                            diffs.push(diff);              
+                        } else {
+                            // Element had already been killed ?
+                            // This cannot occur in algebraic ?
+                        }
+                    }
+                } else {
+                    if (torsion[diff.to][0] || torsion[diff.to][0] != 0) {
+                        torsion[diff.from][0] = 0;
+                        torsion[diff.to][0] = 0;  
+                        diffs.push(diff);                  
+                    } else {
+                        // Element had already been killed 
+                        // This can occur in classical !
+                    }               
                 }
             }
         }
     }
-
-    const diffs = data.differentials.filter((d) => {
-        if (!viewSettings.allDiffs && d.d != viewSettings.page) {
-            return false;
-        }
-        if (torsion[d.from] && torsion[d.from][0] != 0 && torsion[d.to] && torsion[d.to][0] != 0) {
-            return true;
-        } else {
-            return false;
-        }
-    });
 
     return [torsion, diffs]
 }
@@ -247,8 +265,20 @@ export function update_chart() {
         currentChart.display_mult(m.from, m.to, false);
     });
 
-    const [gens, diffs] = get_filtered_data(false);
-    const [perm_classes, _] = get_filtered_data(true);
+    const [gens, _] = get_filtered_data(false, viewSettings.category, viewSettings.truncation, viewSettings.page, viewSettings.allDiffs);
+    const [perm_classes, diffs] = get_filtered_data(true, viewSettings.category, viewSettings.truncation, viewSettings.page, viewSettings.allDiffs);
+
+    const real_diffs = diffs.filter((d) => {
+        if (!gens[d.from] || !gens[d.to]) {
+            return false;
+        }
+        if (gens[d.from][0] == undefined || gens[d.from][0] > 0) {
+            if (gens[d.to][0] == undefined || gens[d.to][0] > 0) {
+                return true;
+            }
+        }
+        return false;
+    });
 
     Object.entries(gens).forEach(([name, [torsion, filtration]]) => {
         if (torsion == undefined || torsion > 0) {
@@ -256,8 +286,9 @@ export function update_chart() {
             currentChart.display_dot(name, true, perm, torsion, filtration);
         }
     });
-    diffs.forEach((d) => {
-        currentChart.display_diff(d.from, d.to, true);
+    real_diffs.forEach((d) => {
+        const torsion = gens[d.from] ? gens[d.from][0] : null;
+        currentChart.display_diff(d.from, d.to, true, torsion);
     });
 
     // Display multiplications only when both generators are alive
