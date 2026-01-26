@@ -1,6 +1,9 @@
 import { xml } from "d3";
 import { Chart } from "./chart";
 import { Differential, Generators, SyntheticEHP } from "./types";
+import { algebraic_data } from "./algebraic_data";
+import { add_homotoptic_information } from "./data";
+import { verify_integrity, verify_stable } from "./verify";
 
 /*
  * SPECTRAL SEQUENCE OVER F2[t]
@@ -13,7 +16,8 @@ import { Differential, Generators, SyntheticEHP } from "./types";
  * DIFFERENTIAL BEHAVIOR:
  * When a differential d_r(x) = coeff * y occurs:
  *
- * 1. The SOURCE (x) always DIES on the E_{r+1} page
+ * 1. The SOURCE (x) DIES on the E_{r+1} page if y is torsion-free, else its adams filtration jumps
+ *      (We assume that our source is always a free F2[t]-module, but this is not checked yet)
  *
  * 2. The TARGET (y) behavior depends on the coefficient:
  *    - If coeff involves t (e.g., t, t^2, etc.) and y was FREE:
@@ -27,118 +31,52 @@ import { Differential, Generators, SyntheticEHP } from "./types";
  * This tracks how algebraic torsion propagates through the spectral sequence.
  */
 
-export let data: SyntheticEHP = {
-    generators: [],
-    differentials: [],
-    multiplications: []
-};
+export let data: SyntheticEHP = structuredClone(algebraic_data);
+
+export enum Category {
+    Synthetic,
+    Algebraic,
+    Classical
+}
 
 // Current view settings
 export let viewSettings = {
     allDiffs: true,
     page: 1,
-    category: 0, // 0: Synthetic, 1: Algebraic, 2: Classical
+    category: Category.Synthetic, // 0: Synthetic, 1: Algebraic, 2: Classical
     truncation: undefined as number | undefined
 };
 
+function sort_gens() {
+    data.generators.sort((a,b) => {
+        return a.adams_filtration - b.adams_filtration
+    });
+}
 function sort_diffs() {
     data.differentials.sort((a,b) => {
         return a.d - b.d
     });
 }
 
-export async function initdata(chart: Chart) {
-    fetch("./data.json").then(x => x.text()).then(x => {
-        data = JSON.parse(x);
-        sort_diffs();
-        if (!verify_integrity()) {
-            console.error("Data integrity has been compromised")
-        }
-        fill_chart(chart);
-    });
+export function initdata(chart: Chart) {
+    add_homotoptic_information();
+    
+    sort_gens();
+    sort_diffs();
+
+    verify_integrity(data);
+    verify_stable();
+    
+    
+
+    fill_chart(chart);
 }
-
-function verify_integrity(): boolean {
-    // Each generator has a unique name
-    const names = new Set<string>();
-    for (const gen of data.generators) {
-        if (names.has(gen.name)) {
-            console.error(`Duplicate generator name: ${gen.name}`);
-            return false;
-        }
-        names.add(gen.name);
-    }
-
-    // Each differential maps to / from a generator
-    for (const diff of data.differentials) {
-        if (diff.from && !names.has(diff.from)) {
-            console.error(`Differential references unknown 'from' generator: ${diff.from}`);
-            return false;
-        }
-        if (diff.to && !names.has(diff.to)) {
-            console.error(`Differential references unknown 'to' generator: ${diff.to}`);
-            return false;
-        }
-    }
-
-    // Each multiplication maps to / from a generator
-    for (const mult of data.multiplications) {
-        if (mult.from && !names.has(mult.from)) {
-            console.error(`Multiplication references unknown 'from' generator: ${mult.from}`);
-            return false;
-        }
-        if (mult.to && !names.has(mult.to)) {
-            console.error(`Multiplication references unknown 'to' generator: ${mult.to}`);
-            return false;
-        }
-    }
-
-    return true;
-}
-
-/**
- * Get differentials to display based on page and allDiffs setting
- */
-function get_differentials_for_page(page: number, allDiffs: boolean): Differential[] {
-    if (page === 1000) { // E∞ page - no differentials
-        return [];
-    }
-
-    if (allDiffs) {
-        // Show all differentials with d >= page
-        return data.differentials.filter(diff => diff.d >= page);
-    } else {
-        // Show only differentials for this page
-        return data.differentials.filter(diff => diff.d === page);
-    }
-}
-
-// /**
-//  * Apply category filtering
-//  * 0: Synthetic (normal)
-//  * 1: Algebraic (remove tau-multiple diffs, keep all gens)
-//  * 2: Classical (remove torsion gens, make tau-multiple diffs normal)
-//  */
-// function apply_category_filter(gens: Map<string, [number | undefined, number]>, diffs: Differential[], category: number): {gens: Map<string, [number | undefined, number]>, diffs: Differential[]} {
-//     if (category === 0) {
-//         // Synthetic: no changes
-//         return {gens, diffs};
-//     } else if (category === 1) {
-//         // Algebraic: keep all generators, remove tau-multiple differentials
-//         const filtered_diffs = diffs.filter(d => d.coeff === 0);
-//         return {gens, diffs: filtered_diffs};
-//     } else {
-//         // Classical: remove torsion generators, keep all differentials (tau-multiple become normal)
-//         const filtered_gens = gens.filter(g => g.torsion === undefined);
-//         return {gens: filtered_gens, diffs};
-//     }
-// }
 
 
 /**
  * Get the filtered view based on current settings
  */
-export function get_filtered_data(perm_classes: boolean, category: number, truncation: number | undefined, page: number, allDiffs: boolean): [Object, Differential[]] {
+export function get_filtered_data(data: SyntheticEHP, perm_classes: boolean, category: Category, truncation: number | undefined, page: number, allDiffs: boolean): [Object, Differential[]] {
     // name -> torsion + adams filtration
     const torsion = new Object();
 
@@ -172,7 +110,7 @@ export function get_filtered_data(perm_classes: boolean, category: number, trunc
             // Only calculate diffs which would have elemented before
             if (diff.d < page || perm_classes) {
                 // Do it for synthetic
-                if (category == 0) {
+                if (category == Category.Synthetic) {
                     if (torsion[diff.to][0] == undefined) {
                         torsion[diff.from][0] = 0;
                         torsion[diff.to][0] = diff.coeff;
@@ -185,13 +123,13 @@ export function get_filtered_data(perm_classes: boolean, category: number, trunc
                         if (torsion[diff.to][0] != 0) {
                             console.log(torsion[diff.from])
                             console.log(torsion[diff.to])
-                            torsion[diff.from][1] += torsion[diff.to][0];
+                            torsion[diff.from][1] -= torsion[diff.to][0];
                             torsion[diff.to][0] = 0
                             diffs.push(diff);              
                             console.log(torsion[diff.from])
                         }
                     }
-                } else if (category == 1) { // Algebraic
+                } else if (category == Category.Algebraic) { // Algebraic
                     if (diff.coeff == 0) {
                         if (torsion[diff.to][0] || torsion[diff.to][0] != 0) {
                             torsion[diff.from][0] = 0;
@@ -265,8 +203,8 @@ export function update_chart() {
         currentChart.display_mult(m.from, m.to, false);
     });
 
-    const [gens, _] = get_filtered_data(false, viewSettings.category, viewSettings.truncation, viewSettings.page, viewSettings.allDiffs);
-    const [perm_classes, diffs] = get_filtered_data(true, viewSettings.category, viewSettings.truncation, viewSettings.page, viewSettings.allDiffs);
+    const [gens, _] = get_filtered_data(data, false, viewSettings.category, viewSettings.truncation, viewSettings.page, viewSettings.allDiffs);
+    const [perm_classes, diffs] = get_filtered_data(data, true, viewSettings.category, viewSettings.truncation, viewSettings.page, viewSettings.allDiffs);
 
     const real_diffs = diffs.filter((d) => {
         if (!gens[d.from] || !gens[d.to]) {
@@ -291,7 +229,7 @@ export function update_chart() {
     });
     real_diffs.forEach((d) => {
         let torsion = d.coeff;
-        if (viewSettings.category != 0) {
+        if (viewSettings.category != Category.Synthetic) {
             torsion = 0;
         }
         currentChart.display_diff(d.from, d.to, true, torsion);

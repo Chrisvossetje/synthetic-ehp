@@ -2,6 +2,9 @@
 
 Displays the synthetic EHP. Also allows for view AEHP and normal EHP and its truncations.
 
+Curtis table from William Balderamma's website.
+Display based on my Ext resolver which is in turn based on the sseq project / d3.
+
 # How to run
 
 ## Prerequisites

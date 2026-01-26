@@ -65,9 +65,9 @@ export class Chart {
         }
 
         if (display) {
-            el.style.visibility = "visible";
-            if (labelEl) labelEl.style.visibility = "visible";
-            if (filtrationEl) filtrationEl.style.visibility = "visible";
+            el.style.visibility = null;
+            if (labelEl) labelEl.style.visibility = null;
+            if (filtrationEl) filtrationEl.style.visibility = null;
         } else {
             el.style.visibility = "hidden";
             if (labelEl) labelEl.style.visibility = "hidden";
@@ -91,7 +91,7 @@ export class Chart {
         if (!el) return;
 
         if (display) {
-            el.style.visibility = "visible";
+            el.style.visibility = null;
         } else {
             el.style.visibility = "hidden";
         }
@@ -107,7 +107,7 @@ export class Chart {
         if (!el) return;
 
         if (display) {
-            el.style.visibility = "visible";
+            el.style.visibility = null;
         } else {
             el.style.visibility = "hidden";
         }
