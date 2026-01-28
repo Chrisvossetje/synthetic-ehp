@@ -10,7 +10,7 @@ mod export;
 mod verification;
 mod data;
 
-const MAX_STEM: i32 = 21; // This is preferably always even
+const MAX_STEM: i32 = 23; // This is preferably always even
 const MAX_UNEVEN_INPUT: i32 = (MAX_STEM + 1) * 2;
 
 
@@ -42,12 +42,12 @@ fn main() {
 
     // add_final_diagonal(&mut data);
     write_typescript_file("../site/src/data.ts", &data).unwrap();
-    if  !verify_integrity(&data) {
+    if !verify_integrity(&data) {
         exit(1);
     }
     if !verify_self_coherence(&data) {
         exit(1);
-    }
+    }   
     if !verify_algebraic(&data) {
         exit(1);
     }

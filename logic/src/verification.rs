@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use itertools::Itertools;
 
 use crate::{
-    MAX_STEM, MAX_UNEVEN_INPUT,
-    naming::{generated_by_name, generating_name},
+    MAX_STEM,
+    naming::{generated_by_name},
     processor::get_filtered_data,
     types::{Category, SyntheticEHP},
 };
@@ -169,7 +169,7 @@ pub fn verify_algebraic(data: &SyntheticEHP) -> bool {
         for g in alg_gens {
             if g.1.0.is_none() {
                 let real_gen = data.find(&g.0).unwrap();
-                if real_gen.x <= MAX_STEM {
+                if real_gen.x >= MAX_STEM {
                     continue;
                 }
                 alg_names.insert(real_gen.name.clone());
@@ -179,7 +179,7 @@ pub fn verify_algebraic(data: &SyntheticEHP) -> bool {
 
         for g in synth_gens {
             let real_gen = data.find(&g.0).unwrap();
-            if real_gen.x <= MAX_STEM {
+            if real_gen.x >= MAX_STEM {
                 continue;
             }
             let x = real_gen.x;
@@ -187,12 +187,21 @@ pub fn verify_algebraic(data: &SyntheticEHP) -> bool {
                 if torsion != 0 {
                     synth_induced_names.insert(real_gen.induced_name.clone());
                     *synth_map.entry((x, g.1.1)).or_insert(0) += 1;
-                    *synth_map.entry((x + 1, g.1.1 - (torsion + 1))).or_insert(0) += 1;
+                    if x + 1 < MAX_STEM {
+                        *synth_map.entry((x + 1, g.1.1 - (torsion + 1))).or_insert(0) += 1;
+                    }
                 }
             } else {
                 synth_induced_names.insert(real_gen.induced_name.clone());
                 *synth_map.entry((x, g.1.1)).or_insert(0) += 1;
             }
+        }
+
+        if alg_map.len() != synth_map.len() {
+            eprintln!(
+                "Algebraic {sphere} sphere different amount of algebraic elements than the synthetic",
+            );
+            is_valid = false;
         }
 
         for (k, val) in alg_map.iter().sorted_by_key(|k| k.0.0) {

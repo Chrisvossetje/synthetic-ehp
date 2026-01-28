@@ -2,6 +2,7 @@ import { xml } from "d3";
 import { Chart } from "./chart";
 import { Differential, Generators, SyntheticEHP } from "./types";
 import { data, MAX_STEM } from "./data";
+import { ehpChart } from "./main";
 
 /*
  * SPECTRAL SEQUENCE OVER F2[t]
@@ -45,10 +46,6 @@ export let viewSettings = {
 
 export function find(name: string): Generators {
     return data.generators.find(g => g.name === name);
-}
-
-export function initdata(chart: Chart) {
-    fill_chart(chart);
 }
 
 export function generated_by_name(gen: Generators): string {
@@ -193,11 +190,7 @@ export function handleLineClick(from: string, to: string) {
     console.log(diff);
 }
 
-
-let currentChart: Chart | undefined = undefined;
 export function fill_chart(chart: Chart) {
-    currentChart = chart;
-
     // Bind click handlers
     chart.dotCallback = handleDotClick;
     chart.lineCallback = handleLineClick;
@@ -208,25 +201,21 @@ export function fill_chart(chart: Chart) {
     chart.set_all_multiplications(data.multiplications);
 
     chart.init();
-
-    // Update with filtered data
-    update_chart();
 }
 
 /**
- * Update the chart with current filter settings
+ * Update the EHP chart with current filter settings
  */
-export function update_chart() {
-    if (!currentChart) return;
-
+export function update_ehp_chart() {
+    // Hide all generators and differentials first
     data.generators.forEach((g) => {
-        currentChart.display_dot(g.name, false, false, undefined, g.adams_filtration);
+        ehpChart.display_dot(g.name, false, false, undefined, g.adams_filtration);
     });
     data.differentials.forEach((d) => {
-        currentChart.display_diff(d.from, d.to, false);
+        ehpChart.display_diff(d.from, d.to, false);
     });
     data.multiplications.forEach((m) => {
-        currentChart.display_mult(m.from, m.to, false);
+        ehpChart.display_mult(m.from, m.to, false);
     });
 
     const [gens, _] = get_filtered_data(data, false, viewSettings.category, viewSettings.truncation, viewSettings.page, viewSettings.allDiffs);
@@ -250,7 +239,7 @@ export function update_chart() {
     Object.entries(gens).forEach(([name, [torsion, filtration]]) => {
         if (torsion == undefined || torsion > 0) {
             let perm = perm_classes[name] != undefined && (perm_classes[name][0] == undefined || perm_classes[name][0] > 0);
-            currentChart.display_dot(name, true, perm, torsion, filtration);
+            ehpChart.display_dot(name, true, perm, torsion, filtration);
         }
     });
     real_diffs.forEach((d) => {
@@ -258,7 +247,7 @@ export function update_chart() {
         if (viewSettings.category != Category.Synthetic) {
             torsion = 0;
         }
-        currentChart.display_diff(d.from, d.to, true, torsion);
+        ehpChart.display_diff(d.from, d.to, true, torsion);
     });
 
     // Display multiplications only when both generators are alive
@@ -266,7 +255,7 @@ export function update_chart() {
         const fromAlive = gens[m.from] && (gens[m.from][0] == undefined || gens[m.from][0] > 0);
         const toAlive = gens[m.to] && (gens[m.to][0] == undefined || gens[m.to][0] > 0);
         if (fromAlive && toAlive) {
-            currentChart.display_mult(m.from, m.to, true);
+            ehpChart.display_mult(m.from, m.to, true);
         }
     });
 }

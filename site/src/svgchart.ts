@@ -1,81 +1,11 @@
 import * as d3 from "d3";
+import { ChartMode } from "./chartMode";
+import { ASS_CHART_CSS, EHP_CHART_CSS } from "./svg_chart_styles";
 
 export const svgNS = 'http://www.w3.org/2000/svg';
 
 // Code originated from: https://github.com/SpectralSequences/sseq/
 // exact file at https://github.com/SpectralSequences/sseq/tree/master/svg-chart/chart.js
-
-const CHART_CSS = `
-:host { display: block; }
-.struct { stroke: black; fill: none; stroke-width: 0.03; }
-
-/* Generator dot styles */    
-.generator-dot {
-    cursor: pointer;
-    transition: all 0.15s ease;
-    stroke-width: 0.01;
-}
-
-.generator-dot:hover {
-    fill: #555;
-    r: 0.03;
-    filter: drop-shadow(0 0 0.08 rgba(0,0,0,0.4));
-}
-
-.generator-dot:active {
-    fill: #777;
-}
-
-/* Differential line styles */
-.differential-line {
-    stroke: #555;
-    stroke-width: 0.008;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.differential-line:hover {
-    stroke: #666 !important;
-    stroke-width: 0.016 !important;
-    filter: drop-shadow(0 0 0.08 rgba(0,0,0,0.4));
-}
-
-.differential-line:active {
-    stroke: #777 !important;
-}
-
-/* Generator label styles */
-.generator-label {
-    pointer-events: none;
-    font-size: 0.04px;
-    fill: #000;
-    font-family: monospace;
-}
-
-/* Filtration label styles */
-.generator-filtration-label {
-    pointer-events: none;
-    font-size: 0.035px;
-    fill: #666;
-    font-family: monospace;
-}
-
-/* Multiplication line styles - internal (softer color) */
-.multiplication-line-internal {
-    stroke: #8888;
-    stroke-width: 0.008;
-    pointer-events: none;
-    opacity: 0.6;
-}
-
-/* Multiplication line styles - external (more prominent) */
-.multiplication-line-external {
-    stroke: #444;
-    stroke-width: 0.01;
-    pointer-events: none;
-    opacity: 0.8;
-}
-`;
 
 
 /**
@@ -101,8 +31,10 @@ export class SvgChart extends HTMLElement {
      */
     static GRID_MARGIN = 0.5;
 
+    public mode: ChartMode;
+
     public minX: number;
-    public minY: number; 
+    public minY: number;
     public maxX: number;
     public maxY: number;
 
@@ -162,20 +94,26 @@ export class SvgChart extends HTMLElement {
         this.maxX = maxx + SvgChart.GRID_MARGIN;
         this.minY = Math.max(0, miny - SvgChart.GRID_MARGIN);
         this.maxY = maxy + SvgChart.GRID_MARGIN;
-        
-        // Zoom out to show the entire chart
-        const scaleX = this.width / (this.maxX - this.minX);
-        const scaleY = this.height / (this.maxY - this.minY);
-        const scale = Math.max(scaleX, scaleY); // Choose the smaller scale to ensure full visibility
 
-        // Reset zoom to fit the new size (y is now positive, going down)
-        this.zoom.transform(this.select, d3.zoomIdentity.scale(scale).translate(-this.minX, -this.minY));
+        // Call onResize first to ensure width/height are set
         this.onResize();
+
+        // Only apply zoom transform if width and height are valid
+        if (this.width && this.height && this.width > 0 && this.height > 0) {
+            // Zoom out to show the entire chart
+            const scaleX = this.width / (this.maxX - this.minX);
+            const scaleY = this.height / (this.maxY - this.minY);
+            const scale = Math.max(scaleX, scaleY); // Choose the smaller scale to ensure full visibility
+
+            // Reset zoom to fit the new size (y is now positive, going down)
+            this.zoom.transform(this.select, d3.zoomIdentity.scale(scale).translate(-this.minX, -this.minY));
+        }
     }
 
-    constructor() {
+    constructor(chartMode: ChartMode = ChartMode.EHP) {
         super();
 
+        this.mode = chartMode;
         this.attachShadow({ mode: 'open' });
 
         this.animationId = null;
@@ -189,9 +127,9 @@ export class SvgChart extends HTMLElement {
         this.svg = document.createElementNS(svgNS, 'svg');
         this.svg.setAttribute('xmlns', svgNS);
 
-
+        // Use different CSS based on mode
         const node = document.createElement('style');
-        node.textContent = CHART_CSS;
+        node.textContent = this.mode === ChartMode.ASS ? ASS_CHART_CSS : EHP_CHART_CSS;
 
         this.line_style = document.createElement('style');
         this.node_style = document.createElement('style');
@@ -202,20 +140,45 @@ export class SvgChart extends HTMLElement {
 
         this.shadowRoot.appendChild(this.svg);
 
+        if (chartMode == ChartMode.EHP) {
         this.svg.innerHTML = `
 <defs>
-  <pattern id="gridPattern" width="1" height="1" patternUnits="userSpaceOnUse">
+<pattern id="gridPattern" width="1" height="1" patternUnits="userSpaceOnUse">
     <rect width="1" height="1" fill="white" stroke="black" stroke-width="0.01" />
-  </pattern>
+</pattern>
 </defs>
 <rect id="xBlock" x="0" height="${SvgChart.MARGIN}" y="${-SvgChart.MARGIN}" fill="white"/>
 <rect id="yBlock" x="${-SvgChart.MARGIN}" width="${SvgChart.MARGIN}" y="0" fill="white"/>
 <g id="inner">
-  <rect id="grid" fill="url(#gridPattern)" />
-  <g id="contents"></g>
+<rect id="grid" fill="url(#gridPattern)" />
+<g id="contents"></g>
 </g>
 <g id="axisLabels"></g>
 `;
+        } else {
+this.svg.innerHTML = 
+`
+<defs>
+  <pattern id="smallGrid" width="1" height="1" patternUnits="userSpaceOnUse">
+    <path d="M 1 1 L 0 1 0 0" fill="none" stroke="black" stroke-width="0.01" />
+  </pattern>
+  <pattern id="bigGrid" width="4" height="4" patternUnits="userSpaceOnUse">
+    <rect width="4" height="4" fill="url(#smallGrid)" />
+    <path d="M 4 4 L 0 4 0 0" fill="none" stroke="black" stroke-width="0.03" />
+  </pattern>
+</defs>
+<g id="inner">
+  <rect id="grid" fill="url(#bigGrid)" />
+  <g id="contents"></g>
+</g>
+<rect id="xBlock" x="${-SvgChart.MARGIN}" height="${
+            SvgChart.MARGIN
+        }" y="0" fill="white"/>
+<rect id="yBlock" x="${-SvgChart.MARGIN}" width="${SvgChart.MARGIN}" fill="white"/>
+<path id="axis" stroke="black" stroke-width="2" fill="none" />
+<g id="axisLabels"></g>
+`
+        }
 
         for (const item of [
             'inner',
@@ -281,31 +244,39 @@ export class SvgChart extends HTMLElement {
             this.axisLabels.removeChild(this.axisLabels.firstChild);
         }
 
-        // Always show all row/column numbers (sep = 1)
         const sep = 1;
+        const isASS = this.mode === ChartMode.ASS;
 
-        // X-axis labels: only show x >= 0, positioned at center of boxes (x + 0.5)
+        // X-axis labels
         const minX = Math.max(0, Math.ceil(transform.invertX(0)));
         const maxX = Math.floor(transform.invertX(this.width));
 
         for (let x = minX; x <= maxX; x += sep) {
             const textNode = document.createElementNS(svgNS, 'text');
             textNode.textContent = x.toString();
-            textNode.setAttribute('x', transform.applyX(x + 0.5).toString());
+            // ASS: on grid lines (x), EHP: centered in boxes (x + 0.5)
+            const xPos = isASS ? x : x + 0.5;
+            textNode.setAttribute('x', transform.applyX(xPos).toString());
             textNode.setAttribute('y', (-SvgChart.LABEL_MARGIN).toString());
             textNode.setAttribute('text-anchor', 'middle');
             textNode.setAttribute('dominant-baseline', 'text-after-edge');
             this.axisLabels.appendChild(textNode);
         }
 
-        // Y-axis labels: only show y >= 0, positioned at center of boxes (y + 0.5)
+        // Y-axis labels
         const minY = Math.max(0, Math.ceil(transform.invertY(0)));
         const maxY = Math.floor(transform.invertY(this.height));
 
         for (let y = minY; y <= maxY; y += sep) {
             const textNode = document.createElementNS(svgNS, 'text');
-            textNode.textContent = y.toString();
-            textNode.setAttribute('y', transform.applyY(y + 0.5).toString());
+            // ASS: show flipped value (0 at bottom), EHP: normal value
+            const displayY = isASS ? Math.round(this.maxY - y) : y;
+            if (isASS && (displayY < 0 || displayY > this.maxY)) continue;
+
+            textNode.textContent = displayY.toString();
+            // ASS: on grid lines (y), EHP: centered in boxes (y + 0.5)
+            const yPos = isASS ? y : y + 0.5;
+            textNode.setAttribute('y', transform.applyY(yPos).toString());
             textNode.setAttribute('x', (-SvgChart.LABEL_MARGIN).toString());
             textNode.setAttribute('text-anchor', 'end');
             textNode.setAttribute('dominant-baseline', 'middle');
@@ -324,6 +295,11 @@ export class SvgChart extends HTMLElement {
         }
 
         const size = this.getBoundingClientRect();
+
+        // Skip if element is not visible (display: none) - size will be 0
+        if (size.width === 0 || size.height === 0) {
+            return;
+        }
 
         this.height = size.height - SvgChart.MARGIN;
         this.width = size.width - SvgChart.MARGIN;

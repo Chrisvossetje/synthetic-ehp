@@ -1,6 +1,7 @@
 import { ToStringMap } from "./stringmap";
 import { SvgChart } from "./svgchart";
 import { Differential, Generators, Multiplication } from "./types";
+import { ChartMode } from "./chartMode";
 
 type Point = [number, number];
 
@@ -27,15 +28,54 @@ export class Chart {
     // Track current bounds to avoid unnecessary zoom resets
     private currentBounds: [number, number, number, number] | null = null;
 
+    // Chart display mode (EHP vs ASS)
+    public readonly mode: ChartMode;
+
     public dotCallback: Function;
     public lineCallback: Function;
 
-    constructor() {
-        this.svgchart = new SvgChart();
-        document.getElementById("svgchart").append(this.svgchart);
+    constructor(containerId: string, mode: ChartMode) {
+        this.mode = mode;
+        // Pass mode to SvgChart for appropriate styling
+        this.svgchart = new SvgChart(mode);
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.append(this.svgchart);
+        }
+    }
 
-        // Make click handlers available globally so SVG onclick can access them
-        (window as any).chartInstance = this;
+    /**
+     * Show this chart
+     */
+    show() {
+        const container = this.svgchart.parentElement;
+        if (container) {
+            container.style.display = 'block';
+            // Trigger resize and reapply zoom after showing to ensure proper dimensions
+            setTimeout(() => {
+                if (this.currentBounds) {
+                    // Reapply size settings now that the element is visible
+                    this.svgchart.set_size(
+                        this.currentBounds[0],
+                        this.currentBounds[1],
+                        this.currentBounds[2],
+                        this.currentBounds[3]
+                    );
+                } else {
+                    this.svgchart.onResize();
+                }
+            }, 0);
+        }
+    }
+
+    /**
+     * Hide this chart
+     */
+    hide() {
+        const container = this.svgchart.parentElement;
+        if (container) {
+            container.style.display = 'none';
+        }
     }
 
     // Set all generators (complete data set)
@@ -137,7 +177,8 @@ export class Chart {
     }
 
     generate_dot(x: number, y: number, name: string, style: string = "") {
-        return `<circle class="generator-dot" id="dot-${name}" cx="${x}" cy="${y}" r="0.022" style="${style}" onclick="window.chartInstance.handleDotClickEvent('${name}')"/>`;
+        const radius = this.mode === ChartMode.ASS ? "0.03" : "0.022";
+        return `<circle class="generator-dot" id="dot-${name}" cx="${x}" cy="${y}" r="${radius}" style="${style}" onclick="window.chartInstance.handleDotClickEvent('${name}')"/>`;
     }
 
     generate_diff(x1: number, y1: number, x2: number, y2: number, from: string, to: string, style: string = "") {
@@ -159,7 +200,7 @@ export class Chart {
         return `<text class="generator-label" id="label-${name}" x="${labelX}" y="${labelY}" text-anchor="end" dominant-baseline="middle">${name}</text>`;
     }
 
-    generate_filtration_label(x: number, y: number, name: string, filtration: number, filtrationName: string = "adams filtration") {
+    generate_filtration_label(x: number, y: number, name: string, filtration: number) {
         // Position the label to the right of the dot using SVG text
         const labelX = x + 0.05; // Position to the right
         const labelY = y; // Vertically centered with dot
@@ -257,19 +298,38 @@ export class Chart {
             }
         });
 
+        // Determine positioning based on mode
+        const isASS = this.mode === ChartMode.ASS;
+        const xOffset = isASS ? 0 : 0.5;  // ASS: on grid lines; EHP: centered
+        const yOffset = isASS ? 0 : 0.5;
+
         // Generate SVG for each group, offsetting if multiple generators at same location
-        // Dots are centered in grid squares (at integer + 0.5)
         let dots = "";
         let labels = "";
         let filtrationLabels = "";
+
+        // Find max Y for flipping in ASS mode
+        const maxY = isASS ? Math.max(...this.generators.map(g => g.y)) : 0;
 
         Object.values(temp.map).forEach((gens) => {
             gens.forEach((gen, index) => {
                 const step = 0.08;
                 const offset = -((gens.length - 1) / 2) * step;
-                const x = gen.x + 0.5 + offset + index * step;
-                const yOffset = offset + index * step ;
-                const y = gen.y + 0.5 - yOffset;
+
+                // Apply mode-specific offsets
+                let x = gen.x + xOffset + offset + index * step;
+                const yOffsetAdjust = offset + index * step;
+
+                let y: number;
+                if (isASS) {
+                    // ASS mode: flip Y so y=0 appears at bottom
+                    // Map gen.y=0 -> maxY, gen.y=maxY -> 0
+                    y = (maxY - gen.y) + yOffset + yOffsetAdjust;
+                } else {
+                    // EHP mode: normal Y axis (y=0 at top)
+                    y = gen.y + yOffset - yOffsetAdjust;
+                }
+
                 this.name_to_location.set(gen.name, [x, y]);
 
                 dots += this.generate_dot(x, y, gen.name, "") + "\n";

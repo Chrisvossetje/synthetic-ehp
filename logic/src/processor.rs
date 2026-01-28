@@ -1,9 +1,8 @@
 use crate::data::{get_diffs, get_induced_names};
-use crate::{MAX_STEM, MAX_UNEVEN_INPUT};
-use crate::types::{Category, Differential, Generator, SyntheticEHP};
-use crate::naming::{generated_by_name, generating_name};
-use std::collections::{HashMap, HashSet};
-use std::process::exit;
+use crate::{MAX_STEM};
+use crate::types::{Category, Differential, SyntheticEHP};
+use crate::naming::{generating_name};
+use std::collections::{HashMap};
 use itertools::Itertools;
 
 
