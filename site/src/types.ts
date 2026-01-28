@@ -3,9 +3,9 @@ export type Generators = {
     "x": number;
     "y": number;
     "adams_filtration": number,
-    "hom_name"?: string;
     "torsion"?: number,
-    "purely_algebraic"?: boolean,
+    "alg_name"?: string;
+    "hom_name"?: string;
 }
 
 export type Differential = {
@@ -13,7 +13,6 @@ export type Differential = {
     "to": string,
     "coeff": number,
     "d": number,
-    "adams_d"?: number,
     "proof"?: string,
 }
 

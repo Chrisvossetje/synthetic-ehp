@@ -11,7 +11,6 @@ const CHART_CSS = `
 
 /* Generator dot styles */    
 .generator-dot {
-    r: 0.022;
     cursor: pointer;
     transition: all 0.15s ease;
     stroke-width: 0.01;
@@ -167,7 +166,7 @@ export class SvgChart extends HTMLElement {
         // Zoom out to show the entire chart
         const scaleX = this.width / (this.maxX - this.minX);
         const scaleY = this.height / (this.maxY - this.minY);
-        const scale = Math.min(scaleX, scaleY); // Choose the smaller scale to ensure full visibility
+        const scale = Math.max(scaleX, scaleY); // Choose the smaller scale to ensure full visibility
 
         // Reset zoom to fit the new size (y is now positive, going down)
         this.zoom.transform(this.select, d3.zoomIdentity.scale(scale).translate(-this.minX, -this.minY));

@@ -1,9 +1,7 @@
 import { xml } from "d3";
 import { Chart } from "./chart";
 import { Differential, Generators, SyntheticEHP } from "./types";
-import { algebraic_data } from "./algebraic_data";
-import { add_homotoptic_information } from "./data";
-import { verify_integrity, verify_stable } from "./verify";
+import { data, MAX_STEM } from "./data";
 
 /*
  * SPECTRAL SEQUENCE OVER F2[t]
@@ -31,8 +29,6 @@ import { verify_integrity, verify_stable } from "./verify";
  * This tracks how algebraic torsion propagates through the spectral sequence.
  */
 
-export let data: SyntheticEHP = structuredClone(algebraic_data);
-
 export enum Category {
     Synthetic,
     Algebraic,
@@ -47,54 +43,69 @@ export let viewSettings = {
     truncation: undefined as number | undefined
 };
 
-function sort_gens() {
-    data.generators.sort((a,b) => {
-        return a.adams_filtration - b.adams_filtration
-    });
-}
-function sort_diffs() {
-    data.differentials.sort((a,b) => {
-        return a.d - b.d
-    });
+export function find(name: string): Generators {
+    return data.generators.find(g => g.name === name);
 }
 
 export function initdata(chart: Chart) {
-    add_homotoptic_information();
-    
-    sort_gens();
-    sort_diffs();
-
-    verify_integrity(data);
-    verify_stable();
-    
-    
-
     fill_chart(chart);
 }
 
+export function generated_by_name(gen: Generators): string {
+    const initial = gen.name.split("[")[0];
+
+    const split_first = initial.split(' ');
+    const end = "[" + String(split_first[0]) + "]";
+    if (split_first.length == 1) {
+        return end;
+    } else {
+        return split_first.slice(1).join(" ") + end;
+    }
+}
+
+export function generating_name(gen: Generators): string {
+    const [initial, last] = gen.name.split("[");
+    const real_last = last.split("]")[0];
+    if (initial == "") {
+        return real_last;
+    } else {
+        return real_last + " " + initial;
+    }
+}
+
+
+export function generates(gen: Generators): Generators[] {
+    let name = generating_name(gen);
+
+    let gens = [];
+    for (let index = 1; index <= MAX_STEM; index++) {
+        const element = name + "[" + String(index) + "]";
+        const g = find(element);
+        if (g) {
+            gens.push(g);
+        }
+    }
+    return gens;
+}
 
 /**
  * Get the filtered view based on current settings
  */
-export function get_filtered_data(data: SyntheticEHP, perm_classes: boolean, category: Category, truncation: number | undefined, page: number, allDiffs: boolean): [Object, Differential[]] {
+export function get_filtered_data(data: SyntheticEHP, perm_classes: boolean, category: Category, truncation: number | undefined, page: number, allDiffs: boolean, limit_x?: number): [Object, Differential[]] {
     // name -> torsion + adams filtration
     const torsion = new Object();
 
     data.generators.forEach((g) => {
-        if (!truncation || g.y < truncation) {
-            if (g.purely_algebraic && category == 1) { // Special Algebraic
+        if ((!truncation || g.y < truncation) && ((limit_x - 1 <= g.x && g.x <= limit_x + 1) || !limit_x)) {
+            if (category == Category.Algebraic) { // Special Algebraic
                 torsion[g.name] = [undefined, g.adams_filtration];
             }
-            if (category == 2) { // Classical
+            else if (category == Category.Classical) { // Classical
                 if (g.torsion == undefined) {
                     torsion[g.name] = [undefined, g.adams_filtration];
                 } 
             } else { 
-                if (category == 0) { // Synthetic 
-                    torsion[g.name] = [g.torsion, g.adams_filtration];
-                } else { // Algebraic
-                    torsion[g.name] = [undefined, g.adams_filtration];
-                }
+                torsion[g.name] = [g.torsion, g.adams_filtration];
             }
         }
     });
@@ -112,23 +123,32 @@ export function get_filtered_data(data: SyntheticEHP, perm_classes: boolean, cat
                 // Do it for synthetic
                 if (category == Category.Synthetic) {
                     if (torsion[diff.to][0] == undefined) {
+                        if (torsion[diff.from][0] == 0) {
+                            continue;
+                        } 
+
                         torsion[diff.from][0] = 0;
                         torsion[diff.to][0] = diff.coeff;
                         diffs.push(diff);              
                     } else {
-                        if (torsion[diff.from][0] > 0) {
-                            console.error(`For ${diff.from} -> ${diff.to}, ${torsion[diff.from]} | ${torsion[diff.to]}  Mapping from torsion to another torsion element, not yet supported`);
+                        if (torsion[diff.from][0] > 0 && torsion[diff.from][0] < torsion[diff.to][0]) {
+                            console.error(`For ${diff.from} -> ${diff.to}, ${torsion[diff.from]} | ${torsion[diff.to]}.  Mapping from lower torsion to another higher torsion element, This cannot happen !`);
                         }
-
+                            
+                        // This is where we have a diff mapping into a torsion module 
                         if (torsion[diff.to][0] != 0) {
-                            console.log(torsion[diff.from])
-                            console.log(torsion[diff.to])
+                            if (torsion[diff.from][0] > 0) {
+                                torsion[diff.from][0] -= torsion[diff.to][0];
+                            }
                             torsion[diff.from][1] -= torsion[diff.to][0];
                             torsion[diff.to][0] = 0
+
                             diffs.push(diff);              
-                            console.log(torsion[diff.from])
                         }
                     }
+                    
+
+                    
                 } else if (category == Category.Algebraic) { // Algebraic
                     if (diff.coeff == 0) {
                         if (torsion[diff.to][0] || torsion[diff.to][0] != 0) {
@@ -140,7 +160,11 @@ export function get_filtered_data(data: SyntheticEHP, perm_classes: boolean, cat
                             // This cannot occur in algebraic ?
                         }
                     }
-                } else {
+
+
+
+
+                } else { // Classical
                     if (torsion[diff.to][0] || torsion[diff.to][0] != 0) {
                         torsion[diff.from][0] = 0;
                         torsion[diff.to][0] = 0;  
@@ -159,16 +183,18 @@ export function get_filtered_data(data: SyntheticEHP, perm_classes: boolean, cat
 
 export function handleDotClick(dot: string) {
     console.log('Dot clicked:', dot);
-    const gen = data.generators.find(g => g.name === dot);
+    const gen = find(dot);
+    console.log(gen);
 }
 
 export function handleLineClick(from: string, to: string) {
     console.log('Line clicked:', from, '->', to);
     const diff = data.differentials.find(d => d.from === from && d.to === to);
+    console.log(diff);
 }
 
-let currentChart: Chart | undefined = undefined;
 
+let currentChart: Chart | undefined = undefined;
 export function fill_chart(chart: Chart) {
     currentChart = chart;
 

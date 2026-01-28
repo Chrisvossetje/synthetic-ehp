@@ -137,7 +137,7 @@ export class Chart {
     }
 
     generate_dot(x: number, y: number, name: string, style: string = "") {
-        return `<circle class="generator-dot" id="dot-${name}" cx="${x}" cy="${y}" style="${style}" onclick="window.chartInstance.handleDotClickEvent('${name}')"/>`;
+        return `<circle class="generator-dot" id="dot-${name}" cx="${x}" cy="${y}" r="0.022" style="${style}" onclick="window.chartInstance.handleDotClickEvent('${name}')"/>`;
     }
 
     generate_diff(x1: number, y1: number, x2: number, y2: number, from: string, to: string, style: string = "") {
