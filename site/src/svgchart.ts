@@ -50,6 +50,7 @@ export class SvgChart extends HTMLElement {
     public zoomTimeout: number;
 
     public inner: HTMLElement;
+    public axis: HTMLElement;
     public axisLabels: HTMLElement;
     public grid: HTMLElement;
     public contents: HTMLElement;
@@ -182,6 +183,7 @@ this.svg.innerHTML =
 
         for (const item of [
             'inner',
+            'axis',
             'axisLabels',
             'grid',
             'contents',

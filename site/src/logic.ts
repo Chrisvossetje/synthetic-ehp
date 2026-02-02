@@ -88,7 +88,7 @@ export function generates(gen: Generators): Generators[] {
 /**
  * Get the filtered view based on current settings
  */
-export function get_filtered_data(data: SyntheticEHP, perm_classes: boolean, category: Category, truncation: number | undefined, page: number, allDiffs: boolean, limit_x?: number): [Object, Differential[]] {
+export function get_filtered_data(data: SyntheticEHP, category: Category, truncation: number | undefined, page: number, allDiffs: boolean, limit_x?: number): [Object, Differential[]] {
     // name -> torsion + adams filtration
     const torsion = new Object();
 
@@ -116,52 +116,46 @@ export function get_filtered_data(data: SyntheticEHP, perm_classes: boolean, cat
         if (torsion[diff.from] && torsion[diff.to]) {
 
             // Only calculate diffs which would have elemented before
-            if (diff.d < page || perm_classes) {
-                // Do it for synthetic
-                if (category == Category.Synthetic) {
-                    if (torsion[diff.to][0] == undefined) {
-                        if (torsion[diff.from][0] == 0) {
-                            continue;
-                        } 
+            if (diff.d < page) {
+                
+                // Synthetic
+                if (category == Category.Synthetic) { 
+                    if (torsion[diff.to][0] == 0) {
+                        continue;
+                    }
+                    if (torsion[diff.from][0] == 0) {
+                        continue;
+                    }
 
+                    if (torsion[diff.to][0] == undefined) {
                         torsion[diff.from][0] = 0;
                         torsion[diff.to][0] = diff.coeff;
                         diffs.push(diff);              
-                    } else {
-                        if (torsion[diff.from][0] > 0 && torsion[diff.from][0] < torsion[diff.to][0]) {
-                            console.error(`For ${diff.from} -> ${diff.to}, ${torsion[diff.from]} | ${torsion[diff.to]}.  Mapping from lower torsion to another higher torsion element, This cannot happen !`);
-                        }
-                            
+                    } else {                         
                         // This is where we have a diff mapping into a torsion module 
-                        if (torsion[diff.to][0] != 0) {
-                            if (torsion[diff.from][0] > 0) {
-                                torsion[diff.from][0] -= torsion[diff.to][0];
-                            }
-                            torsion[diff.from][1] -= torsion[diff.to][0];
-                            torsion[diff.to][0] = 0
-
-                            diffs.push(diff);              
+                        if (torsion[diff.from][0] > 0) {
+                            torsion[diff.from][0] = torsion[diff.from][0] - torsion[diff.to][0] + diff.coeff;
                         }
-                    }
-                    
+                        torsion[diff.from][1] = torsion[diff.from][1] - torsion[diff.to][0] + diff.coeff;
+                        torsion[diff.to][0] = diff.coeff;
+                        diffs.push(diff);              
+                    }    
 
-                    
-                } else if (category == Category.Algebraic) { // Algebraic
+
+
+
+                // Algebraic
+                } else if (category == Category.Algebraic) { 
                     if (diff.coeff == 0) {
-                        if (torsion[diff.to][0] || torsion[diff.to][0] != 0) {
-                            torsion[diff.from][0] = 0;
-                            torsion[diff.to][0] = 0;
-                            diffs.push(diff);              
-                        } else {
-                            // Element had already been killed ?
-                            // This cannot occur in algebraic ?
-                        }
+                        torsion[diff.from][0] = 0;
+                        torsion[diff.to][0] = 0;
+                        diffs.push(diff);              
                     }
 
 
 
-
-                } else { // Classical
+                // Classical
+                } else { 
                     if (torsion[diff.to][0] || torsion[diff.to][0] != 0) {
                         torsion[diff.from][0] = 0;
                         torsion[diff.to][0] = 0;  
@@ -182,25 +176,90 @@ export function handleDotClick(dot: string) {
     console.log('Dot clicked:', dot);
     const gen = find(dot);
     console.log(gen);
+
+    if (!gen) return;
+
+    // Get generating name and what it generates
+    const genName = generated_by_name(gen);
+    const gensList = generates(gen);
+
+    // Build the info display
+    const floatingBox = document.getElementById('floatingBox');
+    if (!floatingBox) return;
+
+    let content = `<span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>`;
+    content += `<h4>Generator: ${gen.name}</h4>`;
+    content += `<pre style="background-color: #00000000; margin: 0;">`;
+    content += `x: ${gen.x}\n`;
+    content += `y: ${gen.y}\n`;
+    content += `Adams filtration: ${gen.adams_filtration}\n`;
+    content += `Module: ${gen.torsion !== undefined ? 'F2[τ]/τ^' + gen.torsion : 'F2[τ]'}\n`;
+
+    if (gen.alg_name) {
+        content += `Algebraic name: ${gen.alg_name}\n`;
+    }
+    if (gen.hom_name) {
+        content += `Homotopy name: ${gen.hom_name}\n`;
+    }
+    if (gen.induced_name) {
+        content += `Induced name: ${gen.induced_name}\n`;
+    }
+
+    content += `\n<b>Generating name:</b> ${genName}\n`;
+
+    if (gensList.length > 0) {
+        content += `\n<b>Generates:</b>\n`;
+        gensList.forEach(g => {
+            content += `  • ${g.name}\n`;
+        });
+    }
+
+    content += `</pre>`;
+
+    floatingBox.innerHTML = content;
+    floatingBox.style.display = 'block';
 }
 
 export function handleLineClick(from: string, to: string) {
     console.log('Line clicked:', from, '->', to);
     const diff = data.differentials.find(d => d.from === from && d.to === to);
     console.log(diff);
+
+    if (!diff) return;
+
+    // Build the info display
+    const floatingBox = document.getElementById('floatingBox');
+    if (!floatingBox) return;
+
+    let content = `<span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>`;
+    content += `<h4>Differential</h4>`;
+    content += `<pre style="background-color: #00000000; margin: 0;">`;
+    content += `From: ${diff.from}\n`;
+    content += `To: ${diff.to}\n`;
+    content += `Page: E${diff.d}\n`;
+    content += `Coefficient: ${diff.coeff === 0 ? '1' : 'τ^' + diff.coeff}\n`;
+    
+    if (diff.proof) {
+        content += `\nProof: ${diff.proof}\n`;
+    }
+    
+    content += `</pre>`;
+
+    floatingBox.innerHTML = content;
+    floatingBox.style.display = 'block';
 }
 
-export function fill_chart(chart: Chart) {
+export function fill_ehp_chart() {
     // Bind click handlers
-    chart.dotCallback = handleDotClick;
-    chart.lineCallback = handleLineClick;
+    ehpChart.dotCallback = handleDotClick;
+    ehpChart.lineCallback = handleLineClick;
 
     // Set all generators and differentials (complete data set)
-    chart.set_all_generators(data.generators);
-    chart.set_all_differentials(data.differentials);
-    chart.set_all_multiplications(data.multiplications);
+    ehpChart.set_all_generators(data.generators);
+    ehpChart.set_all_differentials(data.differentials);
+    ehpChart.set_all_multiplications(data.multiplications);
 
-    chart.init();
+    ehpChart.init();
 }
 
 /**
@@ -218,8 +277,8 @@ export function update_ehp_chart() {
         ehpChart.display_mult(m.from, m.to, false);
     });
 
-    const [gens, _] = get_filtered_data(data, false, viewSettings.category, viewSettings.truncation, viewSettings.page, viewSettings.allDiffs);
-    const [perm_classes, diffs] = get_filtered_data(data, true, viewSettings.category, viewSettings.truncation, viewSettings.page, viewSettings.allDiffs);
+    const [gens, _] = get_filtered_data(data, viewSettings.category, viewSettings.truncation, viewSettings.page, viewSettings.allDiffs);
+    const [perm_classes, diffs] = get_filtered_data(data, viewSettings.category, viewSettings.truncation, 1000, viewSettings.allDiffs);
 
     const real_diffs = diffs.filter((d) => {
         if (!gens[d.from] || !gens[d.to]) {

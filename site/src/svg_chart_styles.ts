@@ -1,4 +1,3 @@
-
 export const EHP_CHART_CSS = `
 :host { display: block; }
 .struct { stroke: black; fill: none; stroke-width: 0.03; }

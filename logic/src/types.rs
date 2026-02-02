@@ -23,7 +23,6 @@ pub struct Generator {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hom_name: Option<String>,
 
-    #[serde(skip_serializing)]
     pub induced_name: String,
 }
 
@@ -67,9 +66,13 @@ impl PartialOrd for Differential {
     }
 }
 
-impl Ord for Differential {    
+impl Ord for Differential {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        return self.d.cmp(&other.d);
+        if self.d == other.d {
+            return other.coeff.cmp(&self.coeff);
+        } else {
+            return self.d.cmp(&other.d);
+        }
     }
 }
 

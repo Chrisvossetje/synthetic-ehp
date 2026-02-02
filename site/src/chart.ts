@@ -44,6 +44,10 @@ export class Chart {
         }
     }
 
+    clear() {
+        this.svgchart.replace_inner("");
+    }
+
     /**
      * Show this chart
      */
@@ -177,7 +181,7 @@ export class Chart {
     }
 
     generate_dot(x: number, y: number, name: string, style: string = "") {
-        const radius = this.mode === ChartMode.ASS ? "0.03" : "0.022";
+        const radius = this.mode === ChartMode.ASS ? "0.08" : "0.022";
         return `<circle class="generator-dot" id="dot-${name}" cx="${x}" cy="${y}" r="${radius}" style="${style}" onclick="window.chartInstance.handleDotClickEvent('${name}')"/>`;
     }
 
@@ -208,10 +212,44 @@ export class Chart {
         return `<text class="generator-filtration-label" id="filtration-${name}" x="${labelX}" y="${labelY}" text-anchor="start" dominant-baseline="middle">${filtration}</text>`;
     }
 
+    generate_stable_line(): string {
+        // Only generate for EHP mode
+        if (this.mode !== ChartMode.EHP) {
+            return "";
+        }
+
+        // Calculate bounds from name_to_location
+        let locations = Array.from(this.name_to_location.values());
+        if (locations.length === 0) {
+            return "";
+        }
+
+        let x_col = locations.map(xy => xy[0]);
+        let maxX = Math.max(...x_col);
+
+        // Build the path: starts at y=1, goes right 3 units, down 1 unit, repeat
+        let pathData = "M 0 1"; // Start at (0, 1)
+        let currentX = 0;
+        let currentY = 1;
+
+        while (currentX < maxX + 3) {
+            // Go right 3 units
+            currentX += 3;
+            pathData += ` L ${currentX} ${currentY}`;
+
+            // Go down 1 unit
+            currentY += 1;
+            pathData += ` L ${currentX} ${currentY}`;
+        }
+
+        return `<path class="stable-line" d="${pathData}" stroke="#ff6b00" stroke-width="0.02" fill="none" stroke-dasharray="0.1,0.05"/>`;
+    }
+
     init() {
         let dots = this.init_dots();
         let lines = this.init_diffs();
         let mults = this.init_multiplications();
+        let stableLine = this.generate_stable_line();
 
         // Calculate bounds from name_to_location
         let locations = Array.from(this.name_to_location.values());
@@ -237,7 +275,8 @@ export class Chart {
             this.currentBounds = newBounds;
         }
 
-        this.svgchart.replace_inner(lines + mults + dots);
+        // Render in order: stable line (background), lines, mults, dots (foreground)
+        this.svgchart.replace_inner(stableLine + lines + mults + dots);
 
         // Cache element references after SVG is populated
         this.cacheElementReferences();

@@ -1,5 +1,5 @@
 use crate::data::{get_diffs, get_induced_names};
-use crate::{MAX_STEM};
+use crate::{MAX_STEM, MAX_VERIFY_STEM};
 use crate::types::{Category, Differential, SyntheticEHP};
 use crate::naming::{generating_name};
 use std::collections::{HashMap};
@@ -10,6 +10,9 @@ use itertools::Itertools;
 /// Add differentials to the data
 pub fn add_diffs(data: &mut SyntheticEHP) {
     for d in get_diffs() {
+        if d.coeff == 0 {
+            eprintln!("I would expect that added differentials cannot have coeff 0");
+        }
         data.insert_diff(d);
     }
 }
@@ -18,7 +21,7 @@ pub fn add_diffs(data: &mut SyntheticEHP) {
 pub fn add_induced_names(data: &mut SyntheticEHP) {
     for (g, induced_name) in get_induced_names() {
         if let Some(g) = data.find_mut(&g) {
-            g.induced_name = induced_name;
+            g.induced_name = induced_name[0].1.clone();
         }
     }
 }
@@ -87,7 +90,7 @@ pub fn get_filtered_data(
         if !torsion_map.contains_key(&diff.from) || !torsion_map.contains_key(&diff.to) {
             continue;
         }
-
+        
         if diff.d < page {
             match category {
                 Category::Synthetic => {
@@ -95,45 +98,49 @@ pub fn get_filtered_data(
                     let &(to_torsion, to_filt) = torsion_map.get(&diff.to).unwrap();
                     let &(from_torsion, from_filt) = torsion_map.get(&diff.from).unwrap();
 
+                    if let Some(t) = to_torsion {
+                        if t == 0 {continue;}
+                    }
+                    if let Some(t) = from_torsion {
+                        if t == 0 {continue;}
+                    }
+
+                    if to_filt != from_filt + 1 + diff.coeff {
+                        eprintln!("Oh Oh. From: {} | {from_filt} and to: {} | {to_filt} do not have compatible filtration, coeff: {}", diff.from, diff.to, diff.coeff);
+                    }
+
                     if to_torsion.is_none() {
-                        if let Some(from_torsion_t) = from_torsion {
-                            if from_torsion_t == 0 {
-                                continue;
-                            } else {
-                                // eprintln!("Oh oh, we have an induced map from torsion to torsion free. {} -> {}", diff.from, diff.to);
-                                // exit(1);
+                        if from_torsion.is_some() {
+                            if data.find(&diff.to).unwrap().x <= MAX_VERIFY_STEM {
+                                eprintln!("Oh oh, we have an induced map from torsion to torsion free. {} -> {}", diff.from, diff.to);
                             }
                         }
+
                         // Target is torsion-free, source dies and target becomes torsion
                         torsion_map.insert(diff.from.clone(), (Some(0), from_filt));
                         torsion_map.insert(diff.to.clone(), (Some(diff.coeff), to_filt));
                         result_diffs.push(diff.clone());
                     } else if let Some(to_torsion_val) = to_torsion {
                         if to_torsion_val != 0 {
-                            let from_torsion = torsion_map.get(&diff.from).unwrap().0;
+                            let new_from_filt = from_filt - to_torsion_val + diff.coeff;
 
                             if let Some(from_torsion_val) = from_torsion {
-                                if from_torsion_val >= 0 && from_torsion_val < to_torsion_val {
+                                // The following would map lower to higher torsion (with coeff)
+                                if from_torsion_val >= 0 && from_torsion_val + diff.coeff < to_torsion_val {
                                     eprintln!(
                                         "For {} -> {}, from_torsion={:?}, to_torsion={:?}. Mapping from lower to higher torsion!",
                                         diff.from, diff.to, from_torsion, to_torsion
                                     );
                                 }
+                                
+                                let new_to_torsion_val = from_torsion_val - to_torsion_val + diff.coeff;
+                                if new_to_torsion_val < 0 {eprintln!("Oh oh, we have negative torsion. This error should have been caught earlier (in mapping from lower torsion to higher torsion). From: {} | to: {}", diff.from, diff.to)}
+                                
+                                torsion_map.insert(diff.from.clone(), (Some(new_to_torsion_val), new_from_filt));
+                            } else {
+                                torsion_map.insert(diff.from.clone(), (None, new_from_filt));
                             }
-
-                            // Update torsion values
-                            let mut new_from_torsion = from_torsion;
-                            let mut new_from_filt = from_filt;
-
-                            if let Some(from_val) = new_from_torsion {
-                                if from_val > 0 {
-                                    new_from_torsion = Some(from_val - to_torsion_val);
-                                }
-                            }
-                            new_from_filt -= to_torsion_val;
-
-                            torsion_map.insert(diff.from.clone(), (new_from_torsion, new_from_filt));
-                            torsion_map.insert(diff.to.clone(), (Some(0), to_filt));
+                            torsion_map.insert(diff.to.clone(), (Some(diff.coeff), to_filt));
                             result_diffs.push(diff.clone());
                         }
                     }
@@ -142,13 +149,12 @@ pub fn get_filtered_data(
 
                 Category::Algebraic => {
                     if diff.coeff == 0 {
-                        let to_torsion = torsion_map.get(&diff.to).unwrap().0;
+                        let from_filt = torsion_map.get(&diff.from).unwrap().1;
                         let to_filt = torsion_map.get(&diff.to).unwrap().1;
-                        if to_torsion.is_some() || to_torsion != Some(0) {
-                            torsion_map.insert(diff.from.clone(), (Some(0), to_filt));
-                            torsion_map.insert(diff.to.clone(), (Some(0), to_filt));
-                            result_diffs.push(diff.clone());
-                        }
+
+                        torsion_map.insert(diff.from.clone(), (Some(0), from_filt));
+                        torsion_map.insert(diff.to.clone(), (Some(0), to_filt));
+                        result_diffs.push(diff.clone());
                     }
                 }
 
@@ -156,8 +162,10 @@ pub fn get_filtered_data(
                 Category::Classical => {
                     let to_torsion = torsion_map.get(&diff.to).unwrap().0;
                     let to_filt = torsion_map.get(&diff.to).unwrap().1;
-                    if to_torsion.is_some() || to_torsion != Some(0) {
-                        torsion_map.insert(diff.from.clone(), (Some(0), to_filt));
+                    let from_filt = torsion_map.get(&diff.from).unwrap().1;
+
+                    if to_torsion.is_none() || to_torsion != Some(0) {
+                        torsion_map.insert(diff.from.clone(), (Some(0), from_filt));
                         torsion_map.insert(diff.to.clone(), (Some(0), to_filt));
                         result_diffs.push(diff.clone());
                     }
