@@ -127,8 +127,8 @@ pub fn get_filtered_data(
                                 // The following would map lower to higher torsion (with coeff)
                                 if from_torsion_val >= 0 && from_torsion_val + diff.coeff < to_torsion_val {
                                     eprintln!(
-                                        "For {} -> {}, from_torsion={:?}, to_torsion={:?}. Mapping from lower to higher torsion!",
-                                        diff.from, diff.to, from_torsion, to_torsion
+                                        "For {} -> {}, from_torsion={:?}, to_torsion={:?}. Mapping from lower to higher torsion! Coeff: {}",
+                                        diff.from, diff.to, from_torsion, to_torsion, diff.coeff
                                     );
                                 }
                                 
