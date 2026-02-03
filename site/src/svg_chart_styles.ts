@@ -68,6 +68,14 @@ export const EHP_CHART_CSS = `
     pointer-events: none;
     opacity: 0.8;
 }
+
+/* Tau multiplication line styles */
+.tau-mult-line {
+    stroke: orange;
+    stroke-width: 0.008;
+    pointer-events: none;
+    opacity: 0.7;
+}
 `;
 
 export const ASS_CHART_CSS = `
@@ -140,5 +148,13 @@ export const ASS_CHART_CSS = `
     stroke-width: 0.015;
     pointer-events: none;
     opacity: 0.8;
+}
+
+/* Tau multiplication line styles - LARGER */
+.tau-mult-line {
+    stroke: orange;
+    stroke-width: 0.012;
+    pointer-events: none;
+    opacity: 0.7;
 }
 `;

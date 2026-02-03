@@ -49,6 +49,9 @@ pub struct Differential {
     pub d: i32,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub synthetic: Option<()>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<String>,
 }
 
@@ -62,7 +65,11 @@ impl Eq for Differential { }
 
 impl PartialOrd for Differential {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        return self.d.partial_cmp(&other.d);
+        if self.d == other.d {
+            return other.coeff.partial_cmp(&self.coeff);
+        } else {
+            return self.d.partial_cmp(&other.d);
+        }
     }
 }
 
@@ -77,10 +84,17 @@ impl Ord for Differential {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TauMult {
+    pub from: String,
+    pub to: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Multiplication {
     pub from: String,
     pub to: String,
     pub internal: bool,
+    pub kind: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,6 +102,7 @@ pub struct SyntheticEHP {
     pub generators: Vec<Generator>,
     pub differentials: Vec<Differential>,
     pub multiplications: Vec<Multiplication>,
+    pub tau_mults: Vec<TauMult>,
     pub find_map: HashMap<String, usize>,
 }
 

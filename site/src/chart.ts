@@ -1,6 +1,6 @@
 import { ToStringMap } from "./stringmap";
 import { SvgChart } from "./svgchart";
-import { Differential, Generators, Multiplication } from "./types";
+import { Differential, Generators, Multiplication, TauMult } from "./types";
 import { ChartMode } from "./chartMode";
 
 type Point = [number, number];
@@ -17,6 +17,7 @@ export class Chart {
     public generators: Generators[] = [];
     public differentials: Differential[] = [];
     public multiplications: Multiplication[] = [];
+    public tau_mults: TauMult[] = [];
 
     // Cached element references
     private dotElements: Map<string, SVGCircleElement> = new Map();
@@ -24,6 +25,7 @@ export class Chart {
     private filtrationElements: Map<string, SVGTextElement> = new Map();
     private diffElements: Map<string, SVGLineElement> = new Map();
     private multElements: Map<string, SVGLineElement> = new Map();
+    private tauMultElements: Map<string, SVGLineElement> = new Map();
 
     // Track current bounds to avoid unnecessary zoom resets
     private currentBounds: [number, number, number, number] | null = null;
@@ -97,6 +99,11 @@ export class Chart {
         this.multiplications = multiplications;
     }
 
+    // Set all tau multiplications (complete data set)
+    set_all_tau_mults(tau_mults: TauMult[]) {
+        this.tau_mults = tau_mults;
+    }
+
     display_dot(gen_name: string, display: boolean, permanent: boolean, torsion: number | null, filtration?: number) {
         const el = this.dotElements.get(gen_name);
         const labelEl = this.labelElements.get(gen_name);
@@ -157,6 +164,19 @@ export class Chart {
         }
     }
 
+    display_tau_mult(tau_mult_from: string, tau_mult_to: string, display: boolean) {
+        const key = `${tau_mult_from}-${tau_mult_to}`;
+        const el = this.tauMultElements.get(key);
+
+        if (!el) return;
+
+        if (display) {
+            el.style.visibility = null;
+        } else {
+            el.style.visibility = "hidden";
+        }
+    }
+
     // Methods callable from onclick handlers
     handleDotClickEvent(name: string) {
         if (this.dotCallback) {
@@ -194,6 +214,10 @@ export class Chart {
     generate_mult(x1: number, y1: number, x2: number, y2: number, from: string, to: string, internal: boolean, style: string = "") {
         const className = internal ? "multiplication-line-internal" : "multiplication-line-external";
         return `<line class="${className}" id="mult-${from}-${to}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="${style}"/>`;
+    }
+
+    generate_tau_mult(x1: number, y1: number, x2: number, y2: number, from: string, to: string, style: string = "") {
+        return `<line class="tau-mult-line" id="tau-mult-${from}-${to}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="${style}"/>`;
     }
 
     generate_label(x: number, y: number, name: string) {
@@ -249,6 +273,7 @@ export class Chart {
         let dots = this.init_dots();
         let lines = this.init_diffs();
         let mults = this.init_multiplications();
+        let tauMults = this.init_tau_mults();
         let stableLine = this.generate_stable_line();
 
         // Calculate bounds from name_to_location
@@ -275,8 +300,8 @@ export class Chart {
             this.currentBounds = newBounds;
         }
 
-        // Render in order: stable line (background), lines, mults, dots (foreground)
-        this.svgchart.replace_inner(stableLine + lines + mults + dots);
+        // Render in order: stable line (background), lines, mults, tau mults, dots (foreground)
+        this.svgchart.replace_inner(stableLine + lines + mults + tauMults + dots);
 
         // Cache element references after SVG is populated
         this.cacheElementReferences();
@@ -289,6 +314,7 @@ export class Chart {
         this.filtrationElements.clear();
         this.diffElements.clear();
         this.multElements.clear();
+        this.tauMultElements.clear();
 
         // Cache dot, label, and filtration elements for each generator
         this.generators.forEach(gen => {
@@ -319,6 +345,16 @@ export class Chart {
             const multEl = this.svgchart.shadowRoot.getElementById(`mult-${mult.from}-${mult.to}`) as unknown as SVGLineElement;
 
             if (multEl) this.multElements.set(key, multEl);
+        });
+
+        // Cache tau multiplication line elements
+        this.tau_mults.forEach(tauMult => {
+            if (!tauMult.from || !tauMult.to) return;
+
+            const key = `${tauMult.from}-${tauMult.to}`;
+            const tauMultEl = this.svgchart.shadowRoot.getElementById(`tau-mult-${tauMult.from}-${tauMult.to}`) as unknown as SVGLineElement;
+
+            if (tauMultEl) this.tauMultElements.set(key, tauMultEl);
         });
     }
 
@@ -412,6 +448,23 @@ export class Chart {
             }
 
             return this.generate_mult(from_loc[0], from_loc[1], to_loc[0], to_loc[1], mult.from, mult.to, mult.internal, "");
+        }).join("\n");
+    }
+
+    init_tau_mults(): string {
+        // Draw ALL tau multiplications
+        return this.tau_mults.map(tauMult => {
+            if (!tauMult.from || !tauMult.to) return "";
+
+            let from_loc = this.name_to_location.get(tauMult.from);
+            let to_loc = this.name_to_location.get(tauMult.to);
+
+            if (!from_loc || !to_loc) {
+                console.warn(`TauMult ${tauMult.from} -> ${tauMult.to} missing location`);
+                return "";
+            }
+
+            return this.generate_tau_mult(from_loc[0], from_loc[1], to_loc[0], to_loc[1], tauMult.from, tauMult.to, "");
         }).join("\n");
     }
 

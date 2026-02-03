@@ -127,6 +127,7 @@ fn parse_algebraic_data(
                 coeff: 0,
                 d: d_r,
                 proof: Some("Lifted AEHP differential.".to_string()),
+                synthetic: None,
             });
 
             if tag.stem == MAX_STEM {
@@ -141,6 +142,7 @@ fn parse_algebraic_data(
         generators,
         differentials,
         multiplications,
+        tau_mults: vec![],
         find_map: HashMap::new(),
     };
 

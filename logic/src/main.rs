@@ -1,6 +1,6 @@
-use std::process::exit;
+use std::{process::exit, time::Instant};
 
-use crate::{curtis::generate_algebraic_data, export::write_typescript_file, processor::{add_diffs, add_induced_names, compute_inductive_generators}, types::{Differential, Generator, SyntheticEHP}, verification::{verify_algebraic, verify_classical, verify_integrity, verify_self_coherence, verify_stable}};
+use crate::{curtis::generate_algebraic_data, export::write_typescript_file, processor::{add_diffs, add_induced_names, add_tau_mults, compute_inductive_generators}, types::{Differential, Generator, SyntheticEHP}, verification::{verify_algebraic, verify_classical, verify_integrity, verify_self_coherence, verify_stable}};
 
 mod curtis;
 mod types;
@@ -10,8 +10,9 @@ mod export;
 mod verification;
 mod data;
 
-const MAX_STEM: i32 = 26;
-const MAX_VERIFY_STEM: i32 = 22;
+const MAX_STEM: i32 = 27;
+const MAX_VERIFY_STEM: i32 = 24;
+const MAX_VERIFY_SPHERE: i32 = MAX_VERIFY_STEM + 5;
 const MAX_UNEVEN_INPUT: i32 = (MAX_STEM + 1) * 2;
 
 
@@ -29,16 +30,23 @@ pub fn add_final_diagonal(data: &mut SyntheticEHP) {
             coeff: 0,
             d: 1,
             proof: Some("Lifted AEHP differential.".to_string()),
+            synthetic: None,
         });
     }
 }
 
 fn main() {
+    let start = Instant::now();
+
     let mut data = generate_algebraic_data();
 
     add_diffs(&mut data);
     add_induced_names(&mut data);
+    add_tau_mults(&mut data);
 
+    data.differentials.sort();
+    
+    
     compute_inductive_generators(&mut data);
 
     // add_final_diagonal(&mut data);
@@ -70,6 +78,8 @@ fn main() {
 
     add_final_diagonal(&mut data);
     write_typescript_file("../site/src/data.ts", &data).unwrap();
+
+    println!("\nProgram took: {:.2?}", start.elapsed());
 }
 
 

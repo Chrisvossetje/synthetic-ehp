@@ -15,6 +15,7 @@ export type Differential = {
     "coeff": number,
     "d": number,
     "proof"?: string,
+    "synthetic"?,
 }
 
 export type Multiplication = {
@@ -23,8 +24,14 @@ export type Multiplication = {
     "internal": boolean
 }
 
+export type TauMult = {
+    "from": string,
+    "to": string
+}
+
 export type SyntheticEHP = {
     "generators": Generators[],
     "differentials": Differential[],
-    "multiplications": Multiplication[]
+    "multiplications": Multiplication[],
+    "tau_mults": TauMult[]
 }

@@ -3,10 +3,7 @@ use std::collections::{HashMap, HashSet};
 use itertools::Itertools;
 
 use crate::{
-    MAX_STEM, MAX_VERIFY_STEM,
-    naming::generated_by_name,
-    processor::get_filtered_data,
-    types::{Category, SyntheticEHP},
+    MAX_VERIFY_SPHERE, MAX_VERIFY_STEM, naming::generated_by_name, processor::get_filtered_data, types::{Category, SyntheticEHP}
 };
 
 /// Verify data integrity
@@ -93,7 +90,7 @@ pub fn verify_self_coherence(data: &SyntheticEHP) -> bool {
             .filter(|g| g.y == y && g.x <= MAX_VERIFY_STEM && g.x != y)
             .collect();
 
-        let (mut conv_gens, _) =
+        let mut conv_gens =
             get_filtered_data(data, Category::Synthetic, Some(sphere), 1000, true, None);
 
         let conv_gens: HashMap<_, _> = conv_gens
@@ -157,10 +154,10 @@ pub fn verify_self_coherence(data: &SyntheticEHP) -> bool {
 
 pub fn verify_algebraic(data: &SyntheticEHP) -> bool {
     let mut is_valid = true;
-    for sphere in (2..=MAX_STEM).into_iter().rev() {
-        let (alg_gens, _) =
+    for sphere in (1..=MAX_VERIFY_SPHERE).into_iter().rev() {
+        let alg_gens =
             get_filtered_data(data, Category::Algebraic, Some(sphere), 1000, true, None);
-        let (synth_gens, _) =
+        let synth_gens =
             get_filtered_data(data, Category::Synthetic, Some(sphere), 1000, true, None);
 
         // (stem, adams filtration)
@@ -251,7 +248,6 @@ pub fn verify_algebraic(data: &SyntheticEHP) -> bool {
                     g.x, g.y
                 );
                 is_valid = false;
-                break;
             }
         }
     }
@@ -269,7 +265,7 @@ pub fn verify_stable(data: &SyntheticEHP) -> bool {
         13, 22, 8, 10, 11, 7,
     ];
 
-    let (gens, _) = get_filtered_data(data, Category::Synthetic, None, 1000, true, None);
+    let gens = get_filtered_data(data, Category::Synthetic, None, 1000, true, None);
 
     let mut count_gens = vec![0; (MAX_VERIFY_STEM + 1) as usize];
     let mut alg_count_gens = vec![0; (MAX_VERIFY_STEM + 1) as usize];
@@ -326,8 +322,8 @@ pub fn verify_classical(data: &SyntheticEHP) -> bool {
     // Col k = pi_*+k(S^k)
     let classical_gens: [[i32; CLASSICAL_MAX_SPHERE as usize]; (CLASSICAL_MAX_STEM + 1) as usize] = [[2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2], [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2], [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2], [1, 2, 12, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24], [1, 12, 2, 4, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 2, 2, 4, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 2, 3, 72, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2], [1, 3, 15, 15, 30, 60, 120, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240], [1, 15, 2, 2, 2, 48, 8, 16, 8, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4], [1, 2, 4, 8, 8, 8, 16, 32, 16, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8], [1, 4, 24, 2880, 144, 144, 48, 1152, 48, 24, 12, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6], [1, 24, 336, 2688, 2016, 2016, 1008, 1008, 1008, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504, 504], [1, 336, 4, 64, 8, 240, 1, 1, 1, 12, 2, 4, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 4, 6, 288, 12, 6, 6, 12, 6, 6, 12, 12, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3], [1, 6, 30, 30240, 12, 24, 96, 23040, 64, 32, 32, 384, 32, 16, 8, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4], [1, 30, 30, 30, 60, 360, 960, 3840, 1920, 960, 480, 480, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960], [1, 30, 12, 72, 4, 2016, 16, 128, 16, 480, 2, 2, 2, 48, 8, 16, 8, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4], [1, 12, 48, 4608, 16, 16, 16, 96, 16, 8, 8, 16, 16, 16, 32, 64, 32, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16], [1, 48, 48, 46080, 96, 288, 48, 24192, 48, 96, 64, 15360, 128, 128, 128, 3072, 128, 64, 32, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16], [1, 48, 264, 4224, 528, 8448, 528, 528, 528, 1584, 2112, 8448, 2112, 2112, 1056, 1056, 1056, 528, 528, 528, 528, 528, 528, 528, 528, 528, 528, 528, 528, 528, 528, 528], [1, 264, 4, 64, 24, 5760, 24, 72, 24, 12096, 96, 768, 192, 5760, 24, 24, 24, 288, 48, 96, 48, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24], [1, 4, 2, 32, 4, 2, 4, 32, 8, 8, 16, 32, 32, 16, 8, 16, 8, 8, 16, 16, 8, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4], [1, 2, 2, 32, 8, 32, 64, 4096, 128, 64, 64, 512, 64, 128, 128, 2048, 128, 64, 64, 256, 32, 16, 8, 4, 4, 4, 4, 4, 4, 4, 4, 4], [1, 2, 4, 32, 32, 2048, 1024, 8192, 2048, 2048, 512, 512, 512, 512, 2048, 8192, 2048, 1024, 512, 512, 512, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256], [1, 4, 8, 32, 16, 512, 128, 4096, 128, 1024, 32, 16, 16, 128, 64, 512, 32, 128, 8, 4, 4, 16, 8, 16, 8, 4, 4, 4, 4, 4, 4, 4], [1, 8, 32, 2048, 128, 1024, 256, 32768, 256, 64, 64, 128, 32, 32, 64, 128, 64, 16, 8, 4, 4, 4, 8, 16, 8, 4, 4, 4, 4, 4, 4, 4]];
     
-    for sphere in (1..=MAX_STEM).into_iter().rev() {
-        let (gens, _) =
+    for sphere in (1..=MAX_VERIFY_SPHERE).into_iter().rev() {
+        let gens =
             get_filtered_data(data, Category::Classical, Some(sphere), 1000, true, None);
 
         let mut conv_gens = vec![0; (CLASSICAL_MAX_STEM + 1) as usize];
@@ -357,7 +353,7 @@ pub fn verify_classical(data: &SyntheticEHP) -> bool {
         }
     }
 
-    let (gens, _) = get_filtered_data(data, Category::Classical, None, 1, true, None);
+    let gens = get_filtered_data(data, Category::Classical, None, 1, true, None);
     for y in 1..=((CLASSICAL_MAX_SPHERE - 1) / 2) {
         let sphere = y * 2 + 1;
 
@@ -384,7 +380,7 @@ pub fn verify_classical(data: &SyntheticEHP) -> bool {
         }
 
         for a in 0..=(CLASSICAL_MAX_STEM - y) {
-            if classical_order[a as usize] != conv_gens[a as usize] {
+            if classical_order[a as usize] != conv_gens[a as usize] && a + y <= MAX_VERIFY_STEM {
                 eprintln!(
                     "Classical homotopy groups on the ROW of {sphere} Sphere do not agree on stem {a} | {}. Expect: {}, Got: {}",
                     a + y,

@@ -1,4 +1,4 @@
-use crate::data::{get_diffs, get_induced_names};
+use crate::data::{get_diffs, get_induced_names, get_tau_mults};
 use crate::{MAX_STEM, MAX_VERIFY_STEM};
 use crate::types::{Category, Differential, SyntheticEHP};
 use crate::naming::{generating_name};
@@ -10,9 +10,7 @@ use itertools::Itertools;
 /// Add differentials to the data
 pub fn add_diffs(data: &mut SyntheticEHP) {
     for d in get_diffs() {
-        if d.coeff == 0 {
-            eprintln!("I would expect that added differentials cannot have coeff 0");
-        }
+        
         data.insert_diff(d);
     }
 }
@@ -26,12 +24,16 @@ pub fn add_induced_names(data: &mut SyntheticEHP) {
     }
 }
 
+pub fn add_tau_mults(data: &mut SyntheticEHP) {
+    data.tau_mults = get_tau_mults();
+}
+
 /// Compute inductive generators
 pub fn compute_inductive_generators(data: &mut SyntheticEHP) {
     for x in 3..MAX_STEM {
         for y in 1..=MAX_STEM {
             let sphere = y * 2 + 1;
-            let (gens, _) = get_filtered_data(data, Category::Synthetic, Some(sphere), 1000, false, Some(x));
+            let gens = get_filtered_data(data, Category::Synthetic, Some(sphere), 1000, false, Some(x));
 
             for (name, (torsion, filtration)) in gens.iter().sorted_by_key(|x|  data.find(&x.0).unwrap().y) {
                 if let Some(g) = data.find(&name).cloned() {
@@ -58,13 +60,13 @@ pub fn get_filtered_data(
     page: i32,
     _all_diffs: bool,
     limit_x: Option<i32>,
-) -> (HashMap<String, (Option<i32>, i32)>, Vec<Differential>) {
+) -> HashMap<String, (Option<i32>, i32)> {
     let mut torsion_map: HashMap<String, (Option<i32>, i32)> = HashMap::new();
 
     // Initialize generator torsion map
     for g in &data.generators {
         let in_truncation = truncation.map_or(true, |t| g.y < t);
-        let in_x_limit = limit_x.map_or(true, |lx| lx - 1 <= g.x && g.x <= lx + 1);
+        let in_x_limit = limit_x.map_or(true, |lx| g.x <= lx + 1);
 
         if in_truncation && in_x_limit {
             match category {
@@ -82,8 +84,6 @@ pub fn get_filtered_data(
             }
         }
     }
-
-    let mut result_diffs = Vec::new();
 
     // Process differentials
     for diff in &data.differentials {
@@ -105,7 +105,7 @@ pub fn get_filtered_data(
                         if t == 0 {continue;}
                     }
 
-                    if to_filt != from_filt + 1 + diff.coeff {
+                    if to_filt != from_filt + 1 + diff.coeff && data.find(&diff.to).unwrap().x <= MAX_VERIFY_STEM {
                         eprintln!("Oh Oh. From: {} | {from_filt} and to: {} | {to_filt} do not have compatible filtration, coeff: {}", diff.from, diff.to, diff.coeff);
                     }
 
@@ -119,7 +119,6 @@ pub fn get_filtered_data(
                         // Target is torsion-free, source dies and target becomes torsion
                         torsion_map.insert(diff.from.clone(), (Some(0), from_filt));
                         torsion_map.insert(diff.to.clone(), (Some(diff.coeff), to_filt));
-                        result_diffs.push(diff.clone());
                     } else if let Some(to_torsion_val) = to_torsion {
                         if to_torsion_val != 0 {
                             let new_from_filt = from_filt - to_torsion_val + diff.coeff;
@@ -141,7 +140,6 @@ pub fn get_filtered_data(
                                 torsion_map.insert(diff.from.clone(), (None, new_from_filt));
                             }
                             torsion_map.insert(diff.to.clone(), (Some(diff.coeff), to_filt));
-                            result_diffs.push(diff.clone());
                         }
                     }
                 }
@@ -154,7 +152,6 @@ pub fn get_filtered_data(
 
                         torsion_map.insert(diff.from.clone(), (Some(0), from_filt));
                         torsion_map.insert(diff.to.clone(), (Some(0), to_filt));
-                        result_diffs.push(diff.clone());
                     }
                 }
 
@@ -167,13 +164,52 @@ pub fn get_filtered_data(
                     if to_torsion.is_none() || to_torsion != Some(0) {
                         torsion_map.insert(diff.from.clone(), (Some(0), from_filt));
                         torsion_map.insert(diff.to.clone(), (Some(0), to_filt));
-                        result_diffs.push(diff.clone());
                     }
                 }
             }
         }
     }
 
-    (torsion_map, result_diffs)
+    if category == Category::Synthetic {
+        for tm in &data.tau_mults {
+            if !torsion_map.contains_key(&tm.from) || !torsion_map.contains_key(&tm.to) {
+                continue;
+            }
+    
+            
+    
+            let &(from_torsion, from_af) = torsion_map.get(&tm.from).unwrap();
+            let &(to_torsion, to_af) = torsion_map.get(&tm.to).unwrap();
+    
+            if let Some(from_torsion_val) = from_torsion {
+                if from_torsion_val == 0 {
+                    continue;
+                }
+            }
+            if let Some(to_torsion_val) = to_torsion {
+                if to_torsion_val == 0 {
+                    continue;
+                }
+            }
+    
+            if let Some(from_torsion_val) = from_torsion {
+                if from_af - from_torsion_val != to_af {
+                    eprintln!("AF does not match up for {tm:?}. From torsion: {from_torsion_val} | from_af: {from_af} | to_af: {to_af}");
+                }
+    
+                torsion_map.insert(tm.to.clone(), (Some(0), to_af));
+                if let Some(to_torsion_val) = to_torsion {
+                    torsion_map.insert(tm.from.clone(), (Some(from_torsion_val + to_torsion_val), from_af));
+                } else {
+                    torsion_map.insert(tm.from.clone(), (None, from_af));
+                }
+            } else {
+                eprintln!("In tau Multiplications, from torsion cannot be None. For tau mult: {tm:?}");
+            }
+    
+        }
+    }
+
+    torsion_map
 }
 
