@@ -10,9 +10,9 @@ mod export;
 mod verification;
 mod data;
 
-const MAX_STEM: i32 = 29;
-const MAX_VERIFY_STEM: i32 = 27;
-const MAX_VERIFY_SPHERE: i32 = MAX_VERIFY_STEM + 5;
+const MAX_STEM: i32 = 30;
+const MAX_VERIFY_STEM: i32 = 28;
+const MAX_VERIFY_SPHERE: i32 = MAX_VERIFY_STEM + 2;
 const MAX_UNEVEN_INPUT: i32 = (MAX_STEM + 1) * 2;
 
 

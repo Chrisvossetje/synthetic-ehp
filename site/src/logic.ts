@@ -179,6 +179,13 @@ export function handleDotClick(dot: string) {
 
     if (!gen) return;
 
+    // Copy generator name to clipboard
+    navigator.clipboard.writeText(gen.name).then(() => {
+        console.log('Copied to clipboard:', gen.name);
+    }).catch(err => {
+        console.error('Failed to copy to clipboard:', err);
+    });
+
     // Get generating name and what it generates
     const genName = generated_by_name(gen);
     const gensList = generates(gen);

@@ -413,7 +413,6 @@ pub fn get_diffs() -> Vec<Differential> {
 
 
         // Stem 27/28, 10 -> 12
-        // Sphere 6
         Differential {
             from: "8 4 1 1 2 4 1 1 1[5]".to_string(),
             to: "2 3 4 4 1 1 2 4 1 1 1[3]".to_string(),
@@ -423,7 +422,6 @@ pub fn get_diffs() -> Vec<Differential> {
             synthetic: Some(()),
         },
         // Stem 27/28, 10 -> 12
-        // Sphere 9
         Differential {
             from: "2 4 5 3 3 3[8]".to_string(),
             to: "2 4 1 1 2 4 3 3 3[4]".to_string(),
@@ -432,6 +430,92 @@ pub fn get_diffs() -> Vec<Differential> {
             proof: Some("Need to fix the algebraic convergence and delete an AF 8 element. There is only one AF 7 element which can do this.".to_string()),
             synthetic: Some(()),
         },
+        // Stem 27/28, 6 -> 9
+        Differential {
+            from: "3 6 2 3 3[11]".to_string(),
+            to: "1 2 3 4 4 1 1 1[10]".to_string(),
+            coeff: 2,
+            d: 1,
+            proof: Some("On the 13 sphere we need to kill the AF 7 element on y=5. To do this we need an element in degree 6 on the 13 sphere. The only element which can do this is 2 3 4 4 1 1 1[12]. This element will be made by having an unstable differential from 3 6 2 3 3[11] to 1 2 3 4 4 1 1 1[10].".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 27/28
+        Differential {
+            from: "2 3 4 4 1 1 1[12]".to_string(),
+            to: "6 2 3 4 4 1 1 1[5]".to_string(),
+            coeff: 0,
+            d: 7,
+            proof: Some("On the 13 sphere we need to kill the AF 7 element on y=5, the other AF 7 element can not be reached. To do this we need an element in degree 6 on the 13 sphere. The only element which can do this is 2 3 4 4 1 1 1[12]. This element will be made by having an unstable differential from 3 6 2 3 3[11] to 1 2 3 4 4 1 1 1[10].".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 27/28
+        Differential {
+            from: "2 4 3 3 3[13]".to_string(),
+            to: "3 5 7 3 3[6]".to_string(),
+            coeff: 0,
+            d: 7,
+            proof: Some("We need an algebraic element in AF 6 to die. These are the only possible target and source".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 27/28
+        Differential {
+            from: "12 1 1 1[13]".to_string(),
+            to: "2 3 4 4 1 1 1[11]".to_string(),
+            coeff: 2,
+            d: 2,
+            proof: Some("We need a differential here to not have a torsion to torsion free map on the next sphere. This is the only choice".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 27/28
+        Differential {
+            from: "6 2 3 3[14]".to_string(),
+            to: "6 6 5 3[7]".to_string(),
+            coeff: 1,
+            d: 7,
+            proof: Some("We need a differential here to not have a torsion to torsion free map on the next sphere. This is the only choice".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 27/28
+        Differential {
+            from: "7 7[14]".to_string(),
+            to: "13 3[11]".to_string(),
+            coeff: 0,
+            d: 3,
+            proof: Some("We need an AF3 element to die on the 16 sphere, this is the only choice.".to_string()),
+            synthetic: Some(()),
+        },
+
+
+
+        // Stem 28/29
+        Differential {
+            from: "2 2 2 4 5 3 3 3[4]".to_string(),
+            to: "1 2 4 1 1 2 4 3 3 3[3]".to_string(),
+            coeff: 1,
+            d: 1,
+            proof: Some("Only possibility to make the AF 8 element die.".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 28/29
+        Differential {
+            from: "3 6 2 3 3[12]".to_string(),
+            to: "3 6 6 5 3[5]".to_string(),
+            coeff: 0,
+            d: 7,
+            proof: Some("Only possibility to make the AF 6 element die.".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 28/29
+        Differential {
+            from: "2 3 5 7 3 3[6]".to_string(),
+            to: "2 4 1 1 2 4 3 3 3[5]".to_string(),
+            coeff: 2,
+            d: 1,
+            proof: Some("We need a stable differential from AF 7 to AF 9, this is the only possibility.".to_string()),
+            synthetic: Some(()),
+        },
+
+
 
     ]
 }
@@ -514,6 +598,16 @@ pub fn get_induced_names() -> Vec<(String, Vec<(i32, String)>)> {
             "2 4 1 1 2 4 3 3 3[4]".to_string(),
             vec![(5, "2 2 3 5 7 3 3[2]".to_string())],
         ),
+        
+        // Stem 28
+        (
+            "3 6 2 3 4 4 1 1 1[3]".to_string(),
+            vec![(5, "2 2 2 2 4 5 3 3 3[2]".to_string())],
+        ),
+        (
+            "2 4 1 1 2 4 3 3 3[5]".to_string(),
+            vec![(6, "2 2 2 4 5 3 3 3[4]".to_string())],
+        ),
     ]
 }
 
@@ -591,6 +685,21 @@ pub fn get_tau_mults() -> Vec<TauMult> {
             from: "1 2 4 3 3 3[11]".to_string(),
             to: "3 5 7 3 3[6]".to_string(),
         },
+        TauMult {
+            from: "6 5 3[13]".to_string(),
+            to: "13 3[11]".to_string(),
+        },
+        TauMult {
+            from: "6 5 3[14]".to_string(),
+            to: "6 2 3 3[14]".to_string(),
+        },
+        
+        // Stem 28
+        TauMult {
+            from: "2 2 4 3 3 3[11]".to_string(),
+            to: "3 6 6 5 3[5]".to_string(),
+        },
+
 
     ]
 }
