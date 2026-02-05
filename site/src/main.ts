@@ -183,7 +183,7 @@ function setupKeyboardControls() {
 
             case 'e':
             case 'E':
-                viewSettings.category = Category.Classical;
+                viewSettings.category = Category.Geometric;
                 categorySelect.value = '2';
                 needsUpdate = true;
                 break;

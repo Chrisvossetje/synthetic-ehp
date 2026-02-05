@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub enum Category {
     Synthetic,
     Algebraic,
-    Classical,
+    Geometric,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,7 +23,7 @@ pub struct Generator {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hom_name: Option<String>,
 
-    pub induced_name: String,
+    pub induced_name: Vec<(i32,String)>,
 }
 
 impl Generator {
@@ -36,8 +36,18 @@ impl Generator {
             torsion: None,
             alg_name: None,
             hom_name: None,
-            induced_name: name,
+            induced_name: vec![(0,name)],
         }
+    }
+
+    pub fn get_induced_name(&self, sphere: i32) -> &str {
+        // HERE I ASSUME THAT INDUCED NAME IS REVERSE SORTED!
+        for (id, name) in &self.induced_name {
+            if sphere >= *id {
+                return &name;
+            }
+        }
+        panic!("No element found?")
     }
 }
 

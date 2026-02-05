@@ -1,6 +1,6 @@
 use std::{process::exit, time::Instant};
 
-use crate::{curtis::generate_algebraic_data, export::write_typescript_file, processor::{add_diffs, add_induced_names, add_tau_mults, compute_inductive_generators}, types::{Differential, Generator, SyntheticEHP}, verification::{verify_algebraic, verify_classical, verify_integrity, verify_self_coherence, verify_stable}};
+use crate::{curtis::{generate_algebraic_data, generate_stable_algebraic_data}, export::write_typescript_file, processor::{add_diffs, add_induced_names, add_tau_mults, compute_inductive_generators}, types::{Differential, Generator, SyntheticEHP}, verification::{verify_algebraic, verify_geometric, verify_integrity, verify_self_coherence, verify_stable}};
 
 mod curtis;
 mod types;
@@ -10,8 +10,8 @@ mod export;
 mod verification;
 mod data;
 
-const MAX_STEM: i32 = 26;
-const MAX_VERIFY_STEM: i32 = 24;
+const MAX_STEM: i32 = 29;
+const MAX_VERIFY_STEM: i32 = 27;
 const MAX_VERIFY_SPHERE: i32 = MAX_VERIFY_STEM + 5;
 const MAX_UNEVEN_INPUT: i32 = (MAX_STEM + 1) * 2;
 
@@ -35,14 +35,12 @@ pub fn add_final_diagonal(data: &mut SyntheticEHP) {
     }
 }
 
-fn main() {
-    let start = Instant::now();
+fn ahss() {
+    let mut data = generate_stable_algebraic_data();
 
-    let mut data = generate_algebraic_data();
-
-    add_diffs(&mut data);
-    add_induced_names(&mut data);
-    add_tau_mults(&mut data);
+    // add_diffs(&mut data);
+    // add_induced_names(&mut data);
+    // add_tau_mults(&mut data);
 
     data.differentials.sort();
     
@@ -61,23 +59,58 @@ fn main() {
         exit(1);
     }   
 
-    println!("\n-----\nTesting Classical stable correctness\n-----\n");
+    add_final_diagonal(&mut data);
+    write_typescript_file("../site/src/data.ts", &data).unwrap();
+}
+
+fn ehp() {
+    let mut data = generate_algebraic_data();
+
+    add_diffs(&mut data);
+    add_induced_names(&mut data);
+    add_tau_mults(&mut data);
+
+    data.differentials.sort();
+    
+    compute_inductive_generators(&mut data);
+
+    // add_final_diagonal(&mut data);
+    write_typescript_file("../site/src/data.ts", &data).unwrap();
+    println!("\n-----\nTesting if data is well-defined, meaning differentials / multiplications understand have generators which exist.)\n-----\n");
+    if !verify_integrity(&data) {
+        exit(1);
+    }
+
+    println!("\n-----\nTesting if Synthetic data is self coherent. (Rows coincide with convergence of SS)\n-----\n");
+    if !verify_self_coherence(&data) {
+        exit(1);
+    }   
+
+    println!("\n-----\nTesting Geometric stable correctness\n-----\n");
     if !verify_stable(&data) {
         // exit(1);
     }
 
-    println!("\n-----\nTesting Classical unstable correctness\n-----\n");
-    if !verify_classical(&data) {
+    println!("\n-----\nTesting Geometric unstable correctness\n-----\n");
+    if !verify_geometric(&data) {
         // exit(1);
     }
 
-    println!("\n-----\nTesting Algebraic correctness (Both stably and unstably)\n-----\n");
+    println!("\n-----\nTesting Algebraic correctness (Both stably and unstably) between the synthetic and the algebraic data\n-----\n");
     if !verify_algebraic(&data) {
         // exit(1);
     }
+    
 
     add_final_diagonal(&mut data);
     write_typescript_file("../site/src/data.ts", &data).unwrap();
+}
+
+fn main() {
+    let start = Instant::now();
+
+    ehp();
+    
 
     println!("\nProgram took: {:.2?}", start.elapsed());
 }
@@ -88,37 +121,40 @@ fn main() {
 fn generate_table() {
     // Table copied from Google Sheets (tabs and newlines)
     // This contains the orders of the group 
-    let table_str = "2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2
-1	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2
-1	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2
-1	2	12	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24
-1	12	2	4	2	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
-1	2	2	4	2	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
-1	2	3	72	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2
-1	3	15	15	30	60	120	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240
-1	15	2	2	2	48	8	16	8	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4
-1	2	4	8	8	8	16	32	16	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8
-1	4	24	2880	144	144	48	1152	48	24	12	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6
-1	24	336	2688	2016	2016	1008	1008	1008	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504
-1	336	4	64	8	240	1	1	1	12	2	4	2	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
-1	4	6	288	12	6	6	12	6	6	12	12	6	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3
-1	6	30	30240	12	24	96	23040	64	32	32	384	32	16	8	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4
-1	30	30	30	60	360	960	3840	1920	960	480	480	960	960	960	960	960	960	960	960	960	960	960	960	960	960	960	960	960	960	960	960
-1	30	12	72	4	2016	16	128	16	480	2	2	2	48	8	16	8	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4
-1	12	48	4608	16	16	16	96	16	8	8	16	16	16	32	64	32	16	16	16	16	16	16	16	16	16	16	16	16	16	16	16
-1	48	48	46080	96	288	48	24192	48	96	64	15360	128	128	128	3072	128	64	32	16	16	16	16	16	16	16	16	16	16	16	16	16
-1	48	264	4224	528	8448	528	528	528	1584	2112	8448	2112	2112	1056	1056	1056	528	528	528	528	528	528	528	528	528	528	528	528	528	528	528
-1	264	4	64	24	5760	24	72	24	12096	96	768	192	5760	24	24	24	288	48	96	48	24	24	24	24	24	24	24	24	24	24	24
-1	4	2	32	4	2	4	32	8	8	16	32	32	16	8	16	8	8	16	16	8	4	4	4	4	4	4	4	4	4	4	4
-1	2	2	32	8	32	64	4096	128	64	64	512	64	128	128	2048	128	64	64	256	32	16	8	4	4	4	4	4	4	4	4	4
-1	2	4	32	32	2048	1024	8192	2048	2048	512	512	512	512	2048	8192	2048	1024	512	512	512	256	256	256	256	256	256	256	256	256	256	256
-1	4	8	32	16	512	128	4096	128	1024	32	16	16	128	64	512	64	128	8	4	4	16	8	16	8	4	4	4	4	4	4	4
-1	8	32	2048	128	1024	256	32768	256	64	64	128	32	32	64	128	64	16	8	4	4	4	8	16	8	4	4	4	4	4	4	4
-1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
-1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
-1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
-1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
-1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
+    let table_str = "2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2
+1	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2
+1	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2
+1	2	12	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24	24
+1	12	2	4	2	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
+1	2	2	4	2	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
+1	2	3	72	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2
+1	3	15	15	30	60	120	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240	240
+1	15	2	2	2	48	8	16	8	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4
+1	2	4	8	8	8	16	32	16	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8	8
+1	4	24	2880	144	144	48	1152	48	24	12	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6	6
+1	24	336	2688	2016	2016	1008	1008	1008	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504	504
+1	336	4	64	8	240	1	1	1	12	2	4	2	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
+1	4	6	288	12	6	6	12	6	6	12	12	6	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3	3
+1	6	30	30240	12	24	96	23040	64	32	32	384	32	16	8	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4
+1	30	30	30	60	360	960	3840	1920	960	480	480	960	960	960	960	960	960	960	960	960	960	960	960	960	960	960	960	960	960	960	960	1440	1920	2400
+1	30	12	72	4	2016	16	128	16	480	2	2	2	48	8	16	8	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4	4
+1	12	48	4608	16	16	16	96	16	8	8	16	16	16	32	64	32	16	16	16	16	16	16	16	16	16	16	16	16	16	16	16	16	16	16
+1	48	48	46080	96	288	48	24192	48	96	64	15360	128	128	128	3072	128	64	32	16	16	16	16	16	16	16	16	16	16	16	16	16	24	32	40
+1	48	264	4224	528	8448	528	528	528	1584	2112	8448	2112	2112	1056	1056	1056	528	528	528	528	528	528	528	528	528	528	528	528	528	528	528	792	1056	1320
+1	264	4	64	24	5760	24	72	24	12096	96	768	192	5760	24	24	24	288	48	96	48	24	24	24	24	24	24	24	24	24	24	24	24	24	24
+1	4	2	32	4	2	4	32	8	8	16	32	32	16	8	16	8	8	16	16	8	4	4	4	4	4	4	4	4	4	4	4	4	4	4
+1	2	2	32	8	32	64	4096	128	64	64	512	64	128	128	2048	128	64	64	256	32	16	8	4	4	4	4	4	4	4	4	4	4	4	4
+1	2	4	32	32	2048	1024	8192	2048	2048	512	512	512	512	2048	8192	2048	1024	512	512	512	256	256	256	256	256	256	256	256	256	256	256	384	512	640
+1	4	8	32	16	512	128	4096	128	1024	32	16	16	128	64	512	64	128	8	4	4	16	8	16	8	4	4	4	4	4	4	4	4	4	4
+1	8	32	2048	128	1024	256	32768	256	64	64	128	32	32	64	128	64	16	8	4	4	4	8	16	8	4	4	4	4	4	4	4	4	4	4
+1	32	32	32768	256	2048	512	540672	512	256	128	8192	128	32	32	256	32	32	32	256	32	32	32	256	32	16	8	4	4	4	4	4	4	4	4
+1	32	32	4096	128	1024	128	3072	128	256	256	512	128	32	8	8	8	8	32	128	32	32	16	16	16	8	8	8	8	8	8	8	8	8	8
+1	32	16	4096	32	512	16	128	32	128	64	256	16	64	2	2	2	16	8	64	16	32	2	2	2	8	4	8	4	2	2	2	2	2	2
+1	16	8	4096	64	64	128	16384	256	512	64	256	16	4	4	16	4	4	8	16	16	8	4	4	2	2	4	4	2	1	1	1	1	1	1
+1	8	8	1024	64	256	512	1048576	1024	1024	128	512	64	256	256	16384	256	64	64	512	64	128	128	1024	64	32	32	128	16	8	4	2	2	2	2
+1	8	16	256	32	1024	128	8192	256	512	32	128	64	1024	2048	4096	2048	1024	256	256	256	256	1024	4096	1024	512	256	256	256	-2	-2	-2	-2	-2	-2
+1	16	16	2048	32	2048	64	4096	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2
+1	16	8	4096	16	128	64	2048	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2	-2
 ";
 
     // Parse the string into a 2D Vec<i32>

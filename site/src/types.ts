@@ -3,7 +3,7 @@ export type Generators = {
     "x": number;
     "y": number;
     "adams_filtration": number,
-    "induced_name"?: string,
+    "induced_name": [number, string][],
     "torsion"?: number,
     "alg_name"?: string;
     "hom_name"?: string;

@@ -19,7 +19,9 @@ pub fn add_diffs(data: &mut SyntheticEHP) {
 pub fn add_induced_names(data: &mut SyntheticEHP) {
     for (g, induced_name) in get_induced_names() {
         if let Some(g) = data.find_mut(&g) {
-            g.induced_name = induced_name[0].1.clone();
+            for n in induced_name {
+                g.induced_name.insert(0, n);
+            }
         }
     }
 }
@@ -38,10 +40,16 @@ pub fn compute_inductive_generators(data: &mut SyntheticEHP) {
             for (name, (torsion, filtration)) in gens.iter().sorted_by_key(|x|  data.find(&x.0).unwrap().y) {
                 if let Some(g) = data.find(&name).cloned() {
                     if g.x == x {
-                        let target_name = format!("{}[{}]", generating_name(&g.induced_name), y);
+                        let target_name = format!("{}[{}]", generating_name(&g.get_induced_name(sphere)), y);
                         if let Some(g_target) = data.find_mut(&target_name) {
                             g_target.torsion = *torsion;
-                            g_target.adams_filtration = filtration + 1;
+                            if let Some(t) = *torsion {
+                                if t != 0 {
+                                    // g_target.adams_filtration = filtration + 1;
+                                }
+                            } else {
+                                // g_target.adams_filtration = filtration + 1;
+                            }
                         }
                     }
                 }
@@ -73,7 +81,7 @@ pub fn get_filtered_data(
                 Category::Algebraic => {
                     torsion_map.insert(g.name.clone(), (None, g.adams_filtration));
                 }
-                Category::Classical => {
+                Category::Geometric => {
                     if g.torsion.is_none() {
                         torsion_map.insert(g.name.clone(), (None, g.adams_filtration));
                     }
@@ -125,7 +133,7 @@ pub fn get_filtered_data(
 
                             if let Some(from_torsion_val) = from_torsion {
                                 // The following would map lower to higher torsion (with coeff)
-                                if from_torsion_val >= 0 && from_torsion_val + diff.coeff < to_torsion_val {
+                                if from_torsion_val >= 0 && from_torsion_val + diff.coeff < to_torsion_val && data.find(&diff.to).unwrap().x <= MAX_VERIFY_STEM {
                                     eprintln!(
                                         "For {} -> {}, from_torsion={:?}, to_torsion={:?}. Mapping from lower to higher torsion! Coeff: {}",
                                         diff.from, diff.to, from_torsion, to_torsion, diff.coeff
@@ -133,7 +141,9 @@ pub fn get_filtered_data(
                                 }
                                 
                                 let new_to_torsion_val = from_torsion_val - to_torsion_val + diff.coeff;
-                                if new_to_torsion_val < 0 {eprintln!("Oh oh, we have negative torsion. This error should have been caught earlier (in mapping from lower torsion to higher torsion). From: {} | to: {}", diff.from, diff.to)}
+                                if new_to_torsion_val < 0 &&  data.find(&diff.to).unwrap().x <= MAX_VERIFY_STEM {
+                                    eprintln!("Oh oh, we have negative torsion. This error should have been caught earlier (in mapping from lower torsion to higher torsion). From: {} | to: {}", diff.from, diff.to)
+                                }
                                 
                                 torsion_map.insert(diff.from.clone(), (Some(new_to_torsion_val), new_from_filt));
                             } else {
@@ -146,7 +156,7 @@ pub fn get_filtered_data(
 
 
                 Category::Algebraic => {
-                    if diff.coeff == 0 {
+                    if diff.coeff == 0 && diff.synthetic.is_none() {
                         let from_filt = torsion_map.get(&diff.from).unwrap().1;
                         let to_filt = torsion_map.get(&diff.to).unwrap().1;
 
@@ -156,7 +166,7 @@ pub fn get_filtered_data(
                 }
 
 
-                Category::Classical => {
+                Category::Geometric => {
                     let to_torsion = torsion_map.get(&diff.to).unwrap().0;
                     let to_filt = torsion_map.get(&diff.to).unwrap().1;
                     let from_filt = torsion_map.get(&diff.from).unwrap().1;

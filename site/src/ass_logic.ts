@@ -42,8 +42,10 @@ export function handleAssDotClick(dot: string) {
     if (gen.hom_name) {
         content += `Homotopy name: ${gen.hom_name}\n`;
     }
-    if (gen.induced_name) {
-        content += `Induced name: ${gen.induced_name}\n`;
+    const filteredInducedNames = gen.induced_name.filter(([num, _]) => num !== 0);
+    if (filteredInducedNames.length > 0) {
+        const namesList = filteredInducedNames.map(([_, name]) => name).join(', ');
+        content += `Induced name: ${namesList}\n`;
     }
 
     content += `\n<b>Generating name:</b> ${genName}\n`;
