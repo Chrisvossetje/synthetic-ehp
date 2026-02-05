@@ -102,6 +102,7 @@ export function update_ass_chart(
                 y: filtration,
                 adams_filtration: filtration,
                 torsion: torsion,
+                induced_name: [[0,g.name]]
             }
 
             gens.push(real_g);
