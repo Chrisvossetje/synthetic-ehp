@@ -203,7 +203,7 @@ export function handleDotClick(dot: string) {
     }
     const filteredInducedNames = gen.induced_name.filter(([num, _]) => num !== 0);
     if (filteredInducedNames.length > 0) {
-        const namesList = filteredInducedNames.map(([_, name]) => name).join(', ');
+        const namesList = filteredInducedNames.map(([sphere, name]) => `${name} (sphere ${sphere})`).join(', ');
         content += `Induced name: ${namesList}\n`;
     }
 
