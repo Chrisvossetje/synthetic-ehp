@@ -1,6 +1,7 @@
 use crate::data::{get_diffs, get_induced_names, get_tau_mults};
+use crate::stable_data::{get_stable_diffs, get_stable_tau_mults};
 use crate::{MAX_STEM, MAX_VERIFY_STEM};
-use crate::types::{Category, Differential, SyntheticEHP};
+use crate::types::{Category, SyntheticSS};
 use crate::naming::{generating_name};
 use std::collections::{HashMap};
 use itertools::Itertools;
@@ -8,15 +9,14 @@ use itertools::Itertools;
 
 
 /// Add differentials to the data
-pub fn add_diffs(data: &mut SyntheticEHP) {
+pub fn add_diffs(data: &mut SyntheticSS) {
     for d in get_diffs() {
-        
         data.insert_diff(d);
     }
 }
 
 /// Add unstable differentials to the data
-pub fn add_induced_names(data: &mut SyntheticEHP) {
+pub fn add_induced_names(data: &mut SyntheticSS) {
     for (g, induced_name) in get_induced_names() {
         if let Some(g) = data.find_mut(&g) {
             for n in induced_name {
@@ -26,16 +26,36 @@ pub fn add_induced_names(data: &mut SyntheticEHP) {
     }
 }
 
-pub fn add_tau_mults(data: &mut SyntheticEHP) {
+pub fn add_tau_mults(data: &mut SyntheticSS) {
     data.tau_mults = get_tau_mults();
 }
 
+/// Add stable differentials to the data
+pub fn add_stable_diffs(data: &mut SyntheticSS) {
+    for d in get_stable_diffs() {
+        data.insert_diff(d);
+    }
+}
+
+pub fn add_stable_tau_mults(data: &mut SyntheticSS) {
+    data.tau_mults = get_stable_tau_mults();
+}
+
 /// Compute inductive generators
-pub fn compute_inductive_generators(data: &mut SyntheticEHP) {
-    for x in 3..MAX_STEM {
+pub fn compute_inductive_generators(data: &mut SyntheticSS) {
+    for x in 3..MAX_VERIFY_STEM {
         for y in 1..=MAX_STEM {
             let sphere = y * 2 + 1;
             let gens = get_filtered_data(data, Category::Synthetic, Some(sphere), 1000, false, Some(x));
+
+
+            // First set everything to zero and then see what should NOT have been zero
+            for g in &mut data.generators {
+                if g.x == x + y && g.y == y {
+                    g.torsion = Some(0);
+                }
+            }
+            
 
             for (name, (torsion, filtration)) in gens.iter().sorted_by_key(|x|  data.find(&x.0).unwrap().y) {
                 if let Some(g) = data.find(&name).cloned() {
@@ -45,10 +65,10 @@ pub fn compute_inductive_generators(data: &mut SyntheticEHP) {
                             g_target.torsion = *torsion;
                             if let Some(t) = *torsion {
                                 if t != 0 {
-                                    // g_target.adams_filtration = filtration + 1;
+                                    g_target.adams_filtration = filtration + 1;
                                 }
                             } else {
-                                // g_target.adams_filtration = filtration + 1;
+                                g_target.adams_filtration = filtration + 1;
                             }
                         }
                     }
@@ -62,7 +82,7 @@ pub fn compute_inductive_generators(data: &mut SyntheticEHP) {
 /// Returns (generators_map, differentials_list)
 /// generators_map: name -> (torsion, adams_filtration)
 pub fn get_filtered_data(
-    data: &SyntheticEHP,
+    data: &SyntheticSS,
     category: Category,
     truncation: Option<i32>,
     page: i32,
@@ -180,7 +200,7 @@ pub fn get_filtered_data(
         }
     }
 
-    if category == Category::Synthetic {
+    if category == Category::Synthetic && page > 999 {
         for tm in &data.tau_mults {
             if !torsion_map.contains_key(&tm.from) || !torsion_map.contains_key(&tm.to) {
                 continue;

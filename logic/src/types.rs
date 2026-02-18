@@ -108,7 +108,7 @@ pub struct Multiplication {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyntheticEHP {
+pub struct SyntheticSS {
     pub generators: Vec<Generator>,
     pub differentials: Vec<Differential>,
     pub multiplications: Vec<Multiplication>,
@@ -117,7 +117,7 @@ pub struct SyntheticEHP {
 }
 
 
-impl SyntheticEHP {
+impl SyntheticSS {
     /// Build the find_map from generators
     pub fn build_find_map(&mut self) {
         self.find_map = self.generators

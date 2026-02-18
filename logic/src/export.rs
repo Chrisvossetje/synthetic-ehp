@@ -4,7 +4,7 @@ use crate::MAX_STEM;
 
 pub fn write_typescript_file(
     output_path: &str,
-    data: &crate::types::SyntheticEHP,
+    data: &crate::types::SyntheticSS,
 ) -> Result<(), std::io::Error> {
     let mut file = File::create(output_path)?;
 

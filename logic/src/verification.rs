@@ -1,13 +1,13 @@
-use std::{collections::{HashMap, HashSet}, process::exit};
+use std::{collections::{HashMap, HashSet}};
 
 use itertools::Itertools;
 
 use crate::{
-    MAX_VERIFY_SPHERE, MAX_VERIFY_STEM, naming::generated_by_name, processor::get_filtered_data, types::{Category, SyntheticEHP}
+    MAX_VERIFY_SPHERE, MAX_VERIFY_STEM, naming::generated_by_name, processor::get_filtered_data, types::{Category, SyntheticSS}
 };
 
 /// Verify data integrity
-pub fn verify_integrity(data: &SyntheticEHP) -> bool {
+pub fn verify_integrity(data: &SyntheticSS) -> bool {
     let mut names = HashSet::new();
     let mut is_valid = true;
 
@@ -78,16 +78,16 @@ pub fn verify_integrity(data: &SyntheticEHP) -> bool {
 }
 
 // Here i check if the E_\infty of SEHP coincides with the input to the SEHP
-pub fn verify_self_coherence(data: &SyntheticEHP) -> bool {
+pub fn verify_self_coherence(data: &SyntheticSS, verification_bound: i32) -> bool {
     let mut is_valid = true;
 
-    for y in 1..=MAX_VERIFY_STEM {
+    for y in 1..=verification_bound {
         let sphere = y * 2 + 1;
 
         let row_gens: Vec<_> = data
             .generators
             .iter()
-            .filter(|g| g.y == y && g.x <= MAX_VERIFY_STEM && g.x != y)
+            .filter(|g| g.y == y && g.x <= verification_bound && g.x != y)
             .collect();
 
         let mut conv_gens =
@@ -97,7 +97,7 @@ pub fn verify_self_coherence(data: &SyntheticEHP) -> bool {
             .drain()
             .filter(|x| {
                 let gx = data.find(&x.0).unwrap().x;
-                0 < gx && gx <= MAX_VERIFY_STEM - y
+                0 < gx && gx <= verification_bound - y
             })
             .filter(|x| if let Some(t) = x.1.0 { t != 0 } else { true })
             .map(|x| (data.find(&x.0).unwrap().get_induced_name(sphere).to_string(), x.1))
@@ -153,7 +153,7 @@ pub fn verify_self_coherence(data: &SyntheticEHP) -> bool {
 }
 
 
-pub fn verify_algebraic(data: &SyntheticEHP) -> bool {
+pub fn verify_algebraic(data: &SyntheticSS) -> bool {
     let mut is_valid = true;
     for sphere in (1..=MAX_VERIFY_SPHERE).into_iter().rev() {
         let alg_gens =
@@ -256,7 +256,7 @@ pub fn verify_algebraic(data: &SyntheticEHP) -> bool {
 }
 
 /// Verify stable stems match expected values
-pub fn verify_stable(data: &SyntheticEHP) -> bool {
+pub fn verify_stable(data: &SyntheticSS) -> bool {
     let stable_gens: Vec<i32> = vec![
         1, 1, 1, 3, 0, 0, 1, 4, 2, 3, 1, 3, 0, 0, 2, 6, 2, 4, 4, 4, 3, 2, 2, 8, 2, 2, 2, 3, 1, 0,
         1, 8, 4, 5, 5, 5,
@@ -313,7 +313,7 @@ pub fn verify_stable(data: &SyntheticEHP) -> bool {
 }
 
 /// Verify stable stems match expected values
-pub fn verify_geometric(data: &SyntheticEHP) -> bool {
+pub fn verify_geometric(data: &SyntheticSS) -> bool {
     let mut is_valid = true;
 
     const CLASSICAL_MAX_SPHERE: i32 = 35;

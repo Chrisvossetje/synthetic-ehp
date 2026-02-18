@@ -89,7 +89,7 @@ pub fn get_diffs() -> Vec<Differential> {
             to: "1 2 4 3 3 3[3]".to_string(),
             coeff: 1,
             d: 1,
-            proof: None,
+            proof: Some("If this diff does not exist, we would have an an element of AF 7 in stem 21 of the 3 sphere. But we know there is no such element.".to_string()),
             synthetic: Some(()),
         },
 
@@ -517,6 +517,138 @@ pub fn get_diffs() -> Vec<Differential> {
 
 
 
+        // Stem 29/30
+        Differential {
+            from: "6 2 3 4 4 1 1 1[8]".to_string(),
+            to: "2 4 1 1 2 4 3 3 3[6]".to_string(),
+            coeff: 1,
+            d: 2,
+            proof: Some("Classical homotopy groups need one less generator, this is the only generator left originating from the 9 sphere.".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 29/30
+        Differential {
+            from: "3 6 2 3 3[13]".to_string(),
+            to: "2 2 2 3 5 7 3 3[2]".to_string(),
+            coeff: 2,
+            d: 11,
+            proof: Some("We need a stable differential from AF 6 to AF 9. TODO: Im not sure which AF 9 should be hit.".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 29/30
+        Differential {
+            from: "13 3[14]".to_string(),
+            to: "4 5 7 7[6]".to_string(),
+            coeff: 1,
+            d: 8,
+            proof: Some("We need an AF 3 element to reduce the torsion of this target, else a lifted differential will not be valid. The AF 3 element on the 15 sphere cannot be it, as this would still give me an invalid map, this leaves only 13 3[14] as the source of this differential.".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 29/30
+        Differential {
+            from: "4 4 1 1 1[19]".to_string(),
+            to: "2 3 5 7 7[5]".to_string(),
+            coeff: 0,
+            d: 14,
+            proof: Some("We need an AF 6 element to die on the 20 sphere, the element 2 4 3 3 3[14] is not a valid target yet for the source of this differential, which is also the only possible source.".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 29/30
+        Differential {
+            from: "2 4 5 3 3 3[10]".to_string(),
+            to: "6 2 3 4 4 1 1 1[7]".to_string(),
+            coeff: 1,
+            d: 3,
+            proof: Some("We need an unstable differential from the 11 sphere. The only possible source is the AF 7 which can only target to another AF 9, NOTE that it is not completely clear WHICH AF 9 is targeted. TODO".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 29/30
+        Differential {
+            from: "9 3 3 3[12]".to_string(),
+            to: "1 2 4 1 1 2 4 1 1 1[11]".to_string(),
+            coeff: 5,
+            d: 1,
+            proof: Some("We need an unstable differential from the 13 sphere. This is really just a guess".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 29/30
+        Differential {
+            from: "2 4 1 1 2 4 1 1 1[13]".to_string(),
+            to: "2 3 5 7 7[5]".to_string(),
+            coeff: 0,
+            d: 8,
+            proof: Some("We need an unstable differential from the 14 sphere. This is really just a guess".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 29/30
+        Differential {
+            from: "7 7[16]".to_string(),
+            to: "7 7 7[8]".to_string(),
+            coeff: 1,
+            d: 8,
+            proof: Some("We need two unstable differentials from the 17 sphere. This is really just a guess just like the other two above. But it also seems like the only possibility at the moment".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 29/30
+        Differential {
+            from: "6 2 3 3[16]".to_string(),
+            to: "2 4 3 3 3[14]".to_string(),
+            coeff: 2,
+            d: 2,
+            proof: Some("We need two unstable differentials from the 17 sphere. This is really just a guess just like the other two above. But it also seems like the only possibility at the moment".to_string()),
+            synthetic: Some(()),
+        },
+        
+        
+        // Stem 30/31
+        Differential {
+            from: "2 4 1 1 2 4 3 3 3[8]".to_string(),
+            to: "3 6 2 3 4 4 1 1 1[5]".to_string(),
+            coeff: 0,
+            d: 3,
+            proof: Some("We need to kill an element in AF 10, and this is the only possibility".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 30/31
+        Differential {
+            from: "2 3 4 4 1 1 1[14]".to_string(),
+            to: "2 2 2 3 5 7 3 3[2]".to_string(), // TODO: WOW The fact that this should've been hit is clear from this differential. Note that else the source does not have correct filtration in time to reduce is filtration
+            coeff: 1,
+            d: 12,
+            proof: Some("We need one less AF 6 element, without getting an extra one, this is the only possibility. The tau torsion element in this cell cannot support this differential as it is killed later.".to_string()),
+            synthetic: Some(()),
+        },
+
+
+
+        // Stem 30/31
+        Differential {
+            from: "[31]".to_string(),
+            to: "1 2 3 3[21]".to_string(),
+            coeff: 1,
+            d: 10,
+            proof: Some("Stable Differential.".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 30/31
+        Differential {
+            from: "1[30]".to_string(),
+            to: "11 3 3[13]".to_string(), 
+            coeff: 1,
+            d: 17,
+            proof: Some("Stable Differential.".to_string()),
+            synthetic: Some(()),
+        },
+        // Stem 30/31
+        Differential {
+            from: "1 1[29]".to_string(),
+            to: "4 4 1 1 1[19]".to_string(), 
+            coeff: 1,
+            d: 10,
+            proof: Some("Stable Differential.".to_string()),
+            synthetic: Some(()),
+        },
+
     ]
 }
 
@@ -582,11 +714,11 @@ pub fn get_induced_names() -> Vec<(String, Vec<(i32, String)>)> {
         // Stem 26
         (
             "5 5 7 3 3[3]".to_string(),
-            vec![(6, "3 5 7 3 3[5]".to_string())],
+            vec![(6, "7 6 2 3 3[5]".to_string())],
         ),
         (
             "2 4 5 3 3 3[6]".to_string(),
-            vec![(11, "3 5 7 3 3[5]".to_string())],
+            vec![(7, "3 5 7 3 3[5]".to_string())],
         ),
         
         // Stem 27
@@ -608,6 +740,26 @@ pub fn get_induced_names() -> Vec<(String, Vec<(i32, String)>)> {
             "2 4 1 1 2 4 3 3 3[5]".to_string(),
             vec![(6, "2 2 2 4 5 3 3 3[4]".to_string())],
         ),
+        
+        
+        // Stem 30
+        (
+            "8 4 1 1 2 4 1 1 1[7]".to_string(),
+            vec![(9, "2 2 2 2 4 5 3 3 3[4]".to_string())],
+        ),
+        (
+            "4 4 1 1 2 4 1 1 1[11]".to_string(),
+            vec![(12, "8 1 1 2 4 3 3 3[5]".to_string())],
+        ),
+        (
+            "1 2 3 4 4 1 1 1[13]".to_string(),
+            vec![(14, "13 1 2 4 1 1 1[7]".to_string())],
+        ),
+        (
+            "2 3 4 4 1 1 1[14]".to_string(),
+            vec![(15, "1 2 4 3 3 3[14]".to_string())],
+        ),
+
     ]
 }
 
@@ -661,11 +813,11 @@ pub fn get_tau_mults() -> Vec<TauMult> {
         },
         TauMult {
             from: "6 2 4 3 3 3[5]".to_string(),
-            to: "7 6 2 3 3[5]".to_string(),
+            to: "5 5 7 3 3[3]".to_string(),
         },
         TauMult {
             from: "2 2 4 3 3 3[9]".to_string(),
-            to: "3 6 2 3 3[9]".to_string(),
+            to: "2 4 5 3 3 3[6]".to_string(),
         },
         TauMult {
             from: "1 2 4 3 3 3[10]".to_string(),
@@ -699,6 +851,29 @@ pub fn get_tau_mults() -> Vec<TauMult> {
             from: "2 2 4 3 3 3[11]".to_string(),
             to: "3 6 6 5 3[5]".to_string(),
         },
+        
+        // Stem 29
+        TauMult {
+            from: "1 2 4 3 3 3[13]".to_string(),
+            to: "2 3 5 7 7[5]".to_string(),
+        },
+        
+        
+        
+        // Stem 30
+        TauMult {
+            from: "2 2 2 2 2 4 5 3 3 3[2]".to_string(),
+            to: "2 2 2 2 3 5 7 3 3[1]".to_string(),
+        },
+        TauMult {
+            from: "1 2 4 1 1 2 4 3 3 3[6]".to_string(),
+            to: "3 6 2 3 4 4 1 1 1[5]".to_string(),
+        },
+        TauMult {
+            from: "1 2 4 3 3 3[14]".to_string(),
+            to: "2 3 4 4 1 1 1[14]".to_string(),
+        },
+
 
 
     ]
