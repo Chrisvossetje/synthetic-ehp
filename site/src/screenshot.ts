@@ -63,19 +63,21 @@ export function handleScreenshotPointerDown(event: PointerEvent, chart: Chart) {
     pt.y = event.clientY;
 
     // Transform to chart coordinates
-    const svgPt = pt.matrixTransform(chart.svgchart.inner.getScreenCTM()?.inverse());
-
-    firstPoint = { x: svgPt.x, y: svgPt.y };
-
-    if (selectionRect) {
-        selectionRect.style.display = "block";
-        selectionRect.setAttribute("x", firstPoint.x.toString());
-        selectionRect.setAttribute("y", firstPoint.y.toString());
-        selectionRect.setAttribute("width", "0");
-        selectionRect.setAttribute("height", "0");
+    if (chart.svgchart.inner instanceof SVGGraphicsElement) {
+        const svgPt = pt.matrixTransform(chart.svgchart.inner.getScreenCTM()!.inverse());
+        
+        firstPoint = { x: svgPt.x, y: svgPt.y };
+    
+        if (selectionRect) {
+            selectionRect.style.display = "block";
+            selectionRect.setAttribute("x", firstPoint.x.toString());
+            selectionRect.setAttribute("y", firstPoint.y.toString());
+            selectionRect.setAttribute("width", "0");
+            selectionRect.setAttribute("height", "0");
+        }
+    
+        return true;
     }
-
-    return true;
 }
 
 /**
@@ -90,19 +92,21 @@ export function handleScreenshotPointerMove(event: PointerEvent, chart: Chart) {
     pt.y = event.clientY;
 
     // Transform to chart coordinates
-    const svgPt = pt.matrixTransform(chart.svgchart.inner.getScreenCTM()?.inverse());
+    if (chart.svgchart.inner instanceof SVGGraphicsElement) {
+        const svgPt = pt.matrixTransform(chart.svgchart.inner.getScreenCTM()?.inverse());
 
-    const x = Math.min(firstPoint.x, svgPt.x);
-    const y = Math.min(firstPoint.y, svgPt.y);
-    const width = Math.abs(svgPt.x - firstPoint.x);
-    const height = Math.abs(svgPt.y - firstPoint.y);
+        const x = Math.min(firstPoint.x, svgPt.x);
+        const y = Math.min(firstPoint.y, svgPt.y);
+        const width = Math.abs(svgPt.x - firstPoint.x);
+        const height = Math.abs(svgPt.y - firstPoint.y);
 
-    selectionRect.setAttribute("x", x.toString());
-    selectionRect.setAttribute("y", y.toString());
-    selectionRect.setAttribute("width", width.toString());
-    selectionRect.setAttribute("height", height.toString());
+        selectionRect.setAttribute("x", x.toString());
+        selectionRect.setAttribute("y", y.toString());
+        selectionRect.setAttribute("width", width.toString());
+        selectionRect.setAttribute("height", height.toString());
 
-    return true;
+        return true;
+    }
 }
 
 /**
@@ -117,25 +121,27 @@ export function handleScreenshotPointerUp(event: PointerEvent, chart: Chart) {
     pt.y = event.clientY;
 
     // Transform to chart coordinates
-    const svgPt = pt.matrixTransform(chart.svgchart.inner.getScreenCTM()?.inverse());
+    if (chart.svgchart.inner instanceof SVGGraphicsElement) {
+        const svgPt = pt.matrixTransform(chart.svgchart.inner.getScreenCTM()!.inverse());
 
-    const x1 = Math.min(firstPoint.x, svgPt.x);
-    const x2 = Math.max(firstPoint.x, svgPt.x);
-    const y1 = Math.min(firstPoint.y, svgPt.y);
-    const y2 = Math.max(firstPoint.y, svgPt.y);
+        const x1 = Math.min(firstPoint.x, svgPt.x);
+        const x2 = Math.max(firstPoint.x, svgPt.x);
+        const y1 = Math.min(firstPoint.y, svgPt.y);
+        const y2 = Math.max(firstPoint.y, svgPt.y);
 
-    // Hide selection rectangle
-    selectionRect.style.display = "none";
+        // Hide selection rectangle
+        selectionRect.style.display = "none";
 
-    // Reset state
-    screenshotState = "idle";
-    document.body.style.cursor = "default";
-    firstPoint = null;
+        // Reset state
+        screenshotState = "idle";
+        document.body.style.cursor = "default";
+        firstPoint = null;
 
-    // Generate TikZ code
-    generateTikzCode(x1, x2, y1, y2, chart);
+        // Generate TikZ code
+        generateTikzCode(x1, x2, y1, y2, chart);
 
-    return true;
+        return true;
+    }
 }
 
 /**
