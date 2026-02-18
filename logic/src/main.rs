@@ -67,7 +67,7 @@ fn ahss() -> SyntheticSS {
     }
 
 
-    write_typescript_file("../site/src/stable_data.ts", &data).unwrap();
+    write_typescript_file("../site/src/data_stable.ts", "_stable", &data).unwrap();
     data
 }
 
@@ -83,7 +83,7 @@ fn ehp() -> SyntheticSS {
     compute_inductive_generators(&mut data);
 
     // add_final_diagonal(&mut data);
-    write_typescript_file("../site/src/data.ts", &data).unwrap();
+    write_typescript_file("../site/src/data.ts", "", &data).unwrap();
     println!("\n-----\nTesting if data is well-defined, meaning differentials / multiplications understand have generators which exist.)\n-----\n");
     if !verify_integrity(&data) {
         exit(1);
@@ -113,7 +113,7 @@ fn ehp() -> SyntheticSS {
     
 
     add_final_diagonal(&mut data);
-    write_typescript_file("../site/src/data.ts", &data).unwrap();
+    write_typescript_file("../site/src/data.ts", "", &data).unwrap();
     data
 }
 

@@ -2,9 +2,9 @@
 // Based on curtis tables of the AEHP sequence
 import { SyntheticEHP } from "./types";
 
-export const MAX_STEM = 32;
+export const MAX_STEM_STABLE = 32;
 
-export const data: SyntheticEHP = {
+export const data_stable: SyntheticEHP = {
     "generators": [
 {"name":"[1]","x":1,"y":1,"adams_filtration":1,"induced_name":[[0,"[1]"]]},
 {"name":"[3]","x":3,"y":3,"adams_filtration":1,"induced_name":[[0,"[3]"]]},

@@ -1,7 +1,8 @@
 import { Chart } from "./chart";
-import { viewSettings, update_ehp_chart, fill_ehp_chart, Category } from "./logic";
+import { viewSettings, update_ehp_chart, fill_ehp_chart, Category, switchDataSource, isUsingStableData } from "./logic";
 import { update_ass_chart } from "./ass_logic";
 import { ChartMode } from "./chartMode";
+import { startScreenshot, handleScreenshotPointerDown, handleScreenshotPointerMove, handleScreenshotPointerUp, cancelScreenshot, isScreenshotMode } from "./screenshot";
 
 // Create two separate chart instances
 export const ehpChart = new Chart('svgchart-ehp', ChartMode.EHP);
@@ -28,6 +29,7 @@ update_ass_chart(viewSettings.truncation);
 window.chartInstance = ehpChart;
 
 setupUIControls();
+setupScreenshotHandlers();
 
 function updateActiveChart() {
     if (isEHPActive) {
@@ -40,6 +42,14 @@ function updateActiveChart() {
 function setupUIControls() {
     // Keyboard controls
     setupKeyboardControls();
+
+    // Data source switch (data.ts vs data_stable.ts)
+    const dataSourceSwitch = document.getElementById('data-source-switch') as HTMLInputElement;
+    if (dataSourceSwitch) {
+        dataSourceSwitch.addEventListener('change', () => {
+            switchDataSource();
+        });
+    }
 
     // EHP/ASS mode switch
     const ehpAssSwitch = document.getElementById('ehp-ass-switch') as HTMLInputElement;
@@ -110,8 +120,42 @@ function setupUIControls() {
     });
 }
 
+function setupScreenshotHandlers() {
+    const svg = ehpChart.svgchart.svg;
+
+    svg.addEventListener('pointerdown', (e) => {
+        if (isScreenshotMode()) {
+            handleScreenshotPointerDown(e, ehpChart);
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    });
+
+    svg.addEventListener('pointermove', (e) => {
+        if (isScreenshotMode()) {
+            handleScreenshotPointerMove(e, ehpChart);
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    });
+
+    svg.addEventListener('pointerup', (e) => {
+        if (isScreenshotMode()) {
+            handleScreenshotPointerUp(e, ehpChart);
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    });
+}
+
 function setupKeyboardControls() {
     document.addEventListener('keydown', (e) => {
+        // Escape key cancels screenshot mode
+        if (e.key === 'Escape' && isScreenshotMode()) {
+            cancelScreenshot();
+            return;
+        }
+
         // Ignore if user is typing in an input field
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
             return;
@@ -124,8 +168,18 @@ function setupKeyboardControls() {
         const truncationInput = document.querySelector('input[name="Truncation"]') as HTMLInputElement;
         const ehpAssSwitch = document.getElementById('ehp-ass-switch') as HTMLInputElement;
         const allDiffCheckbox = document.getElementById('all-diff-checkbox') as HTMLInputElement;
+        const dataSourceSwitch = document.getElementById('data-source-switch') as HTMLInputElement;
 
         switch(e.key) {
+            // Data source switch
+            case 's':
+            case 'S':
+                switchDataSource();
+                if (dataSourceSwitch) {
+                    dataSourceSwitch.checked = isUsingStableData();
+                }
+                return; // No need for needsUpdate, switchDataSource handles everything
+
             // EHP/ASS mode switch
             case 'a':
             case 'A':
@@ -244,6 +298,14 @@ function setupKeyboardControls() {
                 }
                 needsUpdate = true;
                 break;
+
+            // Screenshot mode
+            case 'p':
+            case 'P':
+                if (isEHPActive) {
+                    startScreenshot();
+                }
+                return; // Don't trigger update
         }
 
         if (needsUpdate) {

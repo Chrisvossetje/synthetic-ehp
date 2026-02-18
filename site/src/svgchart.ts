@@ -160,11 +160,11 @@ export class SvgChart extends HTMLElement {
 <rect id="grid" fill="url(#gridPattern)" />
 <g id="invalidCells"></g>
 <g id="contents"></g>
-<line id="topBorder" x1="0" y1="0" x2="1000" y2="0" stroke="black" stroke-width="0.05" />
-<line id="leftBorder" x1="0" y1="0" x2="0" y2="1000" stroke="black" stroke-width="0.05" />
 </g>
 <rect id="xBlock" x="${-SvgChart.MARGIN}" height="${SvgChart.MARGIN + 0.1}" y="${-SvgChart.MARGIN}" fill="white"/>
 <rect id="yBlock" x="${-SvgChart.MARGIN}" width="${SvgChart.MARGIN + 0.1}" y="${-SvgChart.MARGIN}" fill="white"/>
+<line id="topBorder" x1="0" y1="0" x2="1000" y2="0" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke"/>
+<line id="leftBorder" x1="0" y1="0" x2="0" y2="1000" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke"/>
 <g id="axisLabels"></g>
 `;
         } else {
@@ -368,10 +368,10 @@ this.svg.innerHTML =
         this.grid.setAttribute('width', (grid_max_x - grid_min_x).toString());
         this.grid.setAttribute('height', (grid_max_y - grid_min_y).toString());
 
-        // Update border lines for EHP mode
+        // Update border lines for EHP mode (these are in screen coordinates, not chart coordinates)
         if (this.mode === ChartMode.EHP && this.topBorder && this.leftBorder) {
-            this.topBorder.setAttribute('x2', grid_max_x.toString());
-            this.leftBorder.setAttribute('y2', grid_max_y.toString());
+            this.topBorder.setAttribute('x2', this.width.toString());
+            this.leftBorder.setAttribute('y2', this.height.toString());
         }
 
         this.zoom.scaleBy(this.select, 1);

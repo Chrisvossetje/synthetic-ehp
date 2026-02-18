@@ -2,6 +2,7 @@ import { ToStringMap } from "./stringmap";
 import { SvgChart } from "./svgchart";
 import { Differential, Generators, Multiplication, TauMult } from "./types";
 import { ChartMode } from "./chartMode";
+import { MAX_STEM } from "./data";
 
 type Point = [number, number];
 
@@ -242,14 +243,8 @@ export class Chart {
             return "";
         }
 
-        // Calculate bounds from name_to_location
-        let locations = Array.from(this.name_to_location.values());
-        if (locations.length === 0) {
-            return "";
-        }
-
-        let x_col = locations.map(xy => xy[0]);
-        let maxX = Math.max(...x_col);
+        // Use MAX_STEM for bounds
+        let maxX = MAX_STEM;
 
         // Build the path: starts at y=1, goes right 3 units, down 1 unit, repeat
         let pathData = "M 0 1"; // Start at (0, 1)
@@ -275,16 +270,9 @@ export class Chart {
             return "";
         }
 
-        // Calculate bounds from name_to_location
-        let locations = Array.from(this.name_to_location.values());
-        if (locations.length === 0) {
-            return "";
-        }
-
-        let x_col = locations.map(xy => xy[0]);
-        let y_col = locations.map(xy => xy[1]);
-        let maxX = Math.max(...x_col);
-        let maxY = Math.max(...y_col);
+        // Use MAX_STEM + extra padding for bounds
+        let maxX = MAX_STEM + 3;
+        let maxY = MAX_STEM + 3;
 
         let cells = "";
 
@@ -315,18 +303,11 @@ export class Chart {
         let stableLine = this.generate_stable_line();
         let invalidCells = this.generate_invalid_cells();
 
-        // Calculate bounds from name_to_location
-        let locations = Array.from(this.name_to_location.values());
-        if (locations.length === 0) {
-            return;
-        }
-
-        let x_col = locations.map(xy => xy[0]);
-        let y_col = locations.map(xy => xy[1]);
-        let minx = Math.min(...x_col);
-        let maxx = Math.max(...x_col);
-        let miny = Math.min(...y_col);
-        let maxy = Math.max(...y_col);
+        // Use fixed bounds based on MAX_STEM (add 2 for padding)
+        let minx = 0;
+        let maxx = MAX_STEM + 2;
+        let miny = 0;
+        let maxy = MAX_STEM + 2;
 
         // Only update size if bounds have changed
         const newBounds: [number, number, number, number] = [minx, maxx, miny, maxy];
