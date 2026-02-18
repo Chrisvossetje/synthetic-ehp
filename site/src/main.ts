@@ -123,6 +123,7 @@ function setupKeyboardControls() {
         const truncationCheckbox = document.getElementById('truncation-checkbox') as HTMLInputElement;
         const truncationInput = document.querySelector('input[name="Truncation"]') as HTMLInputElement;
         const ehpAssSwitch = document.getElementById('ehp-ass-switch') as HTMLInputElement;
+        const allDiffCheckbox = document.getElementById('all-diff-checkbox') as HTMLInputElement;
 
         switch(e.key) {
             // EHP/ASS mode switch
@@ -186,6 +187,16 @@ function setupKeyboardControls() {
                 viewSettings.category = Category.Geometric;
                 categorySelect.value = '2';
                 needsUpdate = true;
+                break;
+
+            // Toggle all diffs (only affects EHP mode)
+            case 'd':
+            case 'D':
+                viewSettings.allDiffs = !viewSettings.allDiffs;
+                allDiffCheckbox.checked = viewSettings.allDiffs;
+                if (isEHPActive) {
+                    needsUpdate = true;
+                }
                 break;
 
             // Truncation controls

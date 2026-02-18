@@ -269,12 +269,51 @@ export class Chart {
         return `<path class="stable-line" d="${pathData}" stroke="#ff6b00" stroke-width="0.02" fill="none" stroke-dasharray="0.1,0.05"/>`;
     }
 
+    generate_invalid_cells(): string {
+        // Only generate for EHP mode
+        if (this.mode !== ChartMode.EHP) {
+            return "";
+        }
+
+        // Calculate bounds from name_to_location
+        let locations = Array.from(this.name_to_location.values());
+        if (locations.length === 0) {
+            return "";
+        }
+
+        let x_col = locations.map(xy => xy[0]);
+        let y_col = locations.map(xy => xy[1]);
+        let maxX = Math.max(...x_col);
+        let maxY = Math.max(...y_col);
+
+        let cells = "";
+
+        // Generate crossed-out cells for:
+        // 1. First row (y = 0), except for (0, 0)
+        // 2. Below diagonal (x < y)
+        for (let y = 0; y <= maxY; y++) {
+            for (let x = 0; x <= maxX; x++) {
+                // Skip the (0, 0) cell
+                if (x === 0 && y === 0) {
+                    continue;
+                }
+                // Check if this cell should be crossed out
+                if (y === 0 || x < y) {
+                    cells += `<rect x="${x}" y="${y}" width="1" height="1" fill="url(#crossPattern)" pointer-events="none"/>\n`;
+                }
+            }
+        }
+
+        return cells;
+    }
+
     init() {
         let dots = this.init_dots();
         let lines = this.init_diffs();
         let mults = this.init_multiplications();
         let tauMults = this.init_tau_mults();
         let stableLine = this.generate_stable_line();
+        let invalidCells = this.generate_invalid_cells();
 
         // Calculate bounds from name_to_location
         let locations = Array.from(this.name_to_location.values());
@@ -298,6 +337,11 @@ export class Chart {
             this.currentBounds[3] !== newBounds[3]) {
             this.svgchart.set_size(minx, maxx, miny, maxy);
             this.currentBounds = newBounds;
+        }
+
+        // Populate invalid cells group (for EHP mode)
+        if (this.mode === ChartMode.EHP && this.svgchart.invalidCells) {
+            this.svgchart.invalidCells.innerHTML = invalidCells;
         }
 
         // Render in order: stable line (background), lines, mults, tau mults, dots (foreground)

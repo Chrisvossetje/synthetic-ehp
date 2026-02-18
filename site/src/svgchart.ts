@@ -53,9 +53,12 @@ export class SvgChart extends HTMLElement {
     public axis: HTMLElement;
     public axisLabels: HTMLElement;
     public grid: HTMLElement;
+    public invalidCells: HTMLElement;
     public contents: HTMLElement;
     public xBlock: HTMLElement;
     public yBlock: HTMLElement;
+    public topBorder: HTMLElement;
+    public leftBorder: HTMLElement;
 
     public node_style: HTMLElement;
     public line_style: HTMLElement;
@@ -147,13 +150,21 @@ export class SvgChart extends HTMLElement {
 <pattern id="gridPattern" width="1" height="1" patternUnits="userSpaceOnUse">
     <rect width="1" height="1" fill="white" stroke="black" stroke-width="0.01" />
 </pattern>
+<pattern id="crossPattern" width="1" height="1" patternUnits="userSpaceOnUse">
+    <rect width="1" height="1" fill="white" stroke="black" stroke-width="0.01" />
+    <line x1="0" y1="0" x2="1" y2="1" stroke="#ccc" stroke-width="0.02" />
+    <line x1="1" y1="0" x2="0" y2="1" stroke="#ccc" stroke-width="0.02" />
+</pattern>
 </defs>
-<rect id="xBlock" x="0" height="${SvgChart.MARGIN}" y="${-SvgChart.MARGIN}" fill="white"/>
-<rect id="yBlock" x="${-SvgChart.MARGIN}" width="${SvgChart.MARGIN}" y="0" fill="white"/>
 <g id="inner">
 <rect id="grid" fill="url(#gridPattern)" />
+<g id="invalidCells"></g>
 <g id="contents"></g>
+<line id="topBorder" x1="0" y1="0" x2="1000" y2="0" stroke="black" stroke-width="0.05" />
+<line id="leftBorder" x1="0" y1="0" x2="0" y2="1000" stroke="black" stroke-width="0.05" />
 </g>
+<rect id="xBlock" x="${-SvgChart.MARGIN}" height="${SvgChart.MARGIN + 0.1}" y="${-SvgChart.MARGIN}" fill="white"/>
+<rect id="yBlock" x="${-SvgChart.MARGIN}" width="${SvgChart.MARGIN + 0.1}" y="${-SvgChart.MARGIN}" fill="white"/>
 <g id="axisLabels"></g>
 `;
         } else {
@@ -186,9 +197,12 @@ this.svg.innerHTML =
             'axis',
             'axisLabels',
             'grid',
+            'invalidCells',
             'contents',
             'xBlock',
             'yBlock',
+            'topBorder',
+            'leftBorder',
         ]) {
             this[item] = this.shadowRoot.getElementById(`${item}`);
         }
@@ -353,6 +367,12 @@ this.svg.innerHTML =
         this.grid.setAttribute('y', grid_min_y.toString());
         this.grid.setAttribute('width', (grid_max_x - grid_min_x).toString());
         this.grid.setAttribute('height', (grid_max_y - grid_min_y).toString());
+
+        // Update border lines for EHP mode
+        if (this.mode === ChartMode.EHP && this.topBorder && this.leftBorder) {
+            this.topBorder.setAttribute('x2', grid_max_x.toString());
+            this.leftBorder.setAttribute('y2', grid_max_y.toString());
+        }
 
         this.zoom.scaleBy(this.select, 1);
     }
