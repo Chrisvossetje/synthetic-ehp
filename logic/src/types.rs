@@ -63,6 +63,8 @@ pub struct Differential {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<String>,
+
+    pub fake: bool,
 }
 
 impl PartialEq for Differential {

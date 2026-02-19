@@ -41,6 +41,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 10,
             proof: Some("??".to_string()),
             synthetic: Some(()),
+            fake: false,
         },
 
 
@@ -52,6 +53,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 9,
             proof: Some("Stable Diff".to_string()),
             synthetic: Some(()),
+            fake: false,
         },
         // Stem 14/15
         Differential {
@@ -61,6 +63,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 9,
             proof: Some("Stable Diff".to_string()),
             synthetic: Some(()),
+            fake: false,
         },
         // Stem 14/15
         Differential {
@@ -70,6 +73,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 10,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
 
 
@@ -81,6 +85,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 7,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
 
         
@@ -92,6 +97,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 2,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
         // Stem 17/18
         Differential {
@@ -101,6 +107,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 2,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
         // Stem 17/18
         Differential {
@@ -110,6 +117,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 3,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
         // Stem 17/18
         Differential {
@@ -119,6 +127,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 7,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
 
 
@@ -130,6 +139,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 2,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
         // Stem 18/19
         Differential {
@@ -139,6 +149,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 3,
             proof: Some("Its not clear which of the two possible AF 3 targets this will hit. But this one is the most logical? It is also NOT relevant.".to_string()),
             synthetic: Some(()),
+            fake: false,
         },
         
         
@@ -150,6 +161,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 2,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
         // Stem 21/22
         Differential {
@@ -159,6 +171,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 2,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
 
                 
@@ -170,6 +183,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 3,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
 
 
@@ -181,6 +195,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 9,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
 
         // Stem 22/23
@@ -191,6 +206,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 8,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
         // Stem 22/23
         Differential {
@@ -200,6 +216,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 8,
             proof: Some("This must be it as there is no room for this stable diff elsewhere on EHP".to_string()),
             synthetic: Some(()),
+            fake: false,
         },
         // Stem 22/23
         Differential {
@@ -209,6 +226,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 9,
             proof: Some("This must be it as there is no room for this stable diff elsewhere on EHP".to_string()),
             synthetic: Some(()),
+            fake: false,
         },
         // Stem 22/23
         Differential {
@@ -218,6 +236,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 9,
             proof: Some("Unsure about this target. Highly likely".to_string()),
             synthetic: Some(()),
+            fake: false,
         },
         // Stem 22/23
         Differential {
@@ -227,6 +246,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 8,
             proof: None,
             synthetic: Some(()),
+            fake: false,
         },
 
 

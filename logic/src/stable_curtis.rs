@@ -148,6 +148,7 @@ fn parse_stable_algebraic_data(
                 d: (y_2 - y),
                 proof: Some("Lifted AEHP differential.".to_string()),
                 synthetic: None,
+                fake: false,
             });
 
         }

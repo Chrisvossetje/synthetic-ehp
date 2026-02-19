@@ -95,7 +95,7 @@ pub fn verify_rp(data: &SyntheticSS) -> bool {
         
         let mut expected = read_rp_csv(1, upper_trunc);
 
-        let gens = get_filtered_data(data, Category::Synthetic, Some(upper_trunc + 1), 1000, true, None);
+        let gens = get_filtered_data(data, Category::Synthetic, 1, upper_trunc + 1, 1000, None);
 
         let mut compare = HashMap::new();
         
@@ -167,8 +167,8 @@ pub fn verify_ehp_to_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS) {
     // For all pages check the diffs
     for page in 1..=MAX_VERIFY_STEM {
         
-        let ehp_gens = get_filtered_data(ehp, Category::Synthetic, None, page, false, None);
-        let ahss_gens = get_filtered_data(ahss, Category::Synthetic, None, page, false, None);
+        let ehp_gens = get_filtered_data(ehp, Category::Synthetic, 1, 1000, page, None);
+        let ahss_gens = get_filtered_data(ahss, Category::Synthetic, 1, 1000, page, None);
         
         // Check if dr commutes
         for d in &ehp.differentials {

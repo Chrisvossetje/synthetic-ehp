@@ -43,10 +43,10 @@ pub fn add_stable_tau_mults(data: &mut SyntheticSS) {
 
 /// Compute inductive generators
 pub fn compute_inductive_generators(data: &mut SyntheticSS) {
-    for x in 3..MAX_VERIFY_STEM {
+    for x in 3..MAX_STEM {
         for y in 1..=MAX_STEM {
             let sphere = y * 2 + 1;
-            let gens = get_filtered_data(data, Category::Synthetic, Some(sphere), 1000, false, Some(x));
+            let gens = get_filtered_data(data, Category::Synthetic, 0, sphere, 1000, Some(x));
 
 
             // First set everything to zero and then see what should NOT have been zero
@@ -84,19 +84,18 @@ pub fn compute_inductive_generators(data: &mut SyntheticSS) {
 pub fn get_filtered_data(
     data: &SyntheticSS,
     category: Category,
-    truncation: Option<i32>,
+    bottom_truncation: i32,
+    top_truncation: i32,
     page: i32,
-    _all_diffs: bool,
     limit_x: Option<i32>,
 ) -> HashMap<String, (Option<i32>, i32)> {
     let mut torsion_map: HashMap<String, (Option<i32>, i32)> = HashMap::new();
 
     // Initialize generator torsion map
     for g in &data.generators {
-        let in_truncation = truncation.map_or(true, |t| g.y < t);
         let in_x_limit = limit_x.map_or(true, |lx| g.x <= lx + 1);
 
-        if in_truncation && in_x_limit {
+        if bottom_truncation <= g.y && g.y <= top_truncation && in_x_limit {
             match category {
                 Category::Algebraic => {
                     torsion_map.insert(g.name.clone(), (None, g.adams_filtration));

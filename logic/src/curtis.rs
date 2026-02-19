@@ -128,6 +128,7 @@ fn parse_algebraic_data(
                 d: d_r,
                 proof: Some("Lifted AEHP differential.".to_string()),
                 synthetic: None,
+                fake: false,
             });
 
             if tag.stem == MAX_STEM {

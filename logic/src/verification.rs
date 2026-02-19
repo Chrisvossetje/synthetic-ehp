@@ -91,7 +91,7 @@ pub fn verify_self_coherence(data: &SyntheticSS, verification_bound: i32) -> boo
             .collect();
 
         let mut conv_gens =
-            get_filtered_data(data, Category::Synthetic, Some(sphere), 1000, true, None);
+            get_filtered_data(data, Category::Synthetic, 0, sphere, 1000, None);
 
         let conv_gens: HashMap<_, _> = conv_gens
             .drain()
@@ -157,9 +157,9 @@ pub fn verify_algebraic(data: &SyntheticSS) -> bool {
     let mut is_valid = true;
     for sphere in (1..=MAX_VERIFY_SPHERE).into_iter().rev() {
         let alg_gens =
-            get_filtered_data(data, Category::Algebraic, Some(sphere), 1000, true, None);
+            get_filtered_data(data, Category::Algebraic, 0, sphere, 1000, None);
         let synth_gens =
-            get_filtered_data(data, Category::Synthetic, Some(sphere), 1000, true, None);
+            get_filtered_data(data, Category::Synthetic, 0, sphere, 1000, None);
 
         // (stem, adams filtration)
         let mut alg_map = HashMap::new();
@@ -266,7 +266,7 @@ pub fn verify_stable(data: &SyntheticSS) -> bool {
         13, 22, 8, 10, 11, 7,
     ];
 
-    let gens = get_filtered_data(data, Category::Synthetic, None, 1000, true, None);
+    let gens = get_filtered_data(data, Category::Synthetic, 0, 1000, 1000, None);
 
     let mut count_gens = vec![0; (MAX_VERIFY_STEM + 1) as usize];
     let mut alg_count_gens = vec![0; (MAX_VERIFY_STEM + 1) as usize];
@@ -325,7 +325,7 @@ pub fn verify_geometric(data: &SyntheticSS) -> bool {
     
     for sphere in (1..=MAX_VERIFY_SPHERE).into_iter().rev() {
         let gens =
-            get_filtered_data(data, Category::Geometric, Some(sphere), 1000, true, None);
+            get_filtered_data(data, Category::Geometric, 0, sphere, 1000, None);
 
         let mut conv_gens = vec![0; (CLASSICAL_MAX_STEM + 1) as usize];
 
@@ -354,7 +354,8 @@ pub fn verify_geometric(data: &SyntheticSS) -> bool {
         }
     }
 
-    let gens = get_filtered_data(data, Category::Geometric, None, 1, true, None);
+    let gens = get_filtered_data(data, Category::Synthetic, 0, 1000, 1000, None);
+
     for y in 1..=((CLASSICAL_MAX_SPHERE - 1) / 2) {
         let sphere = y * 2 + 1;
 

@@ -14,6 +14,7 @@ export type Differential = {
     "to": string,
     "coeff": number,
     "d": number,
+    "fake": boolean,
     "proof"?: string,
     "synthetic"?,
 }

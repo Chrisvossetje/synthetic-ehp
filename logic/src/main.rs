@@ -34,6 +34,7 @@ pub fn add_final_diagonal(data: &mut SyntheticSS) {
             d: 1,
             proof: Some("Lifted AEHP differential.".to_string()),
             synthetic: None,
+            fake: false,
         });
     }
 }
@@ -51,7 +52,7 @@ fn ahss() -> SyntheticSS {
     
 
 
-    let _ = get_filtered_data(&data, types::Category::Synthetic, None, 1000, true, None);
+    let _ = get_filtered_data(&data, types::Category::Synthetic, 0, 1000, 1000, None);
 
 
 
@@ -74,13 +75,13 @@ fn ahss() -> SyntheticSS {
 fn ehp() -> SyntheticSS {
     let mut data = generate_algebraic_data();
 
-    add_diffs(&mut data);
-    add_induced_names(&mut data);
-    add_tau_mults(&mut data);
+    // add_diffs(&mut data);
+    // add_induced_names(&mut data);
+    // add_tau_mults(&mut data);
 
-    data.differentials.sort();
+    // data.differentials.sort();
     
-    compute_inductive_generators(&mut data);
+    // compute_inductive_generators(&mut data);
 
     // add_final_diagonal(&mut data);
     write_typescript_file("../site/src/data.ts", "", &data).unwrap();
@@ -121,9 +122,9 @@ fn main() {
     let start = Instant::now();
 
     let e = ehp();
-    let a = ahss();
+    // let a = ahss();
 
-    verify_ehp_to_ahss(&e, &a);
+    // verify_ehp_to_ahss(&e, &a);
     
     println!("\nProgram took: {:.2?}", start.elapsed());
 }
