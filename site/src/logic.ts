@@ -1,14 +1,53 @@
-import { xml } from "d3";
 import { Chart } from "./chart";
 import { Differential, Generators, SyntheticEHP } from "./types";
-import { data as mainData, MAX_STEM } from "./data";
-import { data_stable as stableData, MAX_STEM_STABLE } from "./data_stable";
 import { ehpChart } from "./main";
 
 // Track which data is active
 let useStableData = false;
 export function isUsingStableData() { return useStableData; }
 export function setUseStableData(value: boolean) { useStableData = value; }
+
+let mainData: SyntheticEHP | null = null;
+let stableData: SyntheticEHP | null = null;
+let stableDataLoadPromise: Promise<void> | null = null;
+
+export async function initializeData() {
+    const mainModule = await import("./data");
+    mainData = mainModule.data;
+    ensureStableDataLoading();
+}
+
+export function ensureStableDataLoading(): Promise<void> {
+    if (stableData) {
+        return Promise.resolve();
+    }
+    if (!stableDataLoadPromise) {
+        stableDataLoadPromise = import("./data_stable")
+            .then((stableModule) => {
+                stableData = stableModule.data_stable;
+            })
+            .catch((error) => {
+                stableDataLoadPromise = null;
+                throw error;
+            });
+    }
+    return stableDataLoadPromise;
+}
+
+export function isStableDataReady(): boolean {
+    return stableData !== null;
+}
+
+export function getActiveData(): SyntheticEHP | null {
+    if (useStableData) {
+        return stableData;
+    }
+    return mainData;
+}
+
+export function getMainData(): SyntheticEHP | null {
+    return mainData;
+}
 
 /*
  * SPECTRAL SEQUENCE OVER F2[t]
@@ -50,8 +89,15 @@ export let viewSettings = {
     truncation: undefined as number | undefined
 };
 
-export function find(name: string): Generators {
-    return (useStableData ? stableData : mainData).generators.find(g => g.name === name);
+// Shared selection across all modes/data sources.
+let selectedGeneratorName: string | null = null;
+export function setSelectedGenerator(name: string | null) { selectedGeneratorName = name; }
+export function getSelectedGenerator() { return selectedGeneratorName; }
+
+export function find(name: string): Generators | undefined {
+    const activeData = getActiveData();
+    if (!activeData) return undefined;
+    return activeData.generators.find(g => g.name === name);
 }
 
 export function generated_by_name(gen: Generators): string {
@@ -79,22 +125,34 @@ export function generating_name(gen: Generators): string {
 
 export function generates(gen: Generators): Generators[] {
     let name = generating_name(gen);
-
-    let gens = [];
-    for (let index = 1; index <= MAX_STEM; index++) {
-        const element = name + "[" + String(index) + "]";
-        const g = find(element);
-        if (g) {
-            gens.push(g);
-        }
+    const activeData = getActiveData();
+    if (!activeData) {
+        return [];
     }
-    return gens;
+
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`^${escapedName}\\[(\\d+)\\]$`);
+    return activeData.generators
+        .map((g) => {
+            const match = re.exec(g.name);
+            return match ? { g, idx: parseInt(match[1], 10) } : null;
+        })
+        .filter((entry): entry is { g: Generators; idx: number } => entry !== null)
+        .sort((a, b) => a.idx - b.idx)
+        .map((entry) => entry.g);
 }
 
 /**
  * Get the filtered view based on current settings
  */
-export function get_filtered_data(data: SyntheticEHP, category: Category, truncation: number | undefined, page: number, allDiffs: boolean, limit_x?: number): [Object, Differential[]] {
+export function get_filtered_data(
+    data: SyntheticEHP,
+    category: Category,
+    truncation: number | undefined,
+    page: number,
+    limit_x?: number,
+    applyTauMults: boolean = false
+): [Object, Differential[]] {
     // name -> torsion + adams filtration
     const torsion = new Object();
 
@@ -175,6 +233,36 @@ export function get_filtered_data(data: SyntheticEHP, category: Category, trunca
         }
     }
 
+    // At E_infinity in Synthetic, tau multiplications further kill classes.
+    if (applyTauMults && category == Category.Synthetic && page > 999) {
+        for (const tm of data.tau_mults) {
+            if (!torsion[tm.from] || !torsion[tm.to]) {
+                continue;
+            }
+
+            const fromTorsion = torsion[tm.from][0];
+            const fromAf = torsion[tm.from][1];
+            const toTorsion = torsion[tm.to][0];
+
+            if (fromTorsion === 0 || toTorsion === 0) {
+                continue;
+            }
+
+            if (fromTorsion === undefined) {
+                continue;
+            }
+
+            // tau*x = y forces y to die at E_infinity and can increase source torsion.
+            torsion[tm.to][0] = 0;
+            if (toTorsion !== undefined) {
+                torsion[tm.from][0] = fromTorsion + toTorsion;
+            } else {
+                torsion[tm.from][0] = undefined;
+            }
+            torsion[tm.from][1] = fromAf;
+        }
+    }
+
     return [torsion, diffs]
 }
 
@@ -184,6 +272,9 @@ export function handleDotClick(dot: string) {
     console.log(gen);
 
     if (!gen) return;
+
+    setSelectedGenerator(dot);
+    applyEhpSelectionHighlight();
 
     // Copy generator name to clipboard
     navigator.clipboard.writeText(gen.name).then(() => {
@@ -235,9 +326,35 @@ export function handleDotClick(dot: string) {
     floatingBox.style.display = 'block';
 }
 
+export function applyEhpSelectionHighlight() {
+    ehpChart.clear_selection_highlights();
+
+    const selected = getSelectedGenerator();
+    if (!selected) return;
+    const gen = find(selected);
+    if (!gen) return;
+
+    if (ehpChart.name_to_location.has(selected)) {
+        ehpChart.add_selection_highlight(selected, "#ff6a00", 2.2, 0.18, 0.55);
+    }
+
+    const genName = generated_by_name(gen);
+    const gensList = generates(gen);
+    if (ehpChart.name_to_location.has(genName)) {
+        ehpChart.add_selection_highlight(genName, "#00bcd4", 2.0, 0.14, 0.42);
+    }
+    gensList.forEach((g) => {
+        if (ehpChart.name_to_location.has(g.name)) {
+            ehpChart.add_selection_highlight(g.name, "#66bb00", 1.9, 0.12, 0.35);
+        }
+    });
+}
+
 export function handleLineClick(from: string, to: string) {
     console.log('Line clicked:', from, '->', to);
-    const diff = (useStableData ? stableData : mainData).differentials.find(d => d.from === from && d.to === to);
+    const activeData = getActiveData();
+    if (!activeData) return;
+    const diff = activeData.differentials.find(d => d.from === from && d.to === to);
     console.log(diff);
 
     if (!diff) return;
@@ -268,15 +385,20 @@ export function handleLineClick(from: string, to: string) {
 }
 
 export function fill_ehp_chart() {
+    const activeData = getActiveData();
+    if (!activeData) {
+        return;
+    }
+
     // Bind click handlers
     ehpChart.dotCallback = handleDotClick;
     ehpChart.lineCallback = handleLineClick;
 
     // Set all generators and differentials (complete data set)
-    ehpChart.set_all_generators((useStableData ? stableData : mainData).generators);
-    ehpChart.set_all_differentials((useStableData ? stableData : mainData).differentials);
-    ehpChart.set_all_multiplications((useStableData ? stableData : mainData).multiplications);
-    ehpChart.set_all_tau_mults((useStableData ? stableData : mainData).tau_mults);
+    ehpChart.set_all_generators(activeData.generators);
+    ehpChart.set_all_differentials(activeData.differentials);
+    ehpChart.set_all_multiplications(activeData.multiplications);
+    ehpChart.set_all_tau_mults(activeData.tau_mults);
 
     ehpChart.init();
 }
@@ -284,8 +406,12 @@ export function fill_ehp_chart() {
 /**
  * Switch between data and data_stable
  */
-export function switchDataSource() {
-    useStableData = !useStableData;
+export async function switchDataSource() {
+    const nextUseStableData = !useStableData;
+    if (nextUseStableData && !stableData) {
+        await ensureStableDataLoading();
+    }
+    useStableData = nextUseStableData;
 
     // Clear the chart
     ehpChart.clear();
@@ -301,23 +427,26 @@ export function switchDataSource() {
  * Update the EHP chart with current filter settings
  */
 export function update_ehp_chart() {
+    const activeData = getActiveData();
+    if (!activeData) {
+        return;
+    }
+
     // Hide all generators and differentials first
-    (useStableData ? stableData : mainData).generators.forEach((g) => {
+    activeData.generators.forEach((g) => {
         ehpChart.display_dot(g.name, false, false, undefined, g.adams_filtration);
     });
-    (useStableData ? stableData : mainData).differentials.forEach((d) => {
+    activeData.differentials.forEach((d) => {
         ehpChart.display_diff(d.from, d.to, false);
     });
-    (useStableData ? stableData : mainData).multiplications.forEach((m) => {
+    activeData.multiplications.forEach((m) => {
         ehpChart.display_mult(m.from, m.to, false);
     });
-    (useStableData ? stableData : mainData).tau_mults.forEach((t) => {
+    activeData.tau_mults.forEach((t) => {
         ehpChart.display_tau_mult(t.from, t.to, false);
     });
-
-    const activeData = useStableData ? stableData : mainData;
-    const [gens, _] = get_filtered_data(activeData, viewSettings.category, viewSettings.truncation, viewSettings.page, viewSettings.allDiffs);
-    const [perm_classes, diffs] = get_filtered_data(activeData, viewSettings.category, viewSettings.truncation, 1000, viewSettings.allDiffs);
+    const [gens, _] = get_filtered_data(activeData, viewSettings.category, viewSettings.truncation, viewSettings.page);
+    const [perm_classes, diffs] = get_filtered_data(activeData, viewSettings.category, viewSettings.truncation, 1000);
 
     const real_diffs = diffs.filter((d) => {
         if (!gens[d.from] || !gens[d.to]) {
@@ -351,7 +480,7 @@ export function update_ehp_chart() {
     });
 
     // Display multiplications only when both generators are alive
-    (useStableData ? stableData : mainData).multiplications.forEach((m) => {
+    activeData.multiplications.forEach((m) => {
         const fromAlive = gens[m.from] && (gens[m.from][0] == undefined || gens[m.from][0] > 0);
         const toAlive = gens[m.to] && (gens[m.to][0] == undefined || gens[m.to][0] > 0);
         if (fromAlive && toAlive) {
@@ -360,7 +489,7 @@ export function update_ehp_chart() {
     });
 
     // Display tau multiplications only when both generators are alive
-    (useStableData ? stableData : mainData).tau_mults.forEach((t) => {
+    activeData.tau_mults.forEach((t) => {
         if (viewSettings.category == Category.Synthetic) {
             const fromAlive = gens[t.from] && (gens[t.from][0] == undefined || gens[t.from][0] > 0);
             const toAlive = gens[t.to] && (gens[t.to][0] == undefined || gens[t.to][0] > 0);
@@ -369,5 +498,6 @@ export function update_ehp_chart() {
             }
         }
     });
-}
 
+    applyEhpSelectionHighlight();
+}

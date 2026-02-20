@@ -1,8 +1,5 @@
-import { Chart } from "./chart";
-import { Category, find, get_filtered_data, generating_name, generates, isUsingStableData } from "./logic";
-import { data as mainData } from "./data";
-import { data_stable as stableData } from "./data_stable";
-import { assChart, ehpChart } from "./main";
+import { Category, find, getActiveData, get_filtered_data, generating_name, generates, getSelectedGenerator, setSelectedGenerator } from "./logic";
+import { assChart } from "./main";
 import { Differential, Generators } from "./types";
 
 type InferredAssDifferential = {
@@ -27,6 +24,9 @@ const inferredAssDifferentials: Map<string, InferredAssDifferential> = new Map()
 
 export function handleAssDotClick(dot: string) {
     const baseName = dot.replace(/__ass_(src|tgt)$/, '');
+    setSelectedGenerator(baseName);
+    applyAssSelectionHighlight();
+
     console.log('ASS Dot clicked:', baseName);
     const gen = find(baseName);
     console.log(gen);
@@ -83,6 +83,21 @@ export function handleAssDotClick(dot: string) {
     floatingBox.style.display = 'block';
 }
 
+function applyAssSelectionHighlight() {
+    assChart.clear_selection_highlights();
+    const selected = getSelectedGenerator();
+    if (!selected) return;
+
+    // ASS may display a base dot (free class) or synthetic source/target dots (torsion class).
+    const preferredNames = [selected, `${selected}__ass_src`, `${selected}__ass_tgt`];
+    for (const name of preferredNames) {
+        if (assChart.name_to_location.has(name)) {
+            assChart.add_selection_highlight(name, "#ff6a00", 2.35, 0.2, 0.6);
+            return;
+        }
+    }
+}
+
 export function handleAssLineClick(from: string, to: string) {
     const key = `${from}->${to}`;
     const inferred = inferredAssDifferentials.get(key);
@@ -129,7 +144,10 @@ export function update_ass_chart(
 ) {
     assChart.clear();
     inferredAssDifferentials.clear();
-    const activeData = isUsingStableData() ? stableData : mainData;
+    const activeData = getActiveData();
+    if (!activeData) {
+        return;
+    }
 
     // Bind click handlers for ASS chart
     assChart.dotCallback = handleAssDotClick;
@@ -141,14 +159,12 @@ export function update_ass_chart(
         Category.Synthetic,
         truncation,
         1000,
-        true
     );
     const [algebraicClasses, _algebraicDiffs] = get_filtered_data(
         activeData,
         Category.Algebraic,
         truncation,
         1000,
-        true
     );
 
     // Build ASS nodes/differentials:
@@ -241,4 +257,6 @@ export function update_ass_chart(
     diffs.forEach((d) => {
         assChart.display_diff(d.from, d.to, true, d.coeff);
     });
+
+    applyAssSelectionHighlight();
 }

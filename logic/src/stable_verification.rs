@@ -83,16 +83,13 @@ fn read_rp_csv(bottom_trunc: i32, top_trunc: i32)  -> HashMap<(i32, i32), Vec<Op
 }
 
 
+
 pub fn verify_rp(data: &SyntheticSS) -> bool {
     const UNEVEN_MAX_AF_Z_COPY: i32 = 30;
     
     let mut is_valid = true;
 
-    for upper_trunc in 2..=MAX_VERIFY_SPHERE {
-        if upper_trunc & 1 == 1 && upper_trunc > 11 {
-            continue;
-        }
-        
+    for upper_trunc in (2..=MAX_VERIFY_SPHERE).step_by(2) {
         let mut expected = read_rp_csv(1, upper_trunc);
 
         let gens = get_filtered_data(data, Category::Synthetic, 1, upper_trunc + 1, 1000, None);

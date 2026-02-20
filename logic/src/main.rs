@@ -56,7 +56,7 @@ fn ahss() -> SyntheticSS {
 
 
 
-    // add_final_diagonal(&mut data);
+    add_final_diagonal(&mut data);
     println!("\n-----\nTesting if stable data is well-defined, meaning differentials / multiplications understand have generators which exist.)\n-----\n");
     if !verify_integrity(&data) {
         exit(1);
@@ -83,7 +83,7 @@ fn ehp() -> SyntheticSS {
     
     compute_inductive_generators(&mut data);
 
-    add_final_diagonal(&mut data);
+    // add_final_diagonal(&mut data);
     write_typescript_file("../site/src/data.ts", "", &data).unwrap();
     println!("\n-----\nTesting if data is well-defined, meaning differentials / multiplications understand have generators which exist.)\n-----\n");
     if !verify_integrity(&data) {
@@ -124,7 +124,7 @@ fn main() {
     let e = ehp();
     let a = ahss();
 
-    // verify_ehp_to_ahss(&e, &a);
+    verify_ehp_to_ahss(&e, &a);
     
     println!("\nProgram took: {:.2?}", start.elapsed());
 }

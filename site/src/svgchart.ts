@@ -1,4 +1,5 @@
-import * as d3 from "d3";
+import { select } from "d3-selection";
+import { zoom, zoomIdentity, zoomTransform } from "d3-zoom";
 import { ChartMode } from "./chartMode";
 import { ASS_CHART_CSS, EHP_CHART_CSS } from "./svg_chart_styles";
 
@@ -52,6 +53,8 @@ export class SvgChart extends HTMLElement {
     public zoom: any;
     public select: any;
     public zoomTimeout: number;
+    private xAxisLabelNodes: Map<number, SVGTextElement>;
+    private yAxisLabelNodes: Map<number, SVGTextElement>;
 
     public inner: HTMLElement;
     public axis: HTMLElement;
@@ -124,6 +127,8 @@ export class SvgChart extends HTMLElement {
         this.attachShadow({ mode: 'open' });
 
         this.animationId = null;
+        this.xAxisLabelNodes = new Map();
+        this.yAxisLabelNodes = new Map();
 
         // Default to x >= 0 and y >= 0
         this.chartMinX = 0;
@@ -216,8 +221,8 @@ this.svg.innerHTML =
             this[item] = this.shadowRoot.getElementById(`${item}`);
         }
 
-        this.select = d3.select(this.svg);
-        this.zoom = d3.zoom().on('zoom', this._zoomFunc.bind(this));
+        this.select = select(this.svg);
+        this.zoom = zoom().on('zoom', this._zoomFunc.bind(this));
 
         if (navigator.userAgent.includes('Firefox')) {
             this.zoom.on('zoom', e => {
@@ -266,19 +271,20 @@ this.svg.innerHTML =
     _zoomFuncInner({ transform }) {
         this.inner.setAttribute('transform', transform);
         this.updateGridCoverage(transform);
-        while (this.axisLabels.firstChild) {
-            this.axisLabels.removeChild(this.axisLabels.firstChild);
-        }
 
         const sep = 1;
         const isASS = this.mode === ChartMode.ASS;
+        const visibleX = new Set<number>();
+        const visibleY = new Set<number>();
 
         // X-axis labels
         const minX = Math.max(0, Math.ceil(transform.invertX(0)));
         const maxX = Math.floor(transform.invertX(this.width));
 
         for (let x = minX; x <= maxX; x += sep) {
-            const textNode = document.createElementNS(svgNS, 'text');
+            visibleX.add(x);
+            const textNode = this.getOrCreateAxisLabelNode(this.xAxisLabelNodes, x);
+            textNode.style.display = "";
             textNode.textContent = x.toString();
             // ASS: on grid lines (x), EHP: centered in boxes (x + 0.5)
             const xPos = isASS ? x : x + 0.5;
@@ -288,7 +294,6 @@ this.svg.innerHTML =
             textNode.setAttribute('y', xLabelY.toString());
             textNode.setAttribute('text-anchor', 'middle');
             textNode.setAttribute('dominant-baseline', isASS ? 'hanging' : 'text-after-edge');
-            this.axisLabels.appendChild(textNode);
         }
 
         // Y-axis labels
@@ -296,11 +301,16 @@ this.svg.innerHTML =
         const maxY = Math.floor(transform.invertY(this.height));
 
         for (let y = minY; y <= maxY; y += sep) {
-            const textNode = document.createElementNS(svgNS, 'text');
+            visibleY.add(y);
+            const textNode = this.getOrCreateAxisLabelNode(this.yAxisLabelNodes, y);
             // ASS: show flipped value (0 at bottom), EHP: normal value
             const displayY = isASS ? Math.round(this.chartMaxY - y) : y;
-            if (isASS && displayY < 0) continue;
+            if (isASS && displayY < 0) {
+                textNode.style.display = "none";
+                continue;
+            }
 
+            textNode.style.display = "";
             textNode.textContent = displayY.toString();
             // ASS: on grid lines (y), EHP: centered in boxes (y + 0.5)
             const yPos = isASS ? y : y + 0.5;
@@ -308,8 +318,10 @@ this.svg.innerHTML =
             textNode.setAttribute('x', (-SvgChart.LABEL_MARGIN).toString());
             textNode.setAttribute('text-anchor', 'end');
             textNode.setAttribute('dominant-baseline', 'middle');
-            this.axisLabels.appendChild(textNode);
         }
+
+        this.hideUnusedAxisLabels(this.xAxisLabelNodes, visibleX);
+        this.hideUnusedAxisLabels(this.yAxisLabelNodes, visibleY);
     }
 
     private updateGridCoverage(transform: any) {
@@ -357,7 +369,7 @@ this.svg.innerHTML =
             y = this.mode === ChartMode.ASS ? minYTranslate : maxYTranslate;
         }
 
-        return d3.zoomIdentity.translate(x, y).scale(k);
+        return zoomIdentity.translate(x, y).scale(k);
     }
 
     private getDefaultAnchoredTransform(min_k: number) {
@@ -367,7 +379,7 @@ this.svg.innerHTML =
         const y = this.mode === ChartMode.ASS
             ? -this.maxY * min_k + this.height
             : -this.minY * min_k;
-        return d3.zoomIdentity.translate(x, y).scale(min_k);
+        return zoomIdentity.translate(x, y).scale(min_k);
     }
 
     /**
@@ -433,11 +445,29 @@ this.svg.innerHTML =
 
         // Reapply a valid constrained transform after resize.
         // ASS always refits to the bottom-left anchor; EHP preserves user location when possible.
-        const currentTransform = d3.zoomTransform(this.svg);
+        const currentTransform = zoomTransform(this.svg);
         const targetTransform = this.mode === ChartMode.ASS
             ? this.getDefaultAnchoredTransform(min_k)
             : this.constrainTransform(currentTransform, min_k);
         this.zoom.transform(this.select, this.constrainTransform(targetTransform, min_k));
+    }
+
+    private getOrCreateAxisLabelNode(cache: Map<number, SVGTextElement>, key: number): SVGTextElement {
+        let textNode = cache.get(key);
+        if (!textNode) {
+            textNode = document.createElementNS(svgNS, 'text');
+            cache.set(key, textNode);
+            this.axisLabels.appendChild(textNode);
+        }
+        return textNode;
+    }
+
+    private hideUnusedAxisLabels(cache: Map<number, SVGTextElement>, visibleValues: Set<number>) {
+        cache.forEach((node, key) => {
+            if (!visibleValues.has(key)) {
+                node.style.display = "none";
+            }
+        });
     }
 }
 customElements.define('svg-chart', SvgChart);

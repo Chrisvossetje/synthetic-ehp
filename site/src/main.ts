@@ -1,5 +1,5 @@
 import { Chart } from "./chart";
-import { viewSettings, update_ehp_chart, fill_ehp_chart, Category, switchDataSource, isUsingStableData } from "./logic";
+import { viewSettings, update_ehp_chart, fill_ehp_chart, Category, switchDataSource, isUsingStableData, initializeData, ensureStableDataLoading, isStableDataReady } from "./logic";
 import { update_ass_chart } from "./ass_logic";
 import { ChartMode } from "./chartMode";
 import { startScreenshot, handleScreenshotPointerDown, handleScreenshotPointerMove, handleScreenshotPointerUp, cancelScreenshot, isScreenshotMode } from "./screenshot";
@@ -20,18 +20,9 @@ declare global {
     }
 }
 
-// Initialize both charts
-fill_ehp_chart();
-
-// Update charts with initial data
-update_ehp_chart();
-update_ass_chart(viewSettings.truncation);
-
-// Set initial global chart reference
-window.chartInstance = ehpChart;
-
-setupUIControls();
-setupScreenshotHandlers();
+bootstrap().catch((error) => {
+    console.error("Failed to initialize data", error);
+});
 
 function updateActiveChart() {
     if (isEHPActive) {
@@ -48,8 +39,11 @@ function setupUIControls() {
     // Data source switch (data.ts vs data_stable.ts)
     const dataSourceSwitch = document.getElementById('data-source-switch') as HTMLInputElement;
     if (dataSourceSwitch) {
-        dataSourceSwitch.addEventListener('change', () => {
-            switchDataSource();
+        dataSourceSwitch.addEventListener('change', async () => {
+            dataSourceSwitch.disabled = true;
+            await switchDataSource();
+            dataSourceSwitch.checked = isUsingStableData();
+            dataSourceSwitch.disabled = false;
             updateActiveChart();
         });
     }
@@ -114,11 +108,18 @@ function setupUIControls() {
         updateActiveChart();
     });
 
+    let truncationDebounceTimeout: number | null = null;
     truncationInput.addEventListener('input', () => {
         if (truncationCheckbox.checked) {
-            const value = parseInt(truncationInput.value);
-            viewSettings.truncation = isNaN(value) ? null : value;
-            updateActiveChart();
+            if (truncationDebounceTimeout !== null) {
+                window.clearTimeout(truncationDebounceTimeout);
+            }
+            truncationDebounceTimeout = window.setTimeout(() => {
+                const value = parseInt(truncationInput.value);
+                viewSettings.truncation = isNaN(value) ? null : value;
+                updateActiveChart();
+                truncationDebounceTimeout = null;
+            }, 120);
         }
     });
 }
@@ -152,7 +153,16 @@ function setupScreenshotHandlers() {
 }
 
 function setupKeyboardControls() {
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', async (e) => {
+        // Escape closes the info popup first.
+        if (e.key === 'Escape') {
+            const floatingBox = document.getElementById('floatingBox');
+            if (floatingBox && floatingBox.style.display !== 'none') {
+                floatingBox.style.display = 'none';
+                return;
+            }
+        }
+
         // Escape key cancels screenshot mode
         if (e.key === 'Escape' && isScreenshotMode()) {
             cancelScreenshot();
@@ -177,9 +187,13 @@ function setupKeyboardControls() {
             // Data source switch
             case 's':
             case 'S':
-                switchDataSource();
+                if (dataSourceSwitch) {
+                    dataSourceSwitch.disabled = true;
+                }
+                await switchDataSource();
                 if (dataSourceSwitch) {
                     dataSourceSwitch.checked = isUsingStableData();
+                    dataSourceSwitch.disabled = false;
                 }
                 updateActiveChart();
                 return;
@@ -267,7 +281,7 @@ function setupKeyboardControls() {
                     viewSettings.truncation = isNaN(value) ? 5 : value;
                 }
                 if (viewSettings.truncation !== null && viewSettings.truncation !== undefined) {
-                    const newValue = Math.max(1, viewSettings.truncation - 1);
+                    const newValue = Math.max(2, viewSettings.truncation - 1);
                     viewSettings.truncation = newValue;
                     truncationInput.value = newValue.toString();
                 }
@@ -316,4 +330,35 @@ function setupKeyboardControls() {
             updateActiveChart();
         }
     });
+}
+
+async function bootstrap() {
+    await initializeData();
+    ensureStableDataLoading();
+
+    // Initialize both charts
+    fill_ehp_chart();
+
+    // Update charts with initial data
+    update_ehp_chart();
+    update_ass_chart(viewSettings.truncation);
+
+    // Set initial global chart reference
+    window.chartInstance = ehpChart;
+
+    setupUIControls();
+    setupScreenshotHandlers();
+
+    const dataSourceSwitch = document.getElementById('data-source-switch') as HTMLInputElement;
+    if (dataSourceSwitch && !isStableDataReady()) {
+        dataSourceSwitch.disabled = true;
+        ensureStableDataLoading()
+            .then(() => {
+                dataSourceSwitch.disabled = false;
+            })
+            .catch((error) => {
+                console.error("Failed to preload stable data", error);
+                dataSourceSwitch.disabled = false;
+            });
+    }
 }

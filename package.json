@@ -4,10 +4,10 @@
   },
   "scripts": {
     "init": "rm -r -f ./_site && rm -r -f ./site/pkg && cp -r ./site/static ./_site",
-    "build": "npm run init && esbuild ./site/src/main.ts --bundle --outfile=./_site/index.js --format=esm --target=es2016",
-    "minify": "npm run init && esbuild ./site/src/main.ts --bundle --outfile=./_site/index.js --format=esm --target=es2016 --minify",
-    "minify_alt": "esbuild ./site/src/main.ts --bundle --outfile=./_site/index.js --format=esm --target=es2016 --minify",
-    "watch": "npm run init && esbuild ./site/src/main.ts --bundle --outfile=./_site/index.js --format=esm --target=es2016 --watch",
+    "build": "npm run init && esbuild ./site/src/main.ts --bundle --outdir=./_site --entry-names=index --chunk-names=chunks/[name]-[hash] --splitting --format=esm --target=es2016",
+    "minify": "npm run init && esbuild ./site/src/main.ts --bundle --outdir=./_site --entry-names=index --chunk-names=chunks/[name]-[hash] --splitting --format=esm --target=es2016 --minify",
+    "minify_alt": "esbuild ./site/src/main.ts --bundle --outdir=./_site --entry-names=index --chunk-names=chunks/[name]-[hash] --splitting --format=esm --target=es2016 --minify",
+    "watch": "npm run init && esbuild ./site/src/main.ts --bundle --outdir=./_site --entry-names=index --chunk-names=chunks/[name]-[hash] --splitting --format=esm --target=es2016 --watch",
     "typecheck": "tsc -p ./site/src",
     "test": "npm run typecheck"
   },

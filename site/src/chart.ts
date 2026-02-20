@@ -2,14 +2,17 @@ import { ToStringMap } from "./stringmap";
 import { SvgChart } from "./svgchart";
 import { Differential, Generators, Multiplication, TauMult } from "./types";
 import { ChartMode } from "./chartMode";
-import { MAX_STEM } from "./data";
+import { svgNS } from "./svgchart";
 
 type Point = [number, number];
 
 const TorsionColor = ["black", "#0080ff", "red", "mediumseagreen", "cyan", "purple"];
 
 export class Chart {
+    private static cachedInvalidCells: string | null = null;
+
     public svgchart: SvgChart;
+    private maxStem: number = 32;
 
     // Use generator names as unique identifiers
     public name_to_location: Map<string, Point> = new Map();
@@ -97,6 +100,10 @@ export class Chart {
     // Set all generators (complete data set)
     set_all_generators(generators: Generators[]) {
         this.generators = generators;
+        this.maxStem = this.computeMaxStem();
+        if (this.mode === ChartMode.EHP) {
+            Chart.cachedInvalidCells = null;
+        }
     }
 
     // Set all differentials (complete data set)
@@ -112,6 +119,40 @@ export class Chart {
     // Set all tau multiplications (complete data set)
     set_all_tau_mults(tau_mults: TauMult[]) {
         this.tau_mults = tau_mults;
+    }
+
+    private get_dot_radius(): number {
+        return this.mode === ChartMode.ASS ? 0.07 : 0.022;
+    }
+
+    clear_selection_highlights() {
+        const contents = this.svgchart.shadowRoot?.getElementById("contents");
+        if (!contents) return;
+        contents.querySelectorAll(".selection-highlight-ring").forEach((el) => el.remove());
+    }
+
+    add_selection_highlight(
+        name: string,
+        color: string,
+        scale: number = 1.8,
+        strokeWidthScale: number = 0.14,
+        fillOpacity: number = 0.35
+    ) {
+        const loc = this.name_to_location.get(name);
+        const contents = this.svgchart.shadowRoot?.getElementById("contents");
+        if (!loc || !contents) return;
+
+        const ring = document.createElementNS(svgNS, "circle");
+        ring.setAttribute("class", "selection-highlight-ring");
+        ring.setAttribute("cx", loc[0].toString());
+        ring.setAttribute("cy", loc[1].toString());
+        ring.setAttribute("r", (this.get_dot_radius() * scale).toString());
+        ring.setAttribute("fill", color);
+        ring.setAttribute("fill-opacity", fillOpacity.toString());
+        ring.setAttribute("stroke", color);
+        ring.setAttribute("stroke-width", (this.get_dot_radius() * strokeWidthScale).toString());
+        ring.setAttribute("pointer-events", "none");
+        contents.prepend(ring);
     }
 
     display_dot(gen_name: string, display: boolean, permanent: boolean, torsion: number | null, filtration?: number) {
@@ -211,7 +252,7 @@ export class Chart {
     }
 
     generate_dot(x: number, y: number, name: string, style: string = "") {
-        const radius = this.mode === ChartMode.ASS ? "0.07" : "0.022";
+        const radius = this.get_dot_radius().toString();
         return `<circle class="generator-dot" id="dot-${name}" cx="${x}" cy="${y}" r="${radius}" style="${style}" onclick="window.chartInstance.handleDotClickEvent('${name}')"/>`;
     }
 
@@ -253,7 +294,7 @@ export class Chart {
         }
 
         // Use MAX_STEM for bounds
-        let maxX = MAX_STEM;
+        let maxX = this.maxStem;
 
         // Build the path: starts at y=1, goes right 3 units, down 1 unit, repeat
         let pathData = "M 0 1"; // Start at (0, 1)
@@ -278,10 +319,13 @@ export class Chart {
         if (this.mode !== ChartMode.EHP) {
             return "";
         }
+        if (Chart.cachedInvalidCells) {
+            return Chart.cachedInvalidCells;
+        }
 
         // Use MAX_STEM + extra padding for bounds
-        let maxX = MAX_STEM + 3;
-        let maxY = MAX_STEM + 3;
+        let maxX = this.maxStem + 3;
+        let maxY = this.maxStem + 3;
 
         let cells = "";
 
@@ -304,6 +348,7 @@ export class Chart {
             }
         }
 
+        Chart.cachedInvalidCells = cells;
         return cells;
     }
 
@@ -319,9 +364,9 @@ export class Chart {
         // ASS has much smaller y-range (Adams filtration), while EHP uses full stem range.
         const isASS = this.mode === ChartMode.ASS;
         let minx = isASS ? -0.5 : 0;
-        let maxx = MAX_STEM + 2;
+        let maxx = this.maxStem + 2;
         let miny = 0;
-        let maxy = isASS ? Math.ceil(MAX_STEM / 2) + 2 : MAX_STEM + 2;
+        let maxy = isASS ? Math.ceil(this.maxStem / 2) + 2 : this.maxStem + 2;
 
         // Only update size if bounds have changed
         const newBounds: [number, number, number, number] = [minx, maxx, miny, maxy];
@@ -423,7 +468,7 @@ export class Chart {
         let filtrationLabels = "";
 
         // For ASS, use a fixed vertical range so AF=0 is consistently at the bottom.
-        const maxY = isASS ? Math.ceil(MAX_STEM / 2) + 2 : 0;
+        const maxY = isASS ? Math.ceil(this.maxStem / 2) + 2 : 0;
 
         Object.values(temp.map).forEach((gens) => {
             gens.forEach((gen, index) => {
@@ -458,6 +503,14 @@ export class Chart {
 
         // Labels should be rendered after dots so they appear on top
         return dots + labels + filtrationLabels;
+    }
+
+    private computeMaxStem(): number {
+        let maxStem = 0;
+        this.generators.forEach((gen) => {
+            maxStem = Math.max(maxStem, gen.x, gen.y);
+        });
+        return maxStem || 32;
     }
 
     init_diffs(): string {

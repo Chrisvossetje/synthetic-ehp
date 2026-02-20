@@ -8,7 +8,7 @@ pub fn synthetic_stable_e1(data: &mut SyntheticSS) {
         ("5 1 2 3 3", Some(2)), ("14 1", Some(0)), // Stem 14/15
         ("3 4 4 1 1 1", Some(2)), ("13 1 1", Some(0)), // Stem 14/15
         ("1 2 4 3 3 3", Some(1)), ("8 3 3 3", Some(0)), // Stem 16/17
-        ("2 2 4 3 3 3", Some(1)), ("5 7 3 3", Some(0)), // Stem 17/18 TODO: RHS source not clear, could be 9 3 3 3, but this has probably a h_0 to 4 5 3 3 3.
+        ("2 2 4 3 3 3", Some(1)), ("5 7 3 3", Some(0)), // Stem 17/18
         ("1 1 2 4 3 3 3", Some(1)), ("4 5 3 3 3", Some(0)), // Stem 17/18
         ("5 1 2 3 4 4 1 1 1", Some(1)), ("13 1 2 4 1 1 1", Some(0)), // Stem 22/23
         ("3 4 4 1 1 2 4 1 1 1", Some(1)), ("12 1 1 2 4 1 1 1", Some(0)), // Stem 22/23
@@ -19,6 +19,22 @@ pub fn synthetic_stable_e1(data: &mut SyntheticSS) {
         ("4 2 2 2 4 5 3 3 3", Some(1)), ("6 2 3 5 7 3 3", Some(0)), // Stem 28/29
         ("2 2 2 2 2 4 5 3 3 3", Some(1)), ("3 6 2 4 5 3 3 3", Some(0)), // Stem 28/29
         ("2 2 2 2 3 5 7 3 3", Some(2)), ("12 4 5 3 3 3", Some(0)), // Stem 29/30
+
+        ("14 13 3", Some(1)), ("31", Some(0)), // Stem 30/31
+        ("13 11 3 3", Some(1)), ("30 1", Some(0)), // Stem 30/31
+        ("12 9 3 3 3", Some(1)), ("29 1 1", Some(0)), // Stem 30/31 // TODO: All todos this stem wrt. source, prob check wrt. EHP ?
+
+        ("10 2 4 5 3 3 3", Some(2)), ("28 1 1 1", Some(0)), // Stem 30/31
+        ("7 13 1 2 4 1 1 1", Some(2)), ("24 4 1 1 1", Some(0)), // Stem 30/31 // TODO
+        ("5 8 1 1 2 4 3 3 3", Some(2)), ("22 2 4 1 1 1", Some(0)), // Stem 30/31
+        ("4 2 2 2 2 4 5 3 3 3", Some(2)), ("21 1 2 4 1 1 1", Some(0)), // Stem 30/31 
+        ("2 2 2 2 2 2 4 5 3 3 3", Some(2)), ("20 1 1 2 4 1 1 1", Some(0)), // Stem 30/31 // TODO
+
+        ("6 2 3 4 4 1 1 2 4 1 1 1", Some(3)), ("5 6 2 4 5 3 3 3", Some(0)), // Stem 30/31 // TODO
+        ("5 1 2 3 4 4 1 1 2 4 1 1 1", Some(3)), ("16 4 1 1 2 4 1 1 1", Some(0)), // Stem 30/31 // TODO
+        ("3 4 4 1 1 2 4 1 1 2 4 1 1 1", Some(3)), ("14 2 4 1 1 2 4 1 1 1", Some(0)), // Stem 30/31 // TODO 
+
+        ("3 4 4 1 1 2 4 1 1 2 4 1 1 1", Some(3)), ("14 2 4 1 1 2 4 1 1 1", Some(0)), // Stem 31/32 // TODO: Target
     ];
         
     for i in a {
