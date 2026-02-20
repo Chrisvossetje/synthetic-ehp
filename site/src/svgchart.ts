@@ -37,6 +37,10 @@ export class SvgChart extends HTMLElement {
     public minY: number;
     public maxX: number;
     public maxY: number;
+    public chartMinX: number;
+    public chartMinY: number;
+    public chartMaxX: number;
+    public chartMaxY: number;
 
     public height: number;
     public width: number;
@@ -59,6 +63,7 @@ export class SvgChart extends HTMLElement {
     public yBlock: HTMLElement;
     public topBorder: HTMLElement;
     public leftBorder: HTMLElement;
+    public bottomBorder: HTMLElement;
 
     public node_style: HTMLElement;
     public line_style: HTMLElement;
@@ -93,25 +98,23 @@ export class SvgChart extends HTMLElement {
     }
 
     public set_size(minx, maxx, miny, maxy) {
-        // Enforce x >= 0 and y >= 0
-        this.minX = Math.max(0, minx - SvgChart.GRID_MARGIN);
+        this.chartMinX = minx;
+        this.chartMaxX = maxx;
+        this.chartMinY = miny;
+        this.chartMaxY = maxy;
+
+        // ASS can use a small negative minX; EHP stays clamped at x >= 0.
+        if (this.mode === ChartMode.ASS) {
+            this.minX = minx;
+        } else {
+            this.minX = Math.max(0, minx - SvgChart.GRID_MARGIN);
+        }
         this.maxX = maxx + SvgChart.GRID_MARGIN;
         this.minY = Math.max(0, miny - SvgChart.GRID_MARGIN);
-        this.maxY = maxy + SvgChart.GRID_MARGIN;
+        this.maxY = this.mode === ChartMode.ASS ? maxy + 0.5 : maxy + SvgChart.GRID_MARGIN;
 
-        // Call onResize first to ensure width/height are set
+        // Resize/re-anchor is handled centrally in onResize.
         this.onResize();
-
-        // Only apply zoom transform if width and height are valid
-        if (this.width && this.height && this.width > 0 && this.height > 0) {
-            // Zoom out to show the entire chart
-            const scaleX = this.width / (this.maxX - this.minX);
-            const scaleY = this.height / (this.maxY - this.minY);
-            const scale = Math.max(scaleX, scaleY); // Choose the smaller scale to ensure full visibility
-
-            // Reset zoom to fit the new size (y is now positive, going down)
-            this.zoom.transform(this.select, d3.zoomIdentity.scale(scale).translate(-this.minX, -this.minY));
-        }
     }
 
     constructor(chartMode: ChartMode = ChartMode.EHP) {
@@ -123,6 +126,10 @@ export class SvgChart extends HTMLElement {
         this.animationId = null;
 
         // Default to x >= 0 and y >= 0
+        this.chartMinX = 0;
+        this.chartMinY = 0;
+        this.chartMaxX = 20;
+        this.chartMaxY = 20;
         this.minX = 0;
         this.minY = 0;
         this.maxX = 20 + SvgChart.GRID_MARGIN;
@@ -187,7 +194,8 @@ this.svg.innerHTML =
             SvgChart.MARGIN
         }" y="0" fill="white"/>
 <rect id="yBlock" x="${-SvgChart.MARGIN}" width="${SvgChart.MARGIN}" fill="white"/>
-<path id="axis" stroke="black" stroke-width="2" fill="none" />
+<line id="leftBorder" x1="0" y1="0" x2="0" y2="1000" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke"/>
+<line id="bottomBorder" x1="0" y1="1000" x2="1000" y2="1000" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke"/>
 <g id="axisLabels"></g>
 `
         }
@@ -203,6 +211,7 @@ this.svg.innerHTML =
             'yBlock',
             'topBorder',
             'leftBorder',
+            'bottomBorder',
         ]) {
             this[item] = this.shadowRoot.getElementById(`${item}`);
         }
@@ -256,6 +265,7 @@ this.svg.innerHTML =
 
     _zoomFuncInner({ transform }) {
         this.inner.setAttribute('transform', transform);
+        this.updateGridCoverage(transform);
         while (this.axisLabels.firstChild) {
             this.axisLabels.removeChild(this.axisLabels.firstChild);
         }
@@ -273,21 +283,23 @@ this.svg.innerHTML =
             // ASS: on grid lines (x), EHP: centered in boxes (x + 0.5)
             const xPos = isASS ? x : x + 0.5;
             textNode.setAttribute('x', transform.applyX(xPos).toString());
-            textNode.setAttribute('y', (-SvgChart.LABEL_MARGIN).toString());
+            // ASS labels sit at the bottom margin and remain fixed while panning/zooming.
+            const xLabelY = isASS ? this.height + SvgChart.LABEL_MARGIN : -SvgChart.LABEL_MARGIN;
+            textNode.setAttribute('y', xLabelY.toString());
             textNode.setAttribute('text-anchor', 'middle');
-            textNode.setAttribute('dominant-baseline', 'text-after-edge');
+            textNode.setAttribute('dominant-baseline', isASS ? 'hanging' : 'text-after-edge');
             this.axisLabels.appendChild(textNode);
         }
 
         // Y-axis labels
-        const minY = Math.max(0, Math.ceil(transform.invertY(0)));
+        const minY = isASS ? Math.ceil(transform.invertY(0)) : Math.max(0, Math.ceil(transform.invertY(0)));
         const maxY = Math.floor(transform.invertY(this.height));
 
         for (let y = minY; y <= maxY; y += sep) {
             const textNode = document.createElementNS(svgNS, 'text');
             // ASS: show flipped value (0 at bottom), EHP: normal value
-            const displayY = isASS ? Math.round(this.maxY - y) : y;
-            if (isASS && (displayY < 0 || displayY > this.maxY)) continue;
+            const displayY = isASS ? Math.round(this.chartMaxY - y) : y;
+            if (isASS && displayY < 0) continue;
 
             textNode.textContent = displayY.toString();
             // ASS: on grid lines (y), EHP: centered in boxes (y + 0.5)
@@ -298,6 +310,64 @@ this.svg.innerHTML =
             textNode.setAttribute('dominant-baseline', 'middle');
             this.axisLabels.appendChild(textNode);
         }
+    }
+
+    private updateGridCoverage(transform: any) {
+        const visibleMinX = transform.invertX(0);
+        const visibleMaxX = transform.invertX(this.width);
+        const visibleMinY = transform.invertY(0);
+        const visibleMaxY = transform.invertY(this.height);
+
+        const grid_min_x = Math.floor(Math.min(this.minX, visibleMinX));
+        const grid_max_x = Math.max(Math.ceil(this.maxX), Math.ceil(visibleMaxX));
+        const grid_min_y = this.mode === ChartMode.ASS ? Math.floor(Math.min(0, visibleMinY)) : 0;
+        const grid_max_y = Math.max(Math.ceil(this.maxY), Math.ceil(visibleMaxY));
+
+        this.grid.setAttribute('x', grid_min_x.toString());
+        this.grid.setAttribute('y', grid_min_y.toString());
+        this.grid.setAttribute('width', (grid_max_x - grid_min_x).toString());
+        this.grid.setAttribute('height', (grid_max_y - grid_min_y).toString());
+    }
+
+    private constrainTransform(transform: any, min_k: number) {
+        let x = transform.x;
+        let y = transform.y;
+        let k = transform.k;
+
+        k = Math.max(k, min_k);
+
+        const minXTranslate = -this.maxX * k + this.width;
+        const maxXTranslate = -this.minX * k;
+        if (minXTranslate <= maxXTranslate) {
+            x = Math.max(x, minXTranslate);
+            x = Math.min(x, maxXTranslate);
+        } else {
+            // Viewport is wider than content; prefer left alignment.
+            x = maxXTranslate;
+        }
+
+        const minYTranslate = -this.maxY * k + this.height;
+        const maxYTranslate = -this.minY * k;
+        if (minYTranslate <= maxYTranslate) {
+            y = Math.max(y, minYTranslate);
+            y = Math.min(y, maxYTranslate);
+        } else {
+            // Viewport is taller than content.
+            // ASS: bottom-align; EHP: top-align.
+            y = this.mode === ChartMode.ASS ? minYTranslate : maxYTranslate;
+        }
+
+        return d3.zoomIdentity.translate(x, y).scale(k);
+    }
+
+    private getDefaultAnchoredTransform(min_k: number) {
+        // Left edge is fixed for both modes.
+        const x = -this.minX * min_k;
+        // EHP anchors at top; ASS anchors at bottom so extra space appears above.
+        const y = this.mode === ChartMode.ASS
+            ? -this.maxY * min_k + this.height
+            : -this.minY * min_k;
+        return d3.zoomIdentity.translate(x, y).scale(min_k);
     }
 
     /**
@@ -325,56 +395,49 @@ this.svg.innerHTML =
             this.height / (this.maxY - this.minY),
         );
 
-        this.svg.setAttribute(
-            'viewBox',
-            `${-SvgChart.MARGIN} ${-SvgChart.MARGIN} ${size.width} ${size.height}`,
-        );
+        if (this.mode === ChartMode.ASS) {
+            // ASS reserves margin on the left and bottom (not top).
+            this.svg.setAttribute(
+                'viewBox',
+                `${-SvgChart.MARGIN} 0 ${size.width} ${size.height}`,
+            );
+        } else {
+            this.svg.setAttribute(
+                'viewBox',
+                `${-SvgChart.MARGIN} ${-SvgChart.MARGIN} ${size.width} ${size.height}`,
+            );
+        }
 
-        this.zoom.constrain(transform => {
-            let x = transform.x;
-            let y = transform.y;
-            let k = transform.k;
-
-            k = Math.max(k, min_k);
-
-            x = Math.max(x, -this.maxX * k + this.width);
-            x = Math.min(x, -this.minX * k);
-
-            y = Math.max(y, -this.maxY * k + this.height);
-            y = Math.min(y, -this.minY * k);
-
-            return d3.zoomIdentity.translate(x, y).scale(k);
-        });
+        this.zoom.constrain(transform => this.constrainTransform(transform, min_k));
 
         // xBlock covers the top margin area (where x-axis labels go)
         this.xBlock.setAttribute('width', size.width.toString());
+        if (this.mode === ChartMode.ASS) {
+            this.xBlock.setAttribute('y', this.height.toString());
+        }
 
         // yBlock covers the left margin area (where y-axis labels go)
         this.yBlock.setAttribute('height', size.height.toString());
-
-        // Grid should fill the entire visible viewport area
-        // Calculate visible area in chart coordinates based on current scale
-        const currentScale = this.zoom.scale ? this.zoom.scale() : 1;
-        const visibleWidth = this.width / currentScale;
-        const visibleHeight = this.height / currentScale;
-
-        const grid_min_x = 0;
-        const grid_max_x = Math.max(Math.ceil(this.maxX), Math.ceil(this.minX + visibleWidth));
-        const grid_min_y = 0;
-        const grid_max_y = Math.max(Math.ceil(this.maxY), Math.ceil(this.minY + visibleHeight));
-
-        this.grid.setAttribute('x', grid_min_x.toString());
-        this.grid.setAttribute('y', grid_min_y.toString());
-        this.grid.setAttribute('width', (grid_max_x - grid_min_x).toString());
-        this.grid.setAttribute('height', (grid_max_y - grid_min_y).toString());
 
         // Update border lines for EHP mode (these are in screen coordinates, not chart coordinates)
         if (this.mode === ChartMode.EHP && this.topBorder && this.leftBorder) {
             this.topBorder.setAttribute('x2', this.width.toString());
             this.leftBorder.setAttribute('y2', this.height.toString());
         }
+        if (this.mode === ChartMode.ASS && this.leftBorder && this.bottomBorder) {
+            this.leftBorder.setAttribute('y2', this.height.toString());
+            this.bottomBorder.setAttribute('x2', this.width.toString());
+            this.bottomBorder.setAttribute('y1', this.height.toString());
+            this.bottomBorder.setAttribute('y2', this.height.toString());
+        }
 
-        this.zoom.scaleBy(this.select, 1);
+        // Reapply a valid constrained transform after resize.
+        // ASS always refits to the bottom-left anchor; EHP preserves user location when possible.
+        const currentTransform = d3.zoomTransform(this.svg);
+        const targetTransform = this.mode === ChartMode.ASS
+            ? this.getDefaultAnchoredTransform(min_k)
+            : this.constrainTransform(currentTransform, min_k);
+        this.zoom.transform(this.select, this.constrainTransform(targetTransform, min_k));
     }
 }
 customElements.define('svg-chart', SvgChart);

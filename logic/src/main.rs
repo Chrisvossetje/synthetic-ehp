@@ -75,15 +75,15 @@ fn ahss() -> SyntheticSS {
 fn ehp() -> SyntheticSS {
     let mut data = generate_algebraic_data();
 
-    // add_diffs(&mut data);
-    // add_induced_names(&mut data);
-    // add_tau_mults(&mut data);
+    add_diffs(&mut data);
+    add_induced_names(&mut data);
+    add_tau_mults(&mut data);
 
-    // data.differentials.sort();
+    data.differentials.sort();
     
-    // compute_inductive_generators(&mut data);
+    compute_inductive_generators(&mut data);
 
-    // add_final_diagonal(&mut data);
+    add_final_diagonal(&mut data);
     write_typescript_file("../site/src/data.ts", "", &data).unwrap();
     println!("\n-----\nTesting if data is well-defined, meaning differentials / multiplications understand have generators which exist.)\n-----\n");
     if !verify_integrity(&data) {
@@ -122,7 +122,7 @@ fn main() {
     let start = Instant::now();
 
     let e = ehp();
-    // let a = ahss();
+    let a = ahss();
 
     // verify_ehp_to_ahss(&e, &a);
     

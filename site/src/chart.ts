@@ -33,18 +33,27 @@ export class Chart {
 
     // Chart display mode (EHP vs ASS)
     public readonly mode: ChartMode;
+    private showNames: boolean;
+    private showFiltration: boolean;
 
     public dotCallback: Function;
     public lineCallback: Function;
 
     constructor(containerId: string, mode: ChartMode) {
         this.mode = mode;
+        this.showNames = mode !== ChartMode.ASS;
+        this.showFiltration = mode !== ChartMode.ASS;
         // Pass mode to SvgChart for appropriate styling
         this.svgchart = new SvgChart(mode);
         const container = document.getElementById(containerId);
         if (container) {
             container.append(this.svgchart);
         }
+    }
+
+    set_label_display(showNames: boolean, showFiltration: boolean) {
+        this.showNames = showNames;
+        this.showFiltration = showFiltration;
     }
 
     clear() {
@@ -202,7 +211,7 @@ export class Chart {
     }
 
     generate_dot(x: number, y: number, name: string, style: string = "") {
-        const radius = this.mode === ChartMode.ASS ? "0.08" : "0.022";
+        const radius = this.mode === ChartMode.ASS ? "0.07" : "0.022";
         return `<circle class="generator-dot" id="dot-${name}" cx="${x}" cy="${y}" r="${radius}" style="${style}" onclick="window.chartInstance.handleDotClickEvent('${name}')"/>`;
     }
 
@@ -279,14 +288,17 @@ export class Chart {
         // Generate crossed-out cells for:
         // 1. First row (y = 0), except for (0, 0)
         // 2. Below diagonal (x < y)
-        for (let y = 0; y <= maxY; y++) {
+        for (let x = 1; x <= maxX*2 + 10; x++) {
+            cells += `<rect x="${x}" y="${0}" width="1" height="1" fill="url(#crossPattern)" pointer-events="none"/>\n`;
+        }
+        for (let y = 1; y <= maxY; y++) {
             for (let x = 0; x <= maxX; x++) {
                 // Skip the (0, 0) cell
                 if (x === 0 && y === 0) {
                     continue;
                 }
                 // Check if this cell should be crossed out
-                if (y === 0 || x < y) {
+                if (x < y) {
                     cells += `<rect x="${x}" y="${y}" width="1" height="1" fill="url(#crossPattern)" pointer-events="none"/>\n`;
                 }
             }
@@ -303,11 +315,13 @@ export class Chart {
         let stableLine = this.generate_stable_line();
         let invalidCells = this.generate_invalid_cells();
 
-        // Use fixed bounds based on MAX_STEM (add 2 for padding)
-        let minx = 0;
+        // Use fixed bounds for predictable zoom/pan behavior.
+        // ASS has much smaller y-range (Adams filtration), while EHP uses full stem range.
+        const isASS = this.mode === ChartMode.ASS;
+        let minx = isASS ? -0.5 : 0;
         let maxx = MAX_STEM + 2;
         let miny = 0;
-        let maxy = MAX_STEM + 2;
+        let maxy = isASS ? Math.ceil(MAX_STEM / 2) + 2 : MAX_STEM + 2;
 
         // Only update size if bounds have changed
         const newBounds: [number, number, number, number] = [minx, maxx, miny, maxy];
@@ -408,12 +422,12 @@ export class Chart {
         let labels = "";
         let filtrationLabels = "";
 
-        // Find max Y for flipping in ASS mode
-        const maxY = isASS ? Math.max(...this.generators.map(g => g.y)) : 0;
+        // For ASS, use a fixed vertical range so AF=0 is consistently at the bottom.
+        const maxY = isASS ? Math.ceil(MAX_STEM / 2) + 2 : 0;
 
         Object.values(temp.map).forEach((gens) => {
             gens.forEach((gen, index) => {
-                const step = 0.08;
+                const step = isASS ? 0.12 : 0.08;
                 const offset = -((gens.length - 1) / 2) * step;
 
                 // Apply mode-specific offsets
@@ -424,7 +438,7 @@ export class Chart {
                 if (isASS) {
                     // ASS mode: flip Y so y=0 appears at bottom
                     // Map gen.y=0 -> maxY, gen.y=maxY -> 0
-                    y = (maxY - gen.y) + yOffset + yOffsetAdjust;
+                    y = (maxY - gen.y) + yOffset - yOffsetAdjust;
                 } else {
                     // EHP mode: normal Y axis (y=0 at top)
                     y = gen.y + yOffset - yOffsetAdjust;
@@ -433,8 +447,12 @@ export class Chart {
                 this.name_to_location.set(gen.name, [x, y]);
 
                 dots += this.generate_dot(x, y, gen.name, "") + "\n";
-                labels += this.generate_label(x, y, gen.name) + "\n";
-                filtrationLabels += this.generate_filtration_label(x, y, gen.name, gen.adams_filtration) + "\n";
+                if (this.showNames) {
+                    labels += this.generate_label(x, y, gen.name) + "\n";
+                }
+                if (this.showFiltration) {
+                    filtrationLabels += this.generate_filtration_label(x, y, gen.name, gen.adams_filtration) + "\n";
+                }
             });
         });
 
@@ -455,7 +473,8 @@ export class Chart {
                 return "";
             }
 
-            return this.generate_diff(from_loc[0], from_loc[1], to_loc[0], to_loc[1], diff.from, diff.to, "");
+            const style = diff.fake && this.mode !== ChartMode.ASS ? "stroke-dasharray: 0.025,0.02;" : "";
+            return this.generate_diff(from_loc[0], from_loc[1], to_loc[0], to_loc[1], diff.from, diff.to, style);
         }).join("\n");
     }
 
@@ -494,4 +513,3 @@ export class Chart {
     }
 
 }
-

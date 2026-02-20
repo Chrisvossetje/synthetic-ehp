@@ -211,9 +211,10 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
         if (!fromLoc || !toLoc) continue;
 
         const color = getTikzColor(diff.coeff);
+        const lineStyle = diff.fake ? ",dotted" : "";
         const fromYFlip = flipY(fromLoc[1]);
         const toYFlip = flipY(toLoc[1]);
-        tikz += `\\draw[${color},line width=0.4pt] (${roundCoord(fromLoc[0])},${roundCoord(fromYFlip)}) -- (${roundCoord(toLoc[0])},${roundCoord(toYFlip)});\n`;
+        tikz += `\\draw[${color},line width=0.4pt${lineStyle}] (${roundCoord(fromLoc[0])},${roundCoord(fromYFlip)}) -- (${roundCoord(toLoc[0])},${roundCoord(toYFlip)});\n`;
     }
 
     // Draw generators (dots)

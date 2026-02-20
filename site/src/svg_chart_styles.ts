@@ -91,7 +91,7 @@ export const ASS_CHART_CSS = `
 
 .generator-dot:hover {
     fill: #555;
-    r: 0.04;
+    r: 0.085;
     filter: drop-shadow(0 0 0.1 rgba(0,0,0,0.4));
 }
 
@@ -102,14 +102,14 @@ export const ASS_CHART_CSS = `
 /* Differential line styles - LARGER */
 .differential-line {
     stroke: #555;
-    stroke-width: 0.012;
+    stroke-width: 0.014;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .differential-line:hover {
     stroke: #666 !important;
-    stroke-width: 0.024 !important;
+    stroke-width: 0.028 !important;
     filter: drop-shadow(0 0 0.1 rgba(0,0,0,0.4));
 }
 

@@ -94,14 +94,28 @@ pre {
 body {
     display: flex;
     flex-direction: column;
+    height: 100vh;
 }
 
 .visualizer {
     flex: 1;
+    min-height: 0;
     width: 100%;
     margin: 0;
     padding: 0;
     display: block;
+    overflow: hidden;
+}
+
+.topbar {
+    flex: 0 0 auto;
+    height: 60px;
+    width: 100%;
+    min-width: 100%;
+    align-items: center;
+    display: flex;
+    padding: 10px;
+    box-sizing: border-box;
 }
 
 svg-chart, ass-svg-chart {

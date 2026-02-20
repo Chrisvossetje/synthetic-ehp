@@ -1653,8 +1653,8 @@ export const data: SyntheticEHP = {
 {"name":"2 1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[1]","x":30,"y":1,"adams_filtration":17,"induced_name":[[0,"2 1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[1]"]]}
     ],
     "differentials": [
-{"from":"3[2]","to":"2 1[1]","coeff":0,"d":1,"proof":"Lifted AEHP differential.","fake":false},
-{"from":"2 1[2]","to":"1 1 1[1]","coeff":0,"d":1,"proof":"Lifted AEHP differential.","fake":false},
+{"from":"3[2]","to":"2 1[1]","coeff":0,"d":1,"proof":"Lifted AEHP differential.","fake":true},
+{"from":"2 1[2]","to":"1 1 1[1]","coeff":0,"d":1,"proof":"Lifted AEHP differential.","fake":true},
 {"from":"3 1[2]","to":"2 1 1[1]","coeff":0,"d":1,"proof":"Lifted AEHP differential.","fake":false},
 {"from":"3[4]","to":"2 1[3]","coeff":0,"d":1,"proof":"Lifted AEHP differential.","fake":false},
 {"from":"2 1[4]","to":"1 1 1[3]","coeff":0,"d":1,"proof":"Lifted AEHP differential.","fake":false},

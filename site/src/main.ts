@@ -7,6 +7,8 @@ import { startScreenshot, handleScreenshotPointerDown, handleScreenshotPointerMo
 // Create two separate chart instances
 export const ehpChart = new Chart('svgchart-ehp', ChartMode.EHP);
 export const assChart = new Chart('svgchart-ass', ChartMode.ASS);
+ehpChart.set_label_display(true, true);
+assChart.set_label_display(false, false);
 
 // Track which chart is currently active
 let isEHPActive = true;
@@ -48,6 +50,7 @@ function setupUIControls() {
     if (dataSourceSwitch) {
         dataSourceSwitch.addEventListener('change', () => {
             switchDataSource();
+            updateActiveChart();
         });
     }
 
@@ -178,7 +181,8 @@ function setupKeyboardControls() {
                 if (dataSourceSwitch) {
                     dataSourceSwitch.checked = isUsingStableData();
                 }
-                return; // No need for needsUpdate, switchDataSource handles everything
+                updateActiveChart();
+                return;
 
             // EHP/ASS mode switch
             case 'a':
