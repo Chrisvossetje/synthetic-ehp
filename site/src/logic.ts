@@ -86,7 +86,8 @@ export let viewSettings = {
     allDiffs: true,
     page: 1,
     category: Category.Synthetic, // 0: Synthetic, 1: Algebraic, 2: Geometric
-    truncation: undefined as number | undefined
+    truncation: undefined as number | undefined,
+    bottomTruncation: undefined as number | undefined
 };
 
 // Shared selection across all modes/data sources.
@@ -122,6 +123,46 @@ export function generating_name(gen: Generators): string {
     }
 }
 
+function parseSphereFromName(name: string): number | undefined {
+    const match = name.match(/\[(\d+)\]$/);
+    if (!match) return undefined;
+    return parseInt(match[1], 10);
+}
+
+export function getSphereLifecycleInfo(gen: Generators): { bornSphere: string; diesOnAlgebraicSphere: string } {
+    const explicitBorn = (gen as any).born;
+    const explicitDies = (gen as any).dies;
+
+    if (explicitDies === null || explicitDies === undefined) {
+        return {
+            bornSphere: explicitBorn !== undefined ? String(explicitBorn) : "Unknown",
+            diesOnAlgebraicSphere: "survives stably / does not die"
+        };
+    }
+
+    const inducedSpheres = gen.induced_name
+        .map(([sphere]) => sphere)
+        .filter((sphere) => sphere > 0);
+
+    const parsedSphere = parseSphereFromName(gen.name);
+    const born = explicitBorn !== undefined
+        ? explicitBorn
+        : inducedSpheres.length > 0
+        ? Math.min(...inducedSpheres)
+        : parsedSphere;
+    const maxPresent = explicitDies !== undefined
+        ? explicitDies - 1
+        : inducedSpheres.length > 0
+        ? Math.max(...inducedSpheres)
+        : parsedSphere;
+    const dies = maxPresent !== undefined ? maxPresent + 1 : undefined;
+
+    return {
+        bornSphere: born !== undefined ? born.toString() : "Unknown",
+        diesOnAlgebraicSphere: dies !== undefined ? dies.toString() : "Unknown"
+    };
+}
+
 
 export function generates(gen: Generators): Generators[] {
     let name = generating_name(gen);
@@ -150,14 +191,21 @@ export function get_filtered_data(
     category: Category,
     truncation: number | undefined,
     page: number,
+    allDiffs: boolean,
     limit_x?: number,
-    applyTauMults: boolean = false
+    applyTauMults: boolean = false,
+    bottomTruncation: number | undefined = undefined
 ): [Object, Differential[]] {
     // name -> torsion + adams filtration
     const torsion = new Object();
+    const original_af = new Object();
 
     data.generators.forEach((g) => {
-        if ((!truncation || g.y < truncation) && ((limit_x - 1 <= g.x && g.x <= limit_x + 1) || !limit_x)) {
+        original_af[g.name] = g.adams_filtration;
+
+        const passesTop = !truncation || g.y < truncation;
+        const passesBottom = bottomTruncation === undefined || g.y >= bottomTruncation;
+        if (passesTop && passesBottom && ((limit_x - 1 <= g.x && g.x <= limit_x + 1) || !limit_x)) {
             if (category == Category.Algebraic) { // Special Algebraic
                 torsion[g.name] = [undefined, g.adams_filtration];
             }
@@ -180,7 +228,7 @@ export function get_filtered_data(
         if (torsion[diff.from] && torsion[diff.to]) {
 
             // Only calculate diffs which would have elemented before
-            if (diff.d < page) {
+            if (diff.d < page && diff.kind == "Real") {
                 
                 // Synthetic
                 if (category == Category.Synthetic) { 
@@ -191,17 +239,19 @@ export function get_filtered_data(
                         continue;
                     }
 
+                    let coeff = diff.coeff - original_af[diff.to] + torsion[diff.to][1];
+
                     if (torsion[diff.to][0] == undefined) {
                         torsion[diff.from][0] = 0;
-                        torsion[diff.to][0] = diff.coeff;
+                        torsion[diff.to][0] = coeff;
                         diffs.push(diff);              
                     } else {                         
                         // This is where we have a diff mapping into a torsion module 
                         if (torsion[diff.from][0] > 0) {
-                            torsion[diff.from][0] = torsion[diff.from][0] - torsion[diff.to][0] + diff.coeff;
+                            torsion[diff.from][0] = torsion[diff.from][0] - torsion[diff.to][0] + coeff;
                         }
-                        torsion[diff.from][1] = torsion[diff.from][1] - torsion[diff.to][0] + diff.coeff;
-                        torsion[diff.to][0] = diff.coeff;
+                        torsion[diff.from][1] = torsion[diff.from][1] - torsion[diff.to][0] + coeff;
+                        torsion[diff.to][0] = coeff;
                         diffs.push(diff);              
                     }    
 
@@ -286,6 +336,7 @@ export function handleDotClick(dot: string) {
     // Get generating name and what it generates
     const genName = generated_by_name(gen);
     const gensList = generates(gen);
+    const sphereInfo = getSphereLifecycleInfo(gen);
 
     // Build the info display
     const floatingBox = document.getElementById('floatingBox');
@@ -311,14 +362,8 @@ export function handleDotClick(dot: string) {
         content += `Induced name: ${namesList}\n`;
     }
 
-    content += `\n<b>Generated by:</b> ${genName}\n`;
-
-    if (gensList.length > 0) {
-        content += `\n<b>Generates:</b>\n`;
-        gensList.forEach(g => {
-            content += `  • ${g.name}\n`;
-        });
-    }
+    content += `Born on sphere: ${sphereInfo.bornSphere}\n`;
+    content += `Dies on algebraic sphere: ${sphereInfo.diesOnAlgebraicSphere}\n`;
 
     content += `</pre>`;
 
@@ -445,8 +490,26 @@ export function update_ehp_chart() {
     activeData.tau_mults.forEach((t) => {
         ehpChart.display_tau_mult(t.from, t.to, false);
     });
-    const [gens, _] = get_filtered_data(activeData, viewSettings.category, viewSettings.truncation, viewSettings.page);
-    const [perm_classes, diffs] = get_filtered_data(activeData, viewSettings.category, viewSettings.truncation, 1000);
+    const [gens, _] = get_filtered_data(
+        activeData,
+        viewSettings.category,
+        viewSettings.truncation,
+        viewSettings.page,
+        viewSettings.allDiffs,
+        undefined,
+        false,
+        viewSettings.bottomTruncation
+    );
+    const [perm_classes, diffs] = get_filtered_data(
+        activeData,
+        viewSettings.category,
+        viewSettings.truncation,
+        1000,
+        viewSettings.allDiffs,
+        undefined,
+        false,
+        viewSettings.bottomTruncation
+    );
 
     const real_diffs = diffs.filter((d) => {
         if (!gens[d.from] || !gens[d.to]) {

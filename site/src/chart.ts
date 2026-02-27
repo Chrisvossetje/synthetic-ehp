@@ -526,7 +526,7 @@ export class Chart {
                 return "";
             }
 
-            const style = diff.fake && this.mode !== ChartMode.ASS ? "stroke-dasharray: 0.025,0.02;" : "";
+            const style = diff.kind == "Fake" && this.mode !== ChartMode.ASS ? "stroke-dasharray: 0.025,0.02;" : "";
             return this.generate_diff(from_loc[0], from_loc[1], to_loc[0], to_loc[1], diff.from, diff.to, style);
         }).join("\n");
     }

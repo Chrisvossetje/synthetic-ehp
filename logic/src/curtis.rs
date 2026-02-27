@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{char::MAX, collections::HashMap};
 
-use crate::{MAX_UNEVEN_INPUT, MAX_STEM, types::{Differential, Generator, SyntheticSS}};
+use crate::{MAX_STEM, MAX_UNEVEN_INPUT, types::{Differential, Generator, Kind, SyntheticSS}};
 
 static CURTIS_TXT: &str = include_str!("../../curtis_table.txt");
 
@@ -65,77 +65,90 @@ fn parse_algebraic_data(
     let multiplications = Vec::new();
 
     // Add initial generator
-    generators.push(Generator::new("[0]".to_string(), 0, 0, 0));
+    generators.push(Generator::new("[0]".to_string(), 0, 0, 0, 1, None));
 
-    // Generate the degree zero parts
-    for n in (3..MAX_UNEVEN_INPUT).step_by(4) {
-        let y = n / 2;
-        generators.push(Generator::new(format!("[{}]", y), y, y, 1));
-    }
-
+    
     // Stable generators
-    for n in (3..MAX_UNEVEN_INPUT).step_by(2) {
-        let y = n / 2;
-        for unt in untagged {
-            if unt.stem + y <= MAX_STEM {
-                let initial: i32 = unt.tag.split_whitespace().next().unwrap().parse().unwrap();
-                if initial < n {
-                    generators.push(Generator::new(
-                        format!("{}[{}]", unt.tag, y),
-                        unt.stem + y,
-                        y,
-                        unt.filt + 1
-                    ));
-                }
-            }
-        }
-    }
+    for unt in untagged {
+        if unt.stem <= MAX_STEM {
+            let (y, rest) = match unt.tag.split_once(" ") {
+                Some((first, second)) => {
+                    let initial: i32 = first.parse().unwrap();
+                    (initial, second)
+                },
+                None => {
+                    let initial: i32 = unt.tag.parse().unwrap();
+                    (initial, "")
+                },
+            };
 
-    // Unstable generators
-    for n in (3..MAX_UNEVEN_INPUT).step_by(2) {
-        let y = n / 2;
-        for tag in tagged {
-            if tag.stem + y <= MAX_STEM {
-                let initial: i32 = tag.left_tag.split_whitespace().next().unwrap().parse().unwrap();
-                let initial_tag: i32 = tag.right_tag.split_whitespace().next().unwrap().parse().unwrap();
-                if initial < n && n <= initial_tag {
-                    generators.push(Generator::new(
-                        format!("{}[{}]", tag.left_tag, y),
-                        tag.stem + y,
-                        y,
-                        tag.filt + 1
-                    ));
-                }
-            }
+            generators.push(Generator::new(
+                format!("{}[{}]", rest, y),
+                unt.stem,
+                y,
+                unt.filt,
+                y + 1,
+                None
+            ));
         }
     }
 
     // Differentials
     for tag in tagged {
         if tag.stem <= MAX_STEM {
-            let rspl: Vec<&str> = tag.right_tag.split_whitespace().collect();
-            let f = format!("{}[{}]", rspl[1..].join(" "), rspl[0]);
-            
-            let lspl: Vec<&str> = tag.left_tag.split_whitespace().collect();
-            let t = format!("{}[{}]", lspl[1..].join(" "), lspl[0]);
+            let (y, rest) = match tag.left_tag.split_once(" ") {
+                Some((first, second)) => {
+                    let initial: i32 = first.parse().unwrap();
+                    (initial, second)
+                },
+                None => {
+                    let initial: i32 = tag.left_tag.parse().unwrap();
+                    (initial, "")
+                },
+            };
+            let (y_2, rest_2) = match tag.right_tag.split_once(" ") {
+                Some((first, second)) => {
+                    let initial: i32 = first.parse().unwrap();
+                    (initial, second)
+                },
+                None => {
+                    let initial: i32 = tag.right_tag.parse().unwrap();
+                    (initial, "")
+                },
+            };
 
-            let d_r: i32 = rspl[0].parse::<i32>().unwrap() - lspl[0].parse::<i32>().unwrap();
-
+            let to = format!("{}[{}]", rest, y);
+            let from = format!("{}[{}]", rest_2, y_2);
+    
+            generators.push(Generator::new(
+                to.clone(),
+                tag.stem,
+                y,
+                tag.filt,
+                y + 1,
+                Some(y_2 + 1)
+            ));
+                
+            generators.push(Generator::new(
+                from.clone(),
+                tag.stem + 1,
+                y_2,
+                tag.filt - 1,
+                y_2 + 1,
+                Some(y_2 + 1)
+            ));
+    
+            let d_r: i32 = y_2 - y;
+    
             differentials.push(Differential {
-                from: f.clone(),
-                to: t,
+                from,
+                to,
                 coeff: 0,
                 d: d_r,
                 proof: Some("Lifted AEHP differential.".to_string()),
                 synthetic: None,
-                fake: false,
+                kind: Kind::Real,
             });
-
-            if tag.stem == MAX_STEM {
-                let y: i32 = rspl[0].parse().unwrap();
-                let af = tag.right_tag.split_whitespace().count() as i32;
-                generators.push(Generator::new(f, tag.stem + 1, y, af));
-            }
         }
     }
 

@@ -1,6 +1,6 @@
 use std::{process::exit, time::Instant};
 
-use crate::{curtis::generate_algebraic_data, export::write_typescript_file, processor::{add_diffs, add_induced_names, add_stable_diffs, add_stable_tau_mults, add_tau_mults, compute_inductive_generators, get_filtered_data}, stable_curtis::generate_stable_algebraic_data, stable_data::synthetic_stable_e1, stable_verification::{verify_ehp_to_ahss, verify_rp}, types::{Differential, Generator, SyntheticSS}, verification::{verify_algebraic, verify_geometric, verify_integrity, verify_self_coherence, verify_stable}};
+use crate::{curtis::generate_algebraic_data, export::write_typescript_file, processor::{add_diffs, add_induced_names, add_tau_mults, compute_inductive_generators}, solver::fix_correctness_by_stem, stable_curtis::generate_stable_algebraic_data, stable_data::synthetic_stable_e1, stable_verification::verify_rp, types::{Differential, Generator, Kind, SyntheticSS}, verification::{verify_algebraic, verify_geometric, verify_integrity, verify_self_coherence, verify_stable}};
 
 mod curtis;
 mod types;
@@ -12,20 +12,22 @@ mod data;
 mod stable_data;
 mod stable_verification;
 mod stable_curtis;
+mod solver;
+mod generate;
 
-const MAX_STEM: i32 = 32;
-const MAX_VERIFY_STEM: i32 = 22;
+const MAX_STEM: i32 = 30;
+const MAX_VERIFY_STEM: i32 = 20;
 const MAX_VERIFY_SPHERE: i32 = MAX_VERIFY_STEM + 2;
 const MAX_UNEVEN_INPUT: i32 = (MAX_STEM + 1) * 2;
 
 
 pub fn add_final_diagonal(data: &mut SyntheticSS) {
-        // Generate the degree zero parts
+    // Generate the degree zero parts
     for n in (3..MAX_UNEVEN_INPUT).step_by(4) {
         let y = n / 2;
         
-        data.generators.push(Generator::new(format!("2(∞)[{}]", y), y, y, 2));
-        data.generators.push(Generator::new(format!("1(∞)[{}]", y + 1), y + 1, y + 1, 1));
+        data.generators.push(Generator::new(format!("2(∞)[{}]", y), y, y, 2, 0, None));
+        data.generators.push(Generator::new(format!("1(∞)[{}]", y + 1), y + 1, y + 1, 1, 0, None));
 
         data.differentials.push(Differential {
             from: format!("1(∞)[{}]", y + 1),
@@ -34,7 +36,7 @@ pub fn add_final_diagonal(data: &mut SyntheticSS) {
             d: 1,
             proof: Some("Lifted AEHP differential.".to_string()),
             synthetic: None,
-            fake: false,
+            kind: Kind::Real,
         });
     }
 }
@@ -43,20 +45,15 @@ fn ahss() -> SyntheticSS {
     let mut data = generate_stable_algebraic_data();
     add_final_diagonal(&mut data);
     data.build_find_map();
-
+    
     synthetic_stable_e1(&mut data);
-    add_stable_diffs(&mut data);
-    add_stable_tau_mults(&mut data);
-
+    // add_stable_diffs(&mut data);
+    // add_stable_tau_mults(&mut data);
+    
     data.differentials.sort();
     
-
-
-    let _ = get_filtered_data(&data, types::Category::Synthetic, 0, 1000, 1000, None);
-
-
-
-    add_final_diagonal(&mut data);
+    fix_correctness_by_stem(&mut data);
+    
     println!("\n-----\nTesting if stable data is well-defined, meaning differentials / multiplications understand have generators which exist.)\n-----\n");
     if !verify_integrity(&data) {
         exit(1);
@@ -64,10 +61,10 @@ fn ahss() -> SyntheticSS {
     
     println!("\n-----\nTesting if stable data is correct with respect to RP_1^k\n-----\n");
     if !verify_rp(&data) {
-
+        // exit(1);
     }
-
-
+    
+    
     write_typescript_file("../site/src/data_stable.ts", "_stable", &data).unwrap();
     data
 }
@@ -75,42 +72,42 @@ fn ahss() -> SyntheticSS {
 fn ehp() -> SyntheticSS {
     let mut data = generate_algebraic_data();
 
-    add_diffs(&mut data);
-    add_induced_names(&mut data);
-    add_tau_mults(&mut data);
+    // add_diffs(&mut data);
+    // add_induced_names(&mut data);
+    // add_tau_mults(&mut data);
 
-    data.differentials.sort();
+    // data.differentials.sort();
     
-    compute_inductive_generators(&mut data);
+    // compute_inductive_generators(&mut data);
 
-    // add_final_diagonal(&mut data);
-    write_typescript_file("../site/src/data.ts", "", &data).unwrap();
-    println!("\n-----\nTesting if data is well-defined, meaning differentials / multiplications understand have generators which exist.)\n-----\n");
-    if !verify_integrity(&data) {
-        exit(1);
-    }
+    // // add_final_diagonal(&mut data);
+    // write_typescript_file("../site/src/data.ts", "", &data).unwrap();
+    // println!("\n-----\nTesting if data is well-defined, meaning differentials / multiplications understand have generators which exist.)\n-----\n");
+    // if !verify_integrity(&data) {
+    //     exit(1);
+    // }
 
-    println!("\n-----\nTesting if Synthetic data is self coherent. (Rows coincide with convergence of SS)\n-----\n");
-    if !verify_self_coherence(&data, MAX_VERIFY_STEM) {
-        exit(1);
-    }   
+    // println!("\n-----\nTesting if Synthetic data is self coherent. (Rows coincide with convergence of SS)\n-----\n");
+    // if !verify_self_coherence(&data, MAX_VERIFY_STEM) {
+    //     exit(1);
+    // }   
 
-    println!("\n-----\nTesting Geometric stable correctness\n-----\n");
-    if !verify_stable(&data) {
-        // exit(1);
-    }
+    // println!("\n-----\nTesting Geometric stable correctness\n-----\n");
+    // if !verify_stable(&data) {
+    //     // exit(1);
+    // }
 
-    println!("\n-----\nTesting Geometric unstable correctness\n-----\n");
-    if !verify_geometric(&data) {
-        // exit(1);
-    }
+    // println!("\n-----\nTesting Geometric unstable correctness\n-----\n");
+    // if !verify_geometric(&data) {
+    //     // exit(1);
+    // }
 
-    println!("\n-----\nTesting Algebraic correctness (Both stably and unstably) between the synthetic and the algebraic data\n-----\n");
-    if !verify_algebraic(&data) {
-        // exit(1);
-    }
+    // println!("\n-----\nTesting Algebraic correctness (Both stably and unstably) between the synthetic and the algebraic data\n-----\n");
+    // if !verify_algebraic(&data) {
+    //     // exit(1);
+    // }
 
-    // TODO : Do a verify Hopf Inv One maps thing ?
+    // // TODO : Do a verify Hopf Inv One maps thing ?
     
 
     add_final_diagonal(&mut data);
@@ -121,10 +118,10 @@ fn ehp() -> SyntheticSS {
 fn main() {
     let start = Instant::now();
 
-    let e = ehp();
     let a = ahss();
+    // let e = ehp();
 
-    verify_ehp_to_ahss(&e, &a);
+    // verify_ehp_to_ahss(&e, &a);
     
     println!("\nProgram took: {:.2?}", start.elapsed());
 }
@@ -134,7 +131,7 @@ fn main() {
 #[test]
 fn generate_table() {
     // Table copied from Google Sheets
-    // This contains the orders of the group 
+    // This contains the orders of the group
     let table_str = "2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2
 1	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2
 1	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2	2

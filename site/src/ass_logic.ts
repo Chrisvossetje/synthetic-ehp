@@ -1,4 +1,4 @@
-import { Category, find, getActiveData, get_filtered_data, generating_name, generates, getSelectedGenerator, setSelectedGenerator } from "./logic";
+import { Category, find, getActiveData, get_filtered_data, getSelectedGenerator, getSphereLifecycleInfo, setSelectedGenerator } from "./logic";
 import { assChart } from "./main";
 import { Differential, Generators } from "./types";
 
@@ -40,9 +40,7 @@ export function handleAssDotClick(dot: string) {
         console.error('Failed to copy to clipboard:', err);
     });
 
-    // Get generating name and what it generates
-    const genName = generating_name(gen);
-    const gensList = generates(gen);
+    const sphereInfo = getSphereLifecycleInfo(gen);
 
     // Build the info display
     const floatingBox = document.getElementById('floatingBox');
@@ -68,14 +66,8 @@ export function handleAssDotClick(dot: string) {
         content += `Induced name: ${namesList}\n`;
     }
 
-    content += `\n<b>Generating name:</b> ${genName}\n`;
-
-    if (gensList.length > 0) {
-        content += `\n<b>Generates:</b>\n`;
-        gensList.forEach(g => {
-            content += `  • ${g.name}\n`;
-        });
-    }
+    content += `Born on sphere: ${sphereInfo.bornSphere}\n`;
+    content += `Dies on algebraic sphere: ${sphereInfo.diesOnAlgebraicSphere}\n`;
 
     content += `</pre>`;
 
@@ -140,7 +132,8 @@ export function handleAssLineClick(from: string, to: string) {
  * - For each truncation, shows what survives at that level
  */
 export function update_ass_chart(
-    truncation: number | undefined
+    truncation: number | undefined,
+    bottomTruncation: number | undefined
 ) {
     assChart.clear();
     inferredAssDifferentials.clear();
@@ -154,17 +147,25 @@ export function update_ass_chart(
     assChart.lineCallback = handleAssLineClick;
 
     // Compare synthetic and algebraic E_infinity states.
-    const [syntheticClasses, _syntheticDiffs] = get_filtered_data(
+    const [syntheticClasses] = get_filtered_data(
         activeData,
         Category.Synthetic,
         truncation,
         1000,
+        true,
+        undefined,
+        true,
+        bottomTruncation
     );
-    const [algebraicClasses, _algebraicDiffs] = get_filtered_data(
+    const [algebraicClasses] = get_filtered_data(
         activeData,
         Category.Algebraic,
         truncation,
         1000,
+        true,
+        undefined,
+        false,
+        bottomTruncation
     );
 
     // Build ASS nodes/differentials:
@@ -188,7 +189,9 @@ export function update_ass_chart(
                 x: g.x,
                 y: filtration,
                 adams_filtration: filtration,
-                induced_name: [[0, g.name]]
+                induced_name: [[0, g.name]],
+                born: g.born,
+                dies: g.dies,
             });
             return;
         }
@@ -202,21 +205,25 @@ export function update_ass_chart(
             x: g.x,
             y: filtration,
             adams_filtration: filtration,
-            induced_name: [[0, g.name]]
+            induced_name: [[0, g.name]],
+            born: g.born,
+            dies: g.dies,
         });
         gens.push({
             name: targetName,
             x: g.x + 1,
             y: targetFiltration,
             adams_filtration: targetFiltration,
-            induced_name: [[0, g.name]]
+            induced_name: [[0, g.name]],
+            born: -1,
+            dies: -1,
         });
         diffs.push({
             from: sourceName,
             to: targetName,
             coeff: syntheticTorsion,
             d: syntheticTorsion + 1,
-            fake: true,
+            kind: "Real",
             proof: "Inferred from ASS torsion."
         });
 

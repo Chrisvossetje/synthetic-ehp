@@ -1,4 +1,4 @@
-use crate::{MAX_STEM, types::{Differential, SyntheticSS, TauMult}};
+use crate::{MAX_STEM, types::{Differential, Kind, SyntheticSS, TauMult}};
 
 
 pub fn synthetic_stable_e1(data: &mut SyntheticSS) {
@@ -49,18 +49,6 @@ pub fn synthetic_stable_e1(data: &mut SyntheticSS) {
 
 pub fn get_stable_diffs() -> Vec<Differential> {
     vec![
-        // Stem 10/11
-        Differential {
-            from: "2(∞)[11]".to_string(),
-            to: "3 3 3[1]".to_string(),
-            coeff: 1,
-            d: 10,
-            proof: Some("??".to_string()),
-            synthetic: Some(()),
-            fake: false,
-        },
-
-
         // Stem 14/15
         Differential {
             from: "[15]".to_string(),
@@ -69,7 +57,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 9,
             proof: Some("Stable Diff".to_string()),
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
         // Stem 14/15
         Differential {
@@ -79,7 +67,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 9,
             proof: Some("Stable Diff".to_string()),
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
         // Stem 14/15
         Differential {
@@ -89,7 +77,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 10,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
 
 
@@ -101,7 +89,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 7,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
 
         
@@ -113,7 +101,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 2,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
         // Stem 17/18
         Differential {
@@ -123,7 +111,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 2,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
         // Stem 17/18
         Differential {
@@ -133,7 +121,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 3,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
         // Stem 17/18
         Differential {
@@ -143,7 +131,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 7,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
 
 
@@ -155,7 +143,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 2,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
         // Stem 18/19
         Differential {
@@ -165,7 +153,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 3,
             proof: Some("Its not clear which of the two possible AF 3 targets this will hit. But this one is the most logical? It is also NOT relevant.".to_string()),
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
         
         
@@ -177,7 +165,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 2,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
         // Stem 21/22
         Differential {
@@ -187,7 +175,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 2,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
 
                 
@@ -199,7 +187,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 3,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
 
 
@@ -211,7 +199,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 9,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
 
         // Stem 22/23
@@ -222,7 +210,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 8,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
         // Stem 22/23
         Differential {
@@ -232,7 +220,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 8,
             proof: Some("This must be it as there is no room for this stable diff elsewhere on EHP".to_string()),
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
         // Stem 22/23
         Differential {
@@ -242,7 +230,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 9,
             proof: Some("This must be it as there is no room for this stable diff elsewhere on EHP".to_string()),
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
         // Stem 22/23
         Differential {
@@ -252,7 +240,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 9,
             proof: Some("Unsure about this target. Highly likely".to_string()),
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
         // Stem 22/23
         Differential {
@@ -262,7 +250,7 @@ pub fn get_stable_diffs() -> Vec<Differential> {
             d: 8,
             proof: None,
             synthetic: Some(()),
-            fake: false,
+            kind: Kind::Real,
         },
 
 
@@ -275,42 +263,50 @@ pub fn get_stable_tau_mults() -> Vec<TauMult> {
         TauMult {
             from: "3 4 4 1 1 1[2]".to_string(),
             to: "12 1 1 1[1]".to_string(),
+            kind: Kind::Real,
         },
         TauMult {
             from: "6 5 3[2]".to_string(),
             to: "6 2 3 3[2]".to_string(),
+            kind: Kind::Real,
         },
 
         // Stem 18
         TauMult {
             from: "1 2 4 3 3 3[2]".to_string(),
             to: "3 6 2 3 3[1]".to_string(),
+            kind: Kind::Real,
         },
         TauMult {
             from: "3 4 4 1 1 1[4]".to_string(),
             to: "12 1 1 1[3]".to_string(),
+            kind: Kind::Real,
         },
         
         // Stem 19
         TauMult {
             from: "6 5 3[5]".to_string(),
             to: "13 3[3]".to_string(),
+            kind: Kind::Real,
         },
         
         // Stem 20
         TauMult {
             from: "6 5 3[6]".to_string(),
             to: "6 2 3 3[6]".to_string(),
+            kind: Kind::Real,
         },
 
         // Stem 22
         TauMult {
             from: "1 2 4 3 3 3[6]".to_string(),
             to: "3 6 2 3 3[5]".to_string(),
+            kind: Kind::Real,
         },
         TauMult {
             from: "3 4 4 1 1 1[8]".to_string(),
             to: "12 1 1 1[7]".to_string(),
+            kind: Kind::Real,
         },
 
 

@@ -3,6 +3,8 @@ export type Generators = {
     "x": number;
     "y": number;
     "adams_filtration": number,
+    "born": number,
+    "dies": number,
     "induced_name": [number, string][],
     "torsion"?: number,
     "alg_name"?: string;
@@ -14,7 +16,7 @@ export type Differential = {
     "to": string,
     "coeff": number,
     "d": number,
-    "fake": boolean,
+    "kind": "Real" | "Fake";
     "proof"?: string,
     "synthetic"?,
 }

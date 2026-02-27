@@ -4,8 +4,8 @@ use itertools::Itertools;
 
 use crate::{MAX_VERIFY_SPHERE, MAX_VERIFY_STEM, processor::get_filtered_data, types::{Category, SyntheticSS}};
 
-fn read_rp_even_csv(bottom_trunc: i32, top_trunc: i32) -> HashMap<(i32, i32), Vec<Option<i32>>> {
-    let file_name = format!("../RP_ASS/RP{bottom_trunc}_{top_trunc}_AdamsE2_ss.csv",);
+pub fn read_rp_csv(bot_trunc: i32, top_trunc: i32) -> HashMap<(i32, i32), Vec<Option<i32>>> {
+    let file_name = format!("../AHSS_DATA/RP{bot_trunc}_{top_trunc}_AdamsE2_ss.csv",);
 
     let mut m = HashMap::new();
 
@@ -20,7 +20,7 @@ fn read_rp_even_csv(bottom_trunc: i32, top_trunc: i32) -> HashMap<(i32, i32), Ve
 
             af += 1;
 
-            if bottom_trunc == 1 && top_trunc == 2 {
+            if bot_trunc == 1 && top_trunc == 2 {
                 stem += 1;
             }
 
@@ -36,113 +36,68 @@ fn read_rp_even_csv(bottom_trunc: i32, top_trunc: i32) -> HashMap<(i32, i32), Ve
     } else {
         panic!()
     }
-
+    for j in &mut m {
+        j.1.sort();
+    }
     m
 } 
 
-fn read_rp_uneven_csv(bottom_trunc: i32, top_trunc: i32) -> HashMap<(i32, i32), Vec<Option<i32>>> {
-    let file_name = format!("../RP_ASS/RP{bottom_trunc}_{top_trunc}_AdamsE2_ss.csv",);
+fn verify_specific_rp(data: &SyntheticSS, bot_trunc: i32, top_trunc: i32) -> bool {
+    let mut is_valid = true;
+    
+    let expected = read_rp_csv(bot_trunc, top_trunc);
 
-    let mut m = HashMap::new();
+    let gens = get_filtered_data(data, Category::Synthetic, bot_trunc, top_trunc + 1, 1000, None);
 
-    if let Ok(f) = File::open(file_name) {
-        for l in BufReader::new(f).lines().skip(1) {
-            let s = l.unwrap();
-            let spl: Vec<_> = s.split(',').collect();
+    let mut compare = HashMap::new();
+    
+    for n in gens.get_final_page() {
+        let g = data.find(&n.0).unwrap();
+        let (stem, af, dr) = (g.x, n.1.1, n.1.0);
+        if 0 < g.x && g.x <= MAX_VERIFY_STEM && n.1.0 != Some(0) {
+            compare.entry((stem, af)).or_insert(vec![]).push(dr);
+        }
+    }
 
-            let mut s: i32 = spl[1].parse().unwrap();
-            let t: i32 = spl[2].parse().unwrap();
-            let dr: i32 = spl[spl.len()-1].parse().unwrap();
-            let w = spl[spl.len()-2];
+    for j in &mut compare {
+        j.1.sort();
+    }
 
-            let stem = t - s;
-            s += 1;
-
-            if stem <= MAX_VERIFY_STEM {
-                if dr == 9000 || w == "" {
-                    m.entry((stem, s)).or_insert(vec![]).push(None);
-                } 
-                else if dr < 9000 {
-                    m.entry((stem, s)).or_insert(vec![]).push(Some(dr - 1));
-                }
+    for (stem_af, gens) in expected.iter().sorted() {
+        if !compare.contains_key(stem_af) {
+            eprintln!("In stem {}, af {}, we have unequal generators for RP_{bot_trunc}^{top_trunc}. Expect: {:?} | Have: {:?}", stem_af.0, stem_af.1, gens, 0);
+            is_valid = false;
+        } else {
+            if compare.get(stem_af).unwrap() != gens {
+                eprintln!("In stem {}, af {}, we have unequal generators for RP_{bot_trunc}^{top_trunc}. Expect: {:?} | Have: {:?}", stem_af.0, stem_af.1, gens, compare.get(stem_af).unwrap());
+                is_valid = false;
             }
         }
-    } else {
-        panic!()
     }
 
-    m
-} 
-
-fn read_rp_csv(bottom_trunc: i32, top_trunc: i32)  -> HashMap<(i32, i32), Vec<Option<i32>>> {
-    if top_trunc & 1 == 1 {
-        read_rp_uneven_csv(bottom_trunc, top_trunc)
-    } else {
-        read_rp_even_csv(bottom_trunc, top_trunc)
+    for (stem_af, g) in &compare {
+        if !expected.contains_key(stem_af) {
+            eprintln!("In stem {}, af {}, we have unequal generators for RP_{bot_trunc}^{top_trunc}. Expect: {:?} | Have: {:?}", stem_af.0, stem_af.1, 0, g);
+            is_valid = false;
+        } 
     }
+
+    is_valid
 }
 
-
-
 pub fn verify_rp(data: &SyntheticSS) -> bool {
-    const UNEVEN_MAX_AF_Z_COPY: i32 = 30;
-    
     let mut is_valid = true;
 
-    for upper_trunc in (2..=MAX_VERIFY_SPHERE).step_by(2) {
-        let mut expected = read_rp_csv(1, upper_trunc);
+    for top_trunc in (2..=MAX_VERIFY_SPHERE).step_by(2) {
+        is_valid &= verify_specific_rp(data, 1, top_trunc);
+    }
 
-        let gens = get_filtered_data(data, Category::Synthetic, 1, upper_trunc + 1, 1000, None);
-
-        let mut compare = HashMap::new();
-        
-        for n in gens {
-            let g = data.find(&n.0).unwrap();
-            let (stem, af, dr) = (g.x, n.1.1, n.1.0);
-            if 0 < g.x && g.x <= MAX_VERIFY_STEM && n.1.0 != Some(0) && g.adams_filtration <= UNEVEN_MAX_AF_Z_COPY {
-                compare.entry((stem, af)).or_insert(vec![]).push(dr);
-            }
-        }
-
-        if upper_trunc & 1 == 1 {
-            for j in 3..=UNEVEN_MAX_AF_Z_COPY {
-                compare.entry((upper_trunc, j)).or_insert(vec![]).push(None);
-            }
-        }
-
-        for j in &mut expected {
-            j.1.sort();
-        }
-        for j in &mut compare {
-            j.1.sort();
-        }
-
-        for (stem_af, gens) in expected.iter().sorted() {
-            if stem_af.1 > UNEVEN_MAX_AF_Z_COPY {
-                continue;
-            }
-
-            if !compare.contains_key(stem_af) {
-                eprintln!("In stem {}, af {}, we have unequal generators for RP_1^{upper_trunc}. Expect: {:?} | Have: {:?}", stem_af.0, stem_af.1, gens, 0);
-                is_valid = false;
-            } else {
-                if compare.get(stem_af).unwrap() != gens {
-                    eprintln!("In stem {}, af {}, we have unequal generators for RP_1^{upper_trunc}. Expect: {:?} | Have: {:?}", stem_af.0, stem_af.1, gens, compare.get(stem_af).unwrap());
-                    is_valid = false;
-                }
-            }
-        }
-
-        for (stem_af, g) in &compare {
-            if stem_af.1 > UNEVEN_MAX_AF_Z_COPY {
-                continue;
-            }
-            if !expected.contains_key(stem_af) {
-                eprintln!("In stem {}, af {}, we have unequal generators for RP_1^{upper_trunc}. Expect: {:?} | Have: {:?}", stem_af.0, stem_af.1, 0, g);
-                is_valid = false;
-            } 
+    for bot_trunc in (1..=MAX_VERIFY_SPHERE).rev() {
+        if bot_trunc & 1 == 1 {
+            is_valid &= verify_specific_rp(data, bot_trunc, 256);
         }
     }
+
     is_valid
 }
 
@@ -164,8 +119,8 @@ pub fn verify_ehp_to_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS) {
     // For all pages check the diffs
     for page in 1..=MAX_VERIFY_STEM {
         
-        let ehp_gens = get_filtered_data(ehp, Category::Synthetic, 1, 1000, page, None);
-        let ahss_gens = get_filtered_data(ahss, Category::Synthetic, 1, 1000, page, None);
+        let ehp_gens = get_filtered_data(ehp, Category::Synthetic, 1, 1000, page, None).get_final_page();
+        let ahss_gens = get_filtered_data(ahss, Category::Synthetic, 1, 1000, page, None).get_final_page();
         
         // Check if dr commutes
         for d in &ehp.differentials {

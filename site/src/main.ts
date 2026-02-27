@@ -28,7 +28,7 @@ function updateActiveChart() {
     if (isEHPActive) {
         update_ehp_chart();
     } else {
-        update_ass_chart(viewSettings.truncation);
+        update_ass_chart(viewSettings.truncation, viewSettings.bottomTruncation);
     }
 }
 
@@ -97,6 +97,8 @@ function setupUIControls() {
     // Truncation checkbox and input (affects both charts)
     const truncationCheckbox = document.getElementById('truncation-checkbox') as HTMLInputElement;
     const truncationInput = document.querySelector('input[name="Truncation"]') as HTMLInputElement;
+    const bottomTruncationCheckbox = document.getElementById('bottom-truncation-checkbox') as HTMLInputElement;
+    const bottomTruncationInput = document.querySelector('input[name="BottomTruncation"]') as HTMLInputElement;
 
     truncationCheckbox.addEventListener('change', () => {
         if (truncationCheckbox.checked) {
@@ -119,6 +121,31 @@ function setupUIControls() {
                 viewSettings.truncation = isNaN(value) ? null : value;
                 updateActiveChart();
                 truncationDebounceTimeout = null;
+            }, 120);
+        }
+    });
+
+    bottomTruncationCheckbox.addEventListener('change', () => {
+        if (bottomTruncationCheckbox.checked) {
+            const value = parseInt(bottomTruncationInput.value);
+            viewSettings.bottomTruncation = isNaN(value) ? 0 : value;
+        } else {
+            viewSettings.bottomTruncation = undefined;
+        }
+        updateActiveChart();
+    });
+
+    let bottomTruncationDebounceTimeout: number | null = null;
+    bottomTruncationInput.addEventListener('input', () => {
+        if (bottomTruncationCheckbox.checked) {
+            if (bottomTruncationDebounceTimeout !== null) {
+                window.clearTimeout(bottomTruncationDebounceTimeout);
+            }
+            bottomTruncationDebounceTimeout = window.setTimeout(() => {
+                const value = parseInt(bottomTruncationInput.value);
+                viewSettings.bottomTruncation = isNaN(value) ? 0 : value;
+                updateActiveChart();
+                bottomTruncationDebounceTimeout = null;
             }, 120);
         }
     });
@@ -179,6 +206,8 @@ function setupKeyboardControls() {
         const categorySelect = document.getElementById('ss-category') as HTMLSelectElement;
         const truncationCheckbox = document.getElementById('truncation-checkbox') as HTMLInputElement;
         const truncationInput = document.querySelector('input[name="Truncation"]') as HTMLInputElement;
+        const bottomTruncationCheckbox = document.getElementById('bottom-truncation-checkbox') as HTMLInputElement;
+        const bottomTruncationInput = document.querySelector('input[name="BottomTruncation"]') as HTMLInputElement;
         const ehpAssSwitch = document.getElementById('ehp-ass-switch') as HTMLInputElement;
         const allDiffCheckbox = document.getElementById('all-diff-checkbox') as HTMLInputElement;
         const dataSourceSwitch = document.getElementById('data-source-switch') as HTMLInputElement;
@@ -317,6 +346,52 @@ function setupKeyboardControls() {
                 needsUpdate = true;
                 break;
 
+            case 'u':
+            case 'U':
+                // Lower bottom truncation (enable if disabled)
+                if (!bottomTruncationCheckbox.checked) {
+                    bottomTruncationCheckbox.checked = true;
+                    const value = parseInt(bottomTruncationInput.value);
+                    viewSettings.bottomTruncation = isNaN(value) ? 0 : value;
+                }
+                if (viewSettings.bottomTruncation !== undefined) {
+                    const newValue = Math.max(0, viewSettings.bottomTruncation - 1);
+                    viewSettings.bottomTruncation = newValue;
+                    bottomTruncationInput.value = newValue.toString();
+                }
+                needsUpdate = true;
+                break;
+
+            case 'i':
+            case 'I':
+                // Higher bottom truncation (enable if disabled)
+                if (!bottomTruncationCheckbox.checked) {
+                    bottomTruncationCheckbox.checked = true;
+                    const value = parseInt(bottomTruncationInput.value);
+                    viewSettings.bottomTruncation = isNaN(value) ? 0 : value;
+                }
+                if (viewSettings.bottomTruncation !== undefined) {
+                    const maxTop = viewSettings.truncation ?? 50;
+                    const newValue = Math.min(maxTop - 1, viewSettings.bottomTruncation + 1);
+                    viewSettings.bottomTruncation = Math.max(0, newValue);
+                    bottomTruncationInput.value = viewSettings.bottomTruncation.toString();
+                }
+                needsUpdate = true;
+                break;
+
+            case 'o':
+            case 'O':
+                // Toggle bottom truncation
+                bottomTruncationCheckbox.checked = !bottomTruncationCheckbox.checked;
+                if (bottomTruncationCheckbox.checked) {
+                    const value = parseInt(bottomTruncationInput.value);
+                    viewSettings.bottomTruncation = isNaN(value) ? 0 : value;
+                } else {
+                    viewSettings.bottomTruncation = undefined;
+                }
+                needsUpdate = true;
+                break;
+
             // Screenshot mode
             case 'p':
             case 'P':
@@ -341,7 +416,7 @@ async function bootstrap() {
 
     // Update charts with initial data
     update_ehp_chart();
-    update_ass_chart(viewSettings.truncation);
+    update_ass_chart(viewSettings.truncation, viewSettings.bottomTruncation);
 
     // Set initial global chart reference
     window.chartInstance = ehpChart;

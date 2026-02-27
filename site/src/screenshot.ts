@@ -148,8 +148,10 @@ export function handleScreenshotPointerUp(event: PointerEvent, chart: Chart) {
  * Format generator name for LaTeX display
  */
 function formatNameForLatex(name: string): string {
+    // Convert unicode infinity in generator names to LaTeX.
+    const withLatexInfinity = name.replace(/∞/g, '\\infty');
     // Escape square brackets for LaTeX by wrapping in braces
-    return name.replace(/\[/g, '{[}').replace(/\]/g, '{]}');
+    return withLatexInfinity.replace(/\[/g, '{[}').replace(/\]/g, '{]}');
 }
 
 /**
@@ -184,8 +186,8 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
     }
 
     // Draw crossed-out cells (invalid cells)
-    for (let y = yMin; y < yMax; y++) {
-        for (let x = xMin; x < xMax; x++) {
+    for (let y = yMin; y <= yMax; y++) {
+        for (let x = xMin; x <= xMax; x++) {
             if ((y === 0 && x !== 0) || x < y) {
                 const yFlip = flipY(y);
                 const yFlipNext = flipY(y + 1);
@@ -194,6 +196,18 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
             }
         }
     }
+
+    // Draw stable reference line (same staircase pattern as chart.ts), clipped to selection.
+    let stablePath = `(0,${roundCoord(flipY(1))})`;
+    let stableX = 0;
+    let stableY = 1;
+    while (stableX < xMax + 3) {
+        stableX += 3;
+        stablePath += ` -- (${roundCoord(stableX)},${roundCoord(flipY(stableY))})`;
+        stableY += 1;
+        stablePath += ` -- (${roundCoord(stableX)},${roundCoord(flipY(stableY))})`;
+    }
+    tikz += `\\draw[color={rgb,255:red,255;green,107;blue,0},line width=0.4pt,dash pattern=on 2pt off 1pt] ${stablePath};\n`;
 
     // Draw differentials first (so they're behind dots)
     const differentials = chart.differentials.filter(d => {
@@ -211,7 +225,7 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
         if (!fromLoc || !toLoc) continue;
 
         const color = getTikzColor(diff.coeff);
-        const lineStyle = diff.fake ? ",dotted" : "";
+        const lineStyle = diff.kind == "Fake" ? ",dotted" : "";
         const fromYFlip = flipY(fromLoc[1]);
         const toYFlip = flipY(toLoc[1]);
         tikz += `\\draw[${color},line width=0.4pt${lineStyle}] (${roundCoord(fromLoc[0])},${roundCoord(fromYFlip)}) -- (${roundCoord(toLoc[0])},${roundCoord(toYFlip)});\n`;

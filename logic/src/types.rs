@@ -9,12 +9,22 @@ pub enum Category {
     Geometric,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum Kind {
+    Real,
+    Fake,
+    Unknown,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Generator {
     pub name: String,
     pub x: i32,
     pub y: i32,
     pub adams_filtration: i32,
+
+    pub born: i32,
+    pub dies: Option<i32>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub torsion: Option<i32>,
@@ -27,12 +37,14 @@ pub struct Generator {
 }
 
 impl Generator {
-    pub fn new(name: String, x: i32, y: i32, adams_filtration: i32) -> Generator {
+    pub fn new(name: String, x: i32, y: i32, adams_filtration: i32, born: i32, dies: Option<i32>) -> Generator {
         Generator {
             name: name.clone(),
             x,
             y,
             adams_filtration,
+            born,
+            dies,
             torsion: None,
             alg_name: None,
             hom_name: None,
@@ -64,7 +76,12 @@ pub struct Differential {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<String>,
 
-    pub fake: bool,
+    pub kind: Kind,
+
+    // #[serde(skip_serializing)]
+    // pub diff_sources: Vec<Differential>,
+    // #[serde(skip_serializing)]
+    // pub diff_targets: Vec<Differential>,
 }
 
 impl PartialEq for Differential {
@@ -99,6 +116,7 @@ impl Ord for Differential {
 pub struct TauMult {
     pub from: String,
     pub to: String,
+    pub kind: Kind,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
