@@ -1,6 +1,6 @@
 use std::{process::exit, time::Instant};
 
-use crate::{curtis::generate_algebraic_data, export::write_typescript_file, processor::{add_diffs, add_induced_names, add_tau_mults, compute_inductive_generators}, solver::fix_correctness_by_stem, stable_curtis::generate_stable_algebraic_data, stable_data::synthetic_stable_e1, stable_verification::verify_rp, types::{Differential, Generator, Kind, SyntheticSS}, verification::{verify_algebraic, verify_geometric, verify_integrity, verify_self_coherence, verify_stable}};
+use crate::{curtis::generate_algebraic_data, export::write_typescript_file, processor::{add_diffs, add_induced_names, add_stable_diffs, add_tau_mults, compute_inductive_generators}, solver::fix_correctness_by_stem, stable_curtis::generate_stable_algebraic_data, stable_data::synthetic_stable_e1, stable_verification::verify_rp, types::{Differential, Generator, Kind, SyntheticSS}, verification::{verify_algebraic, verify_geometric, verify_integrity, verify_self_coherence, verify_stable}};
 
 mod curtis;
 mod types;
@@ -15,8 +15,10 @@ mod stable_curtis;
 mod solver;
 mod generate;
 
-const MAX_STEM: i32 = 30;
-const MAX_VERIFY_STEM: i32 = 20;
+mod synthetic_stable_data;
+
+const MAX_STEM: i32 = 40;
+const MAX_VERIFY_STEM: i32 = 40;
 const MAX_VERIFY_SPHERE: i32 = MAX_VERIFY_STEM + 2;
 const MAX_UNEVEN_INPUT: i32 = (MAX_STEM + 1) * 2;
 
@@ -47,23 +49,30 @@ fn ahss() -> SyntheticSS {
     data.build_find_map();
     
     synthetic_stable_e1(&mut data);
-    // add_stable_diffs(&mut data);
+    add_stable_diffs(&mut data);
     // add_stable_tau_mults(&mut data);
     
     data.differentials.sort();
     
     fix_correctness_by_stem(&mut data);
     
-    println!("\n-----\nTesting if stable data is well-defined, meaning differentials / multiplications understand have generators which exist.)\n-----\n");
-    if !verify_integrity(&data) {
-        exit(1);
-    }
+    // println!("\n-----\nTesting if stable data is well-defined, meaning differentials / multiplications understand have generators which exist.)\n-----\n");
+    // if !verify_integrity(&data) {
+    //     exit(1);
+    // }
     
-    println!("\n-----\nTesting if stable data is correct with respect to RP_1^k\n-----\n");
-    if !verify_rp(&data) {
-        // exit(1);
-    }
+    // println!("\n-----\nTesting if stable data is correct with respect to RP_1^k\n-----\n");
+    // if !verify_rp(&data) {
+    //     // exit(1);
+    // }
     
+    // Verify integrity, meaning are all diffs / things legal ?
+    // ^ This should be done immediatly, however it can be probably not always be deduced whether a diff is legal, as we do have the implicit propagation of diffs.
+
+    // Verify if it is coherent with S0 / RP stuff
+    
+    // Verify if it is coherent wrt james per. ?
+    // ^ Probably want to do this directly ? meaning, checking if its 
     
     write_typescript_file("../site/src/data_stable.ts", "_stable", &data).unwrap();
     data

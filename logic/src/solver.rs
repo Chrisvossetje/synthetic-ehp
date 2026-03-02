@@ -27,6 +27,45 @@ impl Solution {
         let (from, to) = match other {
             Solution::Diff(diff_solution) => (&diff_solution.from, &diff_solution.to),
             Solution::Tau(tau_mult_solution) => (&tau_mult_solution.from, &tau_mult_solution.to),
+            Solution::DoubleDiff(diff_solution_1, diff_solution_2) => {
+                let from_1 = &diff_solution_1.from;
+                let to_1 = &diff_solution_1.from;
+                let from_2 = &diff_solution_2.from;
+                let to_2 = &diff_solution_2.from;
+                let a = match self {
+                    Solution::Diff(diff_solution) => {
+                        &diff_solution.from == from_1 || &diff_solution.from == to_1 ||
+                        &diff_solution.to == from_1 || &diff_solution.to == to_1
+                    },
+                    Solution::Tau(tau_mult_solution) => {
+                        &tau_mult_solution.from == from_1 || &tau_mult_solution.from == to_1 ||
+                        &tau_mult_solution.to == from_1 || &tau_mult_solution.to == to_1
+                    },
+                    Solution::DoubleDiff(diff_solution_1, diff_solution_2) => {
+                        &diff_solution_1.from == from_1 || &diff_solution_1.from == to_1 ||
+                        &diff_solution_1.to == from_1 || &diff_solution_1.to == to_1 || 
+                        &diff_solution_2.from == from_1 || &diff_solution_2.from == to_1 ||
+                        &diff_solution_2.to == from_1 || &diff_solution_2.to == to_1
+                    },
+                };
+                let b = match self {
+                    Solution::Diff(diff_solution) => {
+                        &diff_solution.from == from_2 || &diff_solution.from == to_2 ||
+                        &diff_solution.to == from_2 || &diff_solution.to == to_2
+                    },
+                    Solution::Tau(tau_mult_solution) => {
+                        &tau_mult_solution.from == from_2 || &tau_mult_solution.from == to_2 ||
+                        &tau_mult_solution.to == from_2 || &tau_mult_solution.to == to_2
+                    },
+                    Solution::DoubleDiff(diff_solution_1, diff_solution_2) => {
+                        &diff_solution_1.from == from_2 || &diff_solution_1.from == to_2 ||
+                        &diff_solution_1.to == from_2 || &diff_solution_1.to == to_2 || 
+                        &diff_solution_2.from == from_2 || &diff_solution_2.from == to_2 ||
+                        &diff_solution_2.to == from_2 || &diff_solution_2.to == to_2
+                    },
+                };
+                return a || b;
+            },
         };
         match self {
             Solution::Diff(diff_solution) => {
@@ -36,6 +75,12 @@ impl Solution {
             Solution::Tau(tau_mult_solution) => {
                 &tau_mult_solution.from == from || &tau_mult_solution.from == to ||
                 &tau_mult_solution.to == from || &tau_mult_solution.to == to
+            },
+            Solution::DoubleDiff(diff_solution_1, diff_solution_2) => {
+                &diff_solution_1.from == from || &diff_solution_1.from == to ||
+                &diff_solution_1.to == from || &diff_solution_1.to == to || 
+                &diff_solution_2.from == from || &diff_solution_2.from == to ||
+                &diff_solution_2.to == from || &diff_solution_2.to == to
             },
         }
     }
@@ -155,16 +200,18 @@ fn find_diffs_for_target(
     let needed_af = t_af - exp_torsion - 1;
     let mut sols = vec![];
 
+    // How to find a possible source ?
     for (src, (p, tor, af)) in sources {
-        if *af == needed_af {
+        if *af <= needed_af {
             let g_src = data.find(&src).unwrap();
             let d_r = g_src.y - t_y;
+            let diff_af = needed_af-*af;
             let mut works = false;
             if d_r > *p {
 
                 if let Some(obs_torsion) = t_torsion {
                     if let Some(src_torsion) = tor {
-                        if obs_torsion - exp_torsion <= *src_torsion {
+                        if obs_torsion - exp_torsion - diff_af <= *src_torsion {
                             works = true;
                         }
                     } else {
@@ -176,7 +223,7 @@ fn find_diffs_for_target(
                     }
                 }
             }
-            if works {
+            if works && *af == needed_af {
                 sols.push(Solution::Diff(
                     DiffSolution {
                         from: src.clone(),
@@ -185,6 +232,36 @@ fn find_diffs_for_target(
                         d: d_r,
                     }
                 ));
+                
+            // Try to find another supporting differential !
+            // Lets hope this will never be a diff with three sources :(
+            } else if works {
+                for (t_src, (t_p, t_tor, t_af)) in sources {
+                    if let Some(t_tor) = t_tor {
+                        if *t_tor == diff_af && *t_af == needed_af {
+                            let t_g_src = data.find(&t_src).unwrap();
+                            let t_d_r = t_g_src.y - t_y;
+                            if t_d_r >= d_r && t_d_r >= *t_p {
+                                // Should already work now !
+                                // All torsion stuff should already be taken care of
+                                sols.push(Solution::DoubleDiff(
+                                    DiffSolution {
+                                        from: src.clone(),
+                                        to: t_name.clone(),
+                                        coeff: exp_torsion + diff_af,
+                                        d: d_r,
+                                    },
+                                    DiffSolution {
+                                        from: t_src.clone(),
+                                        to: t_name.clone(),
+                                        coeff: exp_torsion,
+                                        d: t_d_r,
+                                    }
+                                ));
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -192,11 +269,11 @@ fn find_diffs_for_target(
 }
 
 // This function need not neccesarily give a solution to ALL issues
-fn find_solutions(data: &SyntheticSS, bottom_trunc: i32, top_trunc: i32, stem: i32, issues: Vec<Issue>) -> Vec<(Issue, Vec<Solution>)> {
+fn find_solutions(data: &SyntheticSS, bot_trunc: i32, top_trunc: i32, stem: i32, issues: Vec<Issue>) -> Vec<(Issue, Vec<Solution>)> {
     let mut sols = vec![];
     
-    let sources = find_possible_sources_for_differentials_in_stem(data, stem + 1);
-    let target = get_filtered_data(data, Category::Synthetic, 0, top_trunc + 1, 1000, Some(stem)).get_final_page();
+    let sources = find_possible_sources_for_differentials_in_stem(data, stem + 1, bot_trunc, top_trunc);
+    let target = get_filtered_data(data, Category::Synthetic, bot_trunc, top_trunc + 1, 1000, Some(stem)).get_final_page();
 
     // If there is a generator somewhere which is too much then it must be some tau mult ??
     // Yes, if and only if the generator therre is a generator some AF higher which must not be torsion
@@ -209,9 +286,11 @@ fn find_solutions(data: &SyntheticSS, bottom_trunc: i32, top_trunc: i32, stem: i
             if diff.1.len() != 0 {
                 eprintln!("There is also another problem in this AF, whoops ?");
             }
-            let f = diff.0.iter().find(|x| x.0 == None);
+
             
-            if let Some(target) = f {
+            // TAU mult
+            {
+                let target = &i.obs[0];
                 let t_y = data.find(&target.1).unwrap().y;
                 for j in &issues {
                     let d = diff_sorted(&j.obs, &j.exp);
@@ -233,6 +312,26 @@ fn find_solutions(data: &SyntheticSS, bottom_trunc: i32, top_trunc: i32, stem: i
                     }
                 }
             }
+            
+
+            if diff.0.len() == 1 && diff.1.len() == 0 {
+                // We might need to check if a source of this diff is compatible with AEHP     
+                let mut pot_sols = vec![];
+                for (t_name, (t_torsion, t_af)) in &target {
+                    if *t_af == i.af && *t_torsion != Some(0) {
+                        // Try to find source to do this
+                        // We also need to respect module structure
+                        let t_y = data.find(&t_name).unwrap().y;
+                        let mut d = find_diffs_for_target(data, &sources, t_name, *t_torsion, *t_af, t_y, 0);
+                        pot_sols.append(&mut d);
+                    }
+                }
+                sols.push((
+                    i.clone(),
+                    pot_sols
+                ));
+            }
+
         } else if i.obs.len() == i.exp.len() {
             // Some differential should target something ?
             let (obs, exp) = diff_sorted(&i.obs, &i.exp);
@@ -305,6 +404,27 @@ fn apply_solutions(data: &mut SyntheticSS, sols: Vec<(Issue, Solution)>) {
                     kind: Kind::Real,
                 });
             },
+            Solution::DoubleDiff(diff_solution, diff_solution1) => {
+                println!("{:?}\n{:?}", diff_solution, diff_solution1);
+                data.insert_diff(Differential {
+                    from: diff_solution.from,
+                    to: diff_solution.to,
+                    coeff: diff_solution.coeff,
+                    d: diff_solution.d,
+                    synthetic: Some(()),
+                    proof: None,
+                    kind: Kind::Real,
+                });
+                data.insert_diff(Differential {
+                    from: diff_solution1.from,
+                    to: diff_solution1.to,
+                    coeff: diff_solution1.coeff,
+                    d: diff_solution1.d,
+                    synthetic: Some(()),
+                    proof: None,
+                    kind: Kind::Real,
+                });
+            },
         }
     }
 }
@@ -314,8 +434,11 @@ fn apply_solutions(data: &mut SyntheticSS, sols: Vec<(Issue, Solution)>) {
 // This diff_sources might be incorrect as it can change depending on which page a generator lives ?
 fn fix_in_trunc_stem(data: &mut SyntheticSS, bot_trunc: i32, top_trunc: i32, stem: i32) -> Result<bool, ()> {
     println!("\nRP{:?}_{:?}:\n", bot_trunc, top_trunc);
-    let top_trunc = top_trunc;
     
+    if stem == 19 && bot_trunc == 3 && top_trunc == 256 {
+        println!("LOL!");
+    }
+
     let issues = find_issues(data, bot_trunc, top_trunc, stem); 
     let no_issues = issues.len() == 0;
 
@@ -347,7 +470,9 @@ pub fn fix_correctness_by_stem(data: &mut SyntheticSS) {
         while applied_change {
             applied_change = false;
             is_error = false;
-            for top_trunc in 1..=(stem + 3) {
+
+            // for top_trunc in 1..=(stem + 3) {
+            for top_trunc in 2..=(2) {
                 let bot_trunc = stem + 3 - top_trunc;
                 if bot_trunc & 1 == 1 {
                     match fix_in_trunc_stem(data, bot_trunc, 256, stem) {

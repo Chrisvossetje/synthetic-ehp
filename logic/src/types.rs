@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+pub type Torsion = Option<i32>;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Category {
     Synthetic,

@@ -87,10 +87,11 @@ pub fn compute_inductive_generators(data: &mut SyntheticSS) {
 // page: the page which supported its last diff. Meaning it can support a diff on page + 1
 // torsion: Torsion at the last diff / page
 // af: AF at the last diff / page
-pub fn find_possible_sources_for_differentials_in_stem(data: &SyntheticSS, stem: i32) -> HashMap<String, (i32, Option<i32>, i32)> {
+pub fn find_possible_sources_for_differentials_in_stem(data: &SyntheticSS, stem: i32, bot_trunc: i32, top_trunc: i32) -> HashMap<String, (i32, Option<i32>, i32)> {
     let mut g = get_filtered_data(data, Category::Synthetic, 0, 1000, 1000, Some(stem));
-    g.generators.retain(|_, v| v[0].1 != Some(0));
-    
+    g.generators.retain(|k, v| v[0].1 != Some(0) && bot_trunc <= data.find(&k).unwrap().y && data.find(&k).unwrap().y <= top_trunc);
+
+
     g.generators.into_iter().map(|(k,v)| {
         (k,v[0])
     }).collect()

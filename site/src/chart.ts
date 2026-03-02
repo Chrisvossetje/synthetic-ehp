@@ -6,7 +6,8 @@ import { svgNS } from "./svgchart";
 
 type Point = [number, number];
 
-const TorsionColor = ["black", "#0080ff", "red", "mediumseagreen", "cyan", "purple"];
+// TODO: Torsion color now manually rotates
+const TorsionColor = ["black", "#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple",];
 
 export class Chart {
     private static cachedInvalidCells: string | null = null;
@@ -477,7 +478,7 @@ export class Chart {
 
                 // Apply mode-specific offsets
                 let x = gen.x + xOffset + offset + index * step;
-                const yOffsetAdjust = offset + index * step;
+                const yOffsetAdjust = offset + index * step * 0.85;
 
                 let y: number;
                 if (isASS) {

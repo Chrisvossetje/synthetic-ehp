@@ -34,7 +34,40 @@ pub fn synthetic_stable_e1(data: &mut SyntheticSS) {
         ("5 1 2 3 4 4 1 1 2 4 1 1 1", Some(3)), ("16 4 1 1 2 4 1 1 1", Some(0)), // Stem 30/31 // TODO
         ("3 4 4 1 1 2 4 1 1 2 4 1 1 1", Some(3)), ("14 2 4 1 1 2 4 1 1 1", Some(0)), // Stem 30/31 // TODO 
 
-        ("3 4 4 1 1 2 4 1 1 2 4 1 1 1", Some(3)), ("14 2 4 1 1 2 4 1 1 1", Some(0)), // Stem 31/32 // TODO: Target
+        ("3 6 2 2 4 5 3 3 3", Some(1)), ("6 3 3 6 6 5 3", Some(0)), // Stem 31/32 // TODO: Target
+        ("2 2 2 2 2 3 5 7 3 3", Some(1)), ("3 6 2 3 5 7 3 3", Some(0)), // Stem 31/32 // TODO: Target
+        ("2 4 1 1 2 4 1 1 2 4 3 3 3", Some(3)), ("2 2 2 3 3 6 6 5 3", Some(0)), // Stem 31/32 // Proof: Needed for compatibility with RP1_2
+            
+        ("1 2 4 1 1 2 4 1 1 2 4 3 3 3", Some(1)), ("8 1 1 2 4 1 1 2 4 3 3 3", Some(0)), // Stem 32/33
+        
+        ("11 3 5 7 7", Some(2)), ("27 7", Some(0)), // Stem 33/34
+        ("3 6 2 3 4 4 1 1 2 4 1 1 1", Some(1)), ("6 2 2 2 2 2 4 5 3 3 3", Some(0)), // Stem 33/34
+        ("2 2 4 1 1 2 4 1 1 2 4 3 3 3", Some(1)), ("4 2 2 2 2 2 2 4 5 3 3 3", Some(0)), // Stem 33/34
+        ("1 1 2 4 1 1 2 4 1 1 2 4 3 3 3", Some(1)), ("2 2 2 2 2 2 2 2 4 5 3 3 3", Some(0)), // Stem 33/34
+
+        ("3 5 6 2 4 5 3 3 3", Some(1)), ("6 5 2 3 5 7 7", Some(0)), // Stem 34/35
+        ("2 2 2 2 3 3 6 6 5 3", Some(1)), ("3 6 3 3 6 6 5 3", Some(0)), // Stem 34/35
+        
+        
+        ("4 2 2 2 2 2 2 2 4 5 3 3 3", Some(1)), ("6 2 2 2 2 2 3 5 7 3 3", Some(0)), // Stem 36/37
+        ("2 2 2 2 2 2 2 2 2 4 5 3 3 3", Some(1)), ("3 6 2 2 2 2 2 4 5 3 3 3", Some(0)), // Stem 36/37
+        ("6 2 2 2 2 2 2 4 5 3 3 3", Some(3)), ("4 7 3 3 6 6 5 3", Some(0)), // Stem 36/37 // Proof: the source 4 7 3 3 6 6 5 3 is compatible with the Algebraic AHSS. 
+        
+        ("13 2 3 5 7 7", Some(3)), ("23 15", Some(0)), // Stem 37/38
+        ("7 12 4 5 3 3 3", Some(3)), ("22 13 3", Some(0)), // Stem 37/38
+        ("3 5 7 3 5 7 7", Some(2)), ("21 11 3 3", Some(0)), // Stem 37/38 // Proof: Target else we get a weird extra t^2 diff which need not be there. The other source would make the 39th stem not solvable.
+        ("5 6 3 3 6 6 5 3", Some(1)), ("8 12 9 3 3 3", Some(0)), // Stem 37/38 // Proof: The other option is not compatible with AEHP
+        ("3 5 6 2 3 5 7 3 3", Some(1)), ("6 9 3 6 6 5 3", Some(0)), // Stem 37/38 
+        ("2 2 4 3 3 3 6 6 5 3", Some(1)), ("3 6 5 2 3 5 7 7", Some(0)), // Stem 37/38
+        ("2 2 2 2 2 2 2 2 3 5 7 3 3", Some(3)), ("2 3 5 5 3 6 6 5 3", Some(0)), // Stem 37/38
+        
+
+        ("6 2 3 4 4 1 1 2 4 1 1 2 4 1 1 1", Some(3)), ("5 6 2 2 2 2 2 4 5 3 3 3", Some(0)), // Stem 38/39
+        ("5 1 2 3 4 4 1 1 2 4 1 1 2 4 1 1 1", Some(1)), ("13 1 2 4 1 1 2 4 1 1 2 4 1 1 1", Some(0)), // Stem 38/39
+        ("3 4 4 1 1 2 4 1 1 2 4 1 1 2 4 1 1 1", Some(1)), ("12 1 1 2 4 1 1 2 4 1 1 2 4 1 1 1", Some(0)), // Stem 38/39
+
+
+        ("6 2 3 4 4 1 1 2 4 1 1 2 4 1 1 1", Some(3)), ("5 6 2 2 2 2 2 4 5 3 3 3", Some(0)), // Stem 39/40
     ];
         
     for i in a {
@@ -49,209 +82,230 @@ pub fn synthetic_stable_e1(data: &mut SyntheticSS) {
 
 pub fn get_stable_diffs() -> Vec<Differential> {
     vec![
-        // Stem 14/15
-        Differential {
-            from: "[15]".to_string(),
-            to: "5 3[6]".to_string(),
-            coeff: 1,
-            d: 9,
-            proof: Some("Stable Diff".to_string()),
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
-        // Stem 14/15
-        Differential {
-            from: "1[14]".to_string(),
-            to: "1 2 3 3[5]".to_string(),
-            coeff: 2,
-            d: 9,
-            proof: Some("Stable Diff".to_string()),
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
-        // Stem 14/15
-        Differential {
-            from: "1 1[13]".to_string(),
-            to: "4 4 1 1 1[3]".to_string(),
-            coeff: 2,
-            d: 10,
-            proof: None,
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
+        // // Stem 14/15
+        // Differential {
+        //     from: "[15]".to_string(),
+        //     to: "5 3[6]".to_string(),
+        //     coeff: 1,
+        //     d: 9,
+        //     proof: Some("Stable Diff".to_string()),
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+        // // Stem 14/15
+        // Differential {
+        //     from: "1[14]".to_string(),
+        //     to: "1 2 3 3[5]".to_string(),
+        //     coeff: 2,
+        //     d: 9,
+        //     proof: Some("Stable Diff".to_string()),
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+        // // Stem 14/15
+        // Differential {
+        //     from: "1 1[13]".to_string(),
+        //     to: "4 4 1 1 1[3]".to_string(),
+        //     coeff: 2,
+        //     d: 10,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
 
 
-        // Stem 16/17
-        Differential {
-            from: "3 3 3[8]".to_string(),
-            to: "2 4 3 3 3[1]".to_string(),
-            coeff: 1,
-            d: 7,
-            proof: None,
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
+        // // Stem 16/17
+        // Differential {
+        //     from: "3 3 3[8]".to_string(),
+        //     to: "2 4 3 3 3[1]".to_string(),
+        //     coeff: 1,
+        //     d: 7,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
 
         
-        // Stem 17/18
-        Differential {
-            from: "6 2 3 3[4]".to_string(),
-            to: "2 4 3 3 3[2]".to_string(),
-            coeff: 2,
-            d: 2,
-            proof: None,
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
-        // Stem 17/18
-        Differential {
-            from: "6 5 3[4]".to_string(),
-            to: "2 4 3 3 3[2]".to_string(),
-            coeff: 1,
-            d: 2,
-            proof: None,
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
-        // Stem 17/18
-        Differential {
-            from: "2 4 3 3 3[4]".to_string(),
-            to: "3 6 2 3 3[1]".to_string(),
-            coeff: 0,
-            d: 3,
-            proof: None,
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
-        // Stem 17/18
-        Differential {
-            from: "2 4 1 1 1[10]".to_string(),
-            to: "12 1 1 1[3]".to_string(),
-            coeff: 0,
-            d: 7,
-            proof: None,
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
+        // // Stem 17/18
+        // Differential {
+        //     from: "6 2 3 3[4]".to_string(),
+        //     to: "2 4 3 3 3[2]".to_string(),
+        //     coeff: 2,
+        //     d: 2,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+        // // Stem 17/18
+        // Differential {
+        //     from: "6 5 3[4]".to_string(),
+        //     to: "2 4 3 3 3[2]".to_string(),
+        //     coeff: 1,
+        //     d: 2,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+        // // Stem 17/18
+        // Differential {
+        //     from: "2 4 3 3 3[4]".to_string(),
+        //     to: "3 6 2 3 3[1]".to_string(),
+        //     coeff: 0,
+        //     d: 3,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+        // // Stem 17/18
+        // Differential {
+        //     from: "2 4 1 1 1[10]".to_string(),
+        //     to: "12 1 1 1[3]".to_string(),
+        //     coeff: 0,
+        //     d: 7,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
 
 
-        // Stem 18/19
-        Differential {
-            from: "12 1 1 1[5]".to_string(),
-            to: "2 3 4 4 1 1 1[3]".to_string(),
-            coeff: 2,
-            d: 2,
-            proof: None,
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
-        // Stem 18/19
-        Differential {
-            from: "7 7[6]".to_string(),
-            to: "13 3[3]".to_string(),
-            coeff: 0,
-            d: 3,
-            proof: Some("Its not clear which of the two possible AF 3 targets this will hit. But this one is the most logical? It is also NOT relevant.".to_string()),
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
+        // // Stem 18/19
+        // Differential {
+        //     from: "12 1 1 1[5]".to_string(),
+        //     to: "2 3 4 4 1 1 1[3]".to_string(),
+        //     coeff: 2,
+        //     d: 2,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+        // // Stem 18/19
+        // Differential {
+        //     from: "7 7[6]".to_string(),
+        //     to: "13 3[3]".to_string(),
+        //     coeff: 0,
+        //     d: 3,
+        //     proof: Some("Its not clear which of the two possible AF 3 targets this will hit. But this one is the most logical? It is also NOT relevant.".to_string()),
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
         
         
-        // Stem 21/22
-        Differential {
-            from: "6 2 3 3[8]".to_string(),
-            to: "2 4 3 3 3[6]".to_string(),
-            coeff: 2,
-            d: 2,
-            proof: None,
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
-        // Stem 21/22
-        Differential {
-            from: "6 5 3[8]".to_string(),
-            to: "2 4 3 3 3[6]".to_string(),
-            coeff: 1,
-            d: 2,
-            proof: None,
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
+        // // Stem 21/22
+        // Differential {
+        //     from: "6 2 3 3[8]".to_string(),
+        //     to: "2 4 3 3 3[6]".to_string(),
+        //     coeff: 2,
+        //     d: 2,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+        // // Stem 21/22
+        // Differential {
+        //     from: "6 5 3[8]".to_string(),
+        //     to: "2 4 3 3 3[6]".to_string(),
+        //     coeff: 1,
+        //     d: 2,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
 
                 
-        // Stem 22/23
-        Differential {
-            from: "2 4 3 3 3[8]".to_string(),
-            to: "3 6 2 3 3[5]".to_string(),
-            coeff: 0,
-            d: 3,
-            proof: None,
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
+        // // Stem 22/23
+        // Differential {
+        //     from: "2 4 3 3 3[8]".to_string(),
+        //     to: "3 6 2 3 3[5]".to_string(),
+        //     coeff: 0,
+        //     d: 3,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
 
 
-        // Stem 22/23
+        // // Stem 22/23
+        // Differential {
+        //     from: "1 1 2 4 1 1 1[12]".to_string(),
+        //     to: "4 4 1 1 2 4 1 1 1[3]".to_string(),
+        //     coeff: 1,
+        //     d: 9,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+
+        // // Stem 22/23
+        // Differential {
+        //     from: "1 2 4 1 1 1[13]".to_string(),
+        //     to: "1 2 3 4 4 1 1 1[5]".to_string(),
+        //     coeff: 1,
+        //     d: 8,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+        // // Stem 22/23
+        // Differential {
+        //     from: "4 1 1 1[16]".to_string(),
+        //     to: "3 4 4 1 1 1[8]".to_string(),
+        //     coeff: 0,
+        //     d: 8,
+        //     proof: Some("This must be it as there is no room for this stable diff elsewhere on EHP".to_string()),
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+        // // Stem 22/23
+        // Differential {
+        //     from: "4 1 1 1[16]".to_string(),
+        //     to: "12 1 1 1[7]".to_string(),
+        //     coeff: 0,
+        //     d: 9,
+        //     proof: Some("This must be it as there is no room for this stable diff elsewhere on EHP".to_string()),
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+        // // Stem 22/23
+        // Differential {
+        //     from: "1 1 1[20]".to_string(),
+        //     to: "4 4 1 1 1[11]".to_string(),
+        //     coeff: 0,
+        //     d: 9,
+        //     proof: Some("Unsure about this target. Highly likely".to_string()),
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+        // // Stem 22/23
+        // Differential {
+        //     from: "1 1[21]".to_string(),
+        //     to: "1 2 3 3[13]".to_string(),
+        //     coeff: 0,
+        //     d: 8,
+        //     proof: None,
+        //     synthetic: Some(()),
+        //     kind: Kind::Real,
+        // },
+
+
         Differential {
-            from: "1 1 2 4 1 1 1[12]".to_string(),
-            to: "4 4 1 1 2 4 1 1 1[3]".to_string(),
+            from: "12 9 3 3 3[2]".to_string(),
+            to: "10 2 4 5 3 3 3[1]".to_string(),
             coeff: 1,
-            d: 9,
+            d: 1,
+            proof: None,
+            synthetic: Some(()),
+            kind: Kind::Real,
+        },
+        Differential {
+            from: "2 2 4 3 3 3 6 6 5 3[2]".to_string(),
+            to: "2 2 2 2 2 2 2 2 3 5 7 3 3[1]".to_string(),
+            coeff: 2,
+            d: 1,
             proof: None,
             synthetic: Some(()),
             kind: Kind::Real,
         },
 
-        // Stem 22/23
-        Differential {
-            from: "1 2 4 1 1 1[13]".to_string(),
-            to: "1 2 3 4 4 1 1 1[5]".to_string(),
-            coeff: 1,
-            d: 8,
-            proof: None,
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
-        // Stem 22/23
-        Differential {
-            from: "4 1 1 1[16]".to_string(),
-            to: "3 4 4 1 1 1[8]".to_string(),
-            coeff: 0,
-            d: 8,
-            proof: Some("This must be it as there is no room for this stable diff elsewhere on EHP".to_string()),
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
-        // Stem 22/23
-        Differential {
-            from: "4 1 1 1[16]".to_string(),
-            to: "12 1 1 1[7]".to_string(),
-            coeff: 0,
-            d: 9,
-            proof: Some("This must be it as there is no room for this stable diff elsewhere on EHP".to_string()),
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
-        // Stem 22/23
-        Differential {
-            from: "1 1 1[20]".to_string(),
-            to: "4 4 1 1 1[11]".to_string(),
-            coeff: 0,
-            d: 9,
-            proof: Some("Unsure about this target. Highly likely".to_string()),
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
-        // Stem 22/23
-        Differential {
-            from: "1 1[21]".to_string(),
-            to: "1 2 3 3[13]".to_string(),
-            coeff: 0,
-            d: 8,
-            proof: None,
-            synthetic: Some(()),
-            kind: Kind::Real,
-        },
 
 
     ]
