@@ -1,11 +1,11 @@
-use std::{cell::LazyCell, collections::HashMap, fs::File, io::{BufRead, BufReader}, sync::LazyLock};
+use std::{cell::LazyCell, collections::HashMap, fs::File, io::{BufRead, BufReader}, slice::Iter, sync::LazyLock};
 
 use crate::{MAX_STEM, types::Torsion};
 
 // (stem, af) -> Sorted vec of tau-modules
 type SYNTHETIC_COMPARE_DATA = HashMap<(i32,i32), Vec<Torsion>>;
 
- static S0: LazyLock<SYNTHETIC_COMPARE_DATA> = 
+static S0: LazyLock<SYNTHETIC_COMPARE_DATA> = 
     LazyLock::new(|| {
         let file_name = format!("../AHSS_DATA/S0_AdamsE2_ss.csv",);
         read_csv(1, 256, &file_name)
@@ -26,6 +26,10 @@ pub static RP: LazyLock<HashMap<(i32,i32), SYNTHETIC_COMPARE_DATA>> =
         m
     });
 
+
+fn iterator_for_rp_truncations() -> Vec<(i32,i32)> {
+    (2..=MAX_STEM).step_by(2).map(|x| (1,x)).into_iter().chain((3..=MAX_STEM).step_by(2).map(|x| (x,256))).collect()
+}
 
 
 // This bot / top trunc is for compatibility with C2, which is shifted 1 down wrt. RP1_2
@@ -50,10 +54,10 @@ fn read_csv(bot_trunc: i32, top_trunc: i32, file_name: &str) ->  HashMap<(i32, i
     
             if stem <= MAX_STEM {
                 if dr == 9000 {
-                    m.entry((stem, af)).or_insert(vec![]).push(None);
+                    m.entry((stem, af)).or_insert(vec![]).push(Torsion::default());
                 } 
                 if dr < 9000 {
-                    m.entry((stem, af)).or_insert(vec![]).push(Some(dr - 1));
+                    m.entry((stem, af)).or_insert(vec![]).push(Torsion::new(dr-1));
                 }
             }
         }
@@ -66,7 +70,7 @@ fn read_csv(bot_trunc: i32, top_trunc: i32, file_name: &str) ->  HashMap<(i32, i
     m
 }
 
-pub fn read_rp_csv(bot_trunc: i32, top_trunc: i32) -> HashMap<(i32, i32), Vec<Option<i32>>> {
+pub fn read_rp_csv(bot_trunc: i32, top_trunc: i32) -> HashMap<(i32, i32), Vec<Torsion>> {
     let file_name = format!("../AHSS_DATA/RP{bot_trunc}_{top_trunc}_AdamsE2_ss.csv",);
     read_csv(bot_trunc, top_trunc, &file_name)
 } 

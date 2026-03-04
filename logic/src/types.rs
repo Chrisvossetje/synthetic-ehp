@@ -2,7 +2,52 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-pub type Torsion = Option<i32>;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+pub struct Torsion(pub Option<i32>);
+
+impl Default for Torsion {
+    fn default() -> Self {
+        Self(None)
+    }
+}
+
+impl Torsion {
+    pub fn new(torsion: i32) -> Self {
+        Self(Some(torsion))
+    }
+
+    pub fn zero() -> Self {
+        Self(Some(0))
+    }
+
+    pub fn alive(&self) -> bool {
+        self.0 != Some(0)
+    }
+}
+
+
+// a <= b iff a can map to b
+impl Ord for Torsion {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.0 {
+            Some(a) => match other.0 {
+                Some(b) => b.cmp(&a),
+                None => std::cmp::Ordering::Greater,
+            },
+            None => match other.0 {
+                Some(_) => std::cmp::Ordering::Less,
+                None => std::cmp::Ordering::Equal,
+            },
+        }
+    }
+}
+
+impl PartialOrd for Torsion {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Category {
@@ -11,58 +56,55 @@ pub enum Category {
     Geometric,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Kind {
     Real,
     Fake,
     Unknown,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Generator {
     pub name: String,
-    pub x: i32,
+    pub stem: i32,
     pub y: i32,
-    pub adams_filtration: i32,
+    pub af: i32,
 
+    // As this is somewhat variable, do we want this information here ?
+    // Yes as this generator should represent E1
+    pub torsion: Torsion,
+
+    // This is purely algebraic!
     pub born: i32,
     pub dies: Option<i32>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub torsion: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub alg_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hom_name: Option<String>,
-
-    pub induced_name: Vec<(i32,String)>,
+    pub kind: Kind,
 }
 
 impl Generator {
-    pub fn new(name: String, x: i32, y: i32, adams_filtration: i32, born: i32, dies: Option<i32>) -> Generator {
+    pub fn new(name: String, stem: i32, y: i32, af: i32, born: i32, dies: Option<i32>, kind: Kind) -> Generator {
         Generator {
             name: name.clone(),
-            x,
+            stem,
             y,
-            adams_filtration,
+            af,
+            torsion: Torsion::default(),
             born,
             dies,
-            torsion: None,
-            alg_name: None,
-            hom_name: None,
-            induced_name: vec![(0,name)],
+            kind
         }
     }
 
-    pub fn get_induced_name(&self, sphere: i32) -> &str {
-        // HERE I ASSUME THAT INDUCED NAME IS REVERSE SORTED!
-        for (id, name) in &self.induced_name {
-            if sphere >= *id {
-                return &name;
-            }
-        }
-        panic!("No element found?")
-    }
+    // pub fn get_induced_name(&self, sphere: i32) -> &str {
+    //     // HERE I ASSUME THAT INDUCED NAME IS REVERSE SORTED!
+    //     for (id, name) in &self.induced_name {
+    //         if sphere >= *id {
+    //             return &name;
+    //         }
+    //     }
+    //     panic!("No element found?")
+    // }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,9 +113,6 @@ pub struct Differential {
     pub to: String,
     pub coeff: i32,
     pub d: i32,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub synthetic: Option<()>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<String>,
@@ -130,7 +169,7 @@ pub struct Multiplication {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyntheticSS {
+pub struct OldSyntheticSS {
     pub generators: Vec<Generator>,
     pub differentials: Vec<Differential>,
     pub multiplications: Vec<Multiplication>,
@@ -139,7 +178,7 @@ pub struct SyntheticSS {
 }
 
 
-impl SyntheticSS {
+impl OldSyntheticSS {
     /// Build the find_map from generators
     pub fn build_find_map(&mut self) {
         self.find_map = self.generators

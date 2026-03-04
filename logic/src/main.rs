@@ -1,60 +1,67 @@
 use std::{process::exit, time::Instant};
 
-use crate::{curtis::generate_algebraic_data, export::write_typescript_file, processor::{add_diffs, add_induced_names, add_stable_diffs, add_tau_mults, compute_inductive_generators}, solver::fix_correctness_by_stem, stable_curtis::generate_stable_algebraic_data, stable_data::synthetic_stable_e1, stable_verification::verify_rp, types::{Differential, Generator, Kind, SyntheticSS}, verification::{verify_algebraic, verify_geometric, verify_integrity, verify_self_coherence, verify_stable}};
+use crate::{curtis::generate_algebraic_data, curtis_stable::generate_stable_algebraic_data, export::write_typescript_file, model::SyntheticSS, process::compute_pages};
 
 mod curtis;
 mod types;
-mod processor;
-mod naming;
+// mod processor;
+// mod naming;
 mod export;
-mod verification;
-mod data;
-mod stable_data;
-mod stable_verification;
-mod stable_curtis;
-mod solver;
-mod generate;
+// mod verification;
+// mod data;
+// mod stable_data;
+// mod stable_verification;
+mod curtis_stable;
+// mod solver;
+// mod generate;
+mod model;
+mod process;
+mod issues;
+mod errors;
+mod solve;
 
 mod synthetic_stable_data;
 
 const MAX_STEM: i32 = 40;
-const MAX_VERIFY_STEM: i32 = 40;
+const MAX_VERIFY_STEM: i32 = 30;
 const MAX_VERIFY_SPHERE: i32 = MAX_VERIFY_STEM + 2;
 const MAX_UNEVEN_INPUT: i32 = (MAX_STEM + 1) * 2;
 
 
-pub fn add_final_diagonal(data: &mut SyntheticSS) {
-    // Generate the degree zero parts
-    for n in (3..MAX_UNEVEN_INPUT).step_by(4) {
-        let y = n / 2;
+// pub fn add_final_diagonal(data: &mut OldSyntheticSS) {
+//     // Generate the degree zero parts
+//     for n in (3..MAX_UNEVEN_INPUT).step_by(4) {
+//         let y = n / 2;
         
-        data.generators.push(Generator::new(format!("2(∞)[{}]", y), y, y, 2, 0, None));
-        data.generators.push(Generator::new(format!("1(∞)[{}]", y + 1), y + 1, y + 1, 1, 0, None));
+//         data.generators.push(Generator::new(format!("2(∞)[{}]", y), y, y, 2, 0, None));
+//         data.generators.push(Generator::new(format!("1(∞)[{}]", y + 1), y + 1, y + 1, 1, 0, None));
 
-        data.differentials.push(Differential {
-            from: format!("1(∞)[{}]", y + 1),
-            to: format!("2(∞)[{}]", y),
-            coeff: 0,
-            d: 1,
-            proof: Some("Lifted AEHP differential.".to_string()),
-            synthetic: None,
-            kind: Kind::Real,
-        });
-    }
-}
+//         data.differentials.push(Differential {
+//             from: format!("1(∞)[{}]", y + 1),
+//             to: format!("2(∞)[{}]", y),
+//             coeff: 0,
+//             d: 1,
+//             proof: Some("Lifted AEHP differential.".to_string()),
+//             synthetic: None,
+//             kind: Kind::Real,
+//         });
+//     }
+// }
 
 fn ahss() -> SyntheticSS {
-    let mut data = generate_stable_algebraic_data();
-    add_final_diagonal(&mut data);
-    data.build_find_map();
+    let data = generate_stable_algebraic_data();
+    let page = compute_pages(&data, 1, 256);
+
+    // add_final_diagonal(&mut data);
+    // data.build_find_map();
     
-    synthetic_stable_e1(&mut data);
-    add_stable_diffs(&mut data);
-    // add_stable_tau_mults(&mut data);
+    // synthetic_stable_e1(&mut data);
+    // add_stable_diffs(&mut data);
+    // // add_stable_tau_mults(&mut data);
     
-    data.differentials.sort();
+    // data.differentials.sort();
     
-    fix_correctness_by_stem(&mut data);
+    // fix_correctness_by_stem(&mut data);
     
     // println!("\n-----\nTesting if stable data is well-defined, meaning differentials / multiplications understand have generators which exist.)\n-----\n");
     // if !verify_integrity(&data) {
@@ -74,12 +81,12 @@ fn ahss() -> SyntheticSS {
     // Verify if it is coherent wrt james per. ?
     // ^ Probably want to do this directly ? meaning, checking if its 
     
-    write_typescript_file("../site/src/data_stable.ts", "_stable", &data).unwrap();
+    write_typescript_file("../site/src/data_stable.ts", "_stable", &data, &page).unwrap();
     data
 }
 
 fn ehp() -> SyntheticSS {
-    let mut data = generate_algebraic_data();
+    let mut data = generate_algebraic_data(); 
 
     // add_diffs(&mut data);
     // add_induced_names(&mut data);
@@ -119,8 +126,8 @@ fn ehp() -> SyntheticSS {
     // // TODO : Do a verify Hopf Inv One maps thing ?
     
 
-    add_final_diagonal(&mut data);
-    write_typescript_file("../site/src/data.ts", "", &data).unwrap();
+    // add_final_diagonal(&mut data);
+    // write_typescript_file("../site/src/data.ts", "", &data).unwrap();
     data
 }
 
@@ -137,6 +144,8 @@ fn main() {
 
 
 
+
+// TODO: Don't let this be a test and just make this some lazy static thing whatev.
 #[test]
 fn generate_table() {
     // Table copied from Google Sheets

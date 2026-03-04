@@ -49,9 +49,9 @@ export function handleAssDotClick(dot: string) {
     let content = `<span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>`;
     content += `<h4>Generator: ${gen.name}</h4>`;
     content += `<pre style="background-color: #00000000; margin: 0;">`;
-    content += `x: ${gen.x}\n`;
+    content += `x: ${gen.stem}\n`;
     content += `y: ${gen.y}\n`;
-    content += `Adams filtration: ${gen.adams_filtration}\n`;
+    content += `Adams filtration: ${gen.af}\n`;
     content += `Torsion: ${gen.torsion !== undefined ? 'F2[τ]/τ^' + gen.torsion : 'F2[τ]'}\n`;
 
     if (gen.alg_name) {
@@ -186,9 +186,9 @@ export function update_ass_chart(
         if (syntheticTorsion == undefined) {
             gens.push({
                 name: g.name,
-                x: g.x,
+                stem: g.stem,
                 y: filtration,
-                adams_filtration: filtration,
+                af: filtration,
                 induced_name: [[0, g.name]],
                 born: g.born,
                 dies: g.dies,
@@ -202,18 +202,18 @@ export function update_ass_chart(
 
         gens.push({
             name: sourceName,
-            x: g.x,
+            stem: g.stem,
             y: filtration,
-            adams_filtration: filtration,
+            af: filtration,
             induced_name: [[0, g.name]],
             born: g.born,
             dies: g.dies,
         });
         gens.push({
             name: targetName,
-            x: g.x + 1,
+            stem: g.stem + 1,
             y: targetFiltration,
-            adams_filtration: targetFiltration,
+            af: targetFiltration,
             induced_name: [[0, g.name]],
             born: -1,
             dies: -1,
@@ -257,7 +257,7 @@ export function update_ass_chart(
 
     // ASS dots are always black in this presentation.
     gens.forEach((gen) => {
-        assChart.display_dot(gen.name, true, true, 0, gen.adams_filtration);
+        assChart.display_dot(gen.name, true, true, 0, gen.af);
     });
 
     // Differential color encodes the torsion exponent.

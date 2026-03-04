@@ -233,7 +233,7 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
 
     // Draw generators (dots)
     const generators = chart.generators.filter(g =>
-        g.x >= xMin && g.x <= xMax && g.y >= yMin && g.y <= yMax
+        g.stem >= xMin && g.stem <= xMax && g.y >= yMin && g.y <= yMax
     );
 
     for (const gen of generators) {
@@ -265,7 +265,7 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
         }
 
         // Add adams filtration (to the right of the dot, very small)
-        tikz += `\\node[anchor=west,scale=0.15,gray,inner sep=0pt] at (${roundCoord(cx + 0.04)},${roundCoord(cyFlip)}) {${gen.adams_filtration}};\n`;
+        tikz += `\\node[anchor=west,scale=0.15,gray,inner sep=0pt] at (${roundCoord(cx + 0.04)},${roundCoord(cyFlip)}) {${gen.af}};\n`;
     }
 
     tikz += "\\end{scope}\n";

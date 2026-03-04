@@ -450,7 +450,7 @@ export class Chart {
         let temp: ToStringMap<Point, Generators[]> = new ToStringMap();
 
         this.generators.forEach(gen => {
-            let xy: Point = [gen.x, gen.y];
+            let xy: Point = [gen.stem, gen.y];
             if (temp.has(xy)) {
                 temp.get(xy).push(gen);
             } else {
@@ -477,7 +477,7 @@ export class Chart {
                 const offset = -((gens.length - 1) / 2) * step;
 
                 // Apply mode-specific offsets
-                let x = gen.x + xOffset + offset + index * step;
+                let x = gen.stem + xOffset + offset + index * step;
                 const yOffsetAdjust = offset + index * step * 0.85;
 
                 let y: number;
@@ -497,7 +497,7 @@ export class Chart {
                     labels += this.generate_label(x, y, gen.name) + "\n";
                 }
                 if (this.showFiltration) {
-                    filtrationLabels += this.generate_filtration_label(x, y, gen.name, gen.adams_filtration) + "\n";
+                    filtrationLabels += this.generate_filtration_label(x, y, gen.name, gen.af) + "\n";
                 }
             });
         });
@@ -509,7 +509,7 @@ export class Chart {
     private computeMaxStem(): number {
         let maxStem = 0;
         this.generators.forEach((gen) => {
-            maxStem = Math.max(maxStem, gen.x, gen.y);
+            maxStem = Math.max(maxStem, gen.stem, gen.y);
         });
         return maxStem || 32;
     }

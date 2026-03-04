@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use crate::{MAX_STEM, curtis::{Tagged, Untagged}, types::{Differential, Generator, Kind, SyntheticSS}};
+use crate::{MAX_STEM, curtis::{Tagged, Untagged}, model::{Diff, E1, SyntheticSS}, types::{Differential, Generator, Kind, OldSyntheticSS}};
 
 static STABLE_CURTIS_TXT: &str = include_str!("../../stable_curtis_table.txt");
 
@@ -54,7 +52,6 @@ fn parse_stable_algebraic_data(
 ) -> SyntheticSS {
     let mut generators = Vec::new();
     let mut differentials = Vec::new();
-    let multiplications = Vec::new();
 
     for unt in untagged {
         if unt.stem <= MAX_STEM {
@@ -67,7 +64,8 @@ fn parse_stable_algebraic_data(
                 y,
                 unt.filt,
                 y + 1,
-                None
+                None,
+                Kind::Unknown
             ));
         }
     }
@@ -90,7 +88,8 @@ fn parse_stable_algebraic_data(
                 y,
                 tag.filt,
                 y + 1,
-                Some(y_2 + 1)
+                Some(y_2 + 1),
+                Kind::Unknown
             ));
             
             generators.push(Generator::new(
@@ -99,7 +98,8 @@ fn parse_stable_algebraic_data(
                 y_2,
                 tag.filt - 1,
                 y_2 + 1,
-                Some(y_2 + 1)
+                Some(y_2 + 1),
+                Kind::Unknown
             ));
 
             differentials.push(Differential {
@@ -107,23 +107,37 @@ fn parse_stable_algebraic_data(
                 to,
                 coeff: 0,
                 d: (y_2 - y),
-                proof: Some("Lifted AEHP differential.".to_string()),
-                synthetic: None,
+                proof: None,
                 kind: Kind::Real,
             });
 
         }
     }
 
-    let mut data = SyntheticSS {
-        generators,
-        differentials,
-        multiplications,
-        tau_mults: vec![],
-        find_map: HashMap::new(),
+    generators.sort_by_key(|x| x.af);
+    generators.sort_by_key(|x| x.y);
+    generators.sort_by_key(|x| x.stem);
+
+    let mut diffs_page = vec![vec![]; (MAX_STEM + 1) as usize];
+    let internal_tau_page = vec![vec![]; (MAX_STEM + 1) as usize];
+    let external_tau_page = vec![];
+
+    let model = E1::new(generators);
+
+
+    for d in differentials {
+        let from = model.get_index(&d.from);
+        let to = model.get_index(&d.to);
+        diffs_page[d.d as usize].push(Diff { from, to });
+    }
+
+    let data = SyntheticSS {
+        model,
+        diffs_page,
+        internal_tau_page,
+        external_tau_page,
     };
 
-    data.build_find_map();
     data
 }
 
@@ -131,14 +145,5 @@ fn parse_stable_algebraic_data(
 
 pub fn generate_stable_algebraic_data() -> SyntheticSS {
     let (untagged, tagged) = parse_stable_curtis_table();
-
-
-    let mut data = parse_stable_algebraic_data(&untagged, &tagged);
-    
-    // Note: Sorting on y is quite important !!!
-    data.generators.sort_by_key(|x| x.y);
-    data.generators.sort_by_key(|x| x.adams_filtration);
-    data.differentials.sort();
-    data.build_find_map();
-    data
+    parse_stable_algebraic_data(&untagged, &tagged)
 }

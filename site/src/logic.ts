@@ -201,20 +201,20 @@ export function get_filtered_data(
     const original_af = new Object();
 
     data.generators.forEach((g) => {
-        original_af[g.name] = g.adams_filtration;
+        original_af[g.name] = g.af;
 
         const passesTop = !truncation || g.y < truncation;
         const passesBottom = bottomTruncation === undefined || g.y >= bottomTruncation;
-        if (passesTop && passesBottom && ((limit_x - 1 <= g.x && g.x <= limit_x + 1) || !limit_x)) {
+        if (passesTop && passesBottom && ((limit_x - 1 <= g.stem && g.stem <= limit_x + 1) || !limit_x)) {
             if (category == Category.Algebraic) { // Special Algebraic
-                torsion[g.name] = [undefined, g.adams_filtration];
+                torsion[g.name] = [undefined, g.af];
             }
             else if (category == Category.Geometric) { // Geometric
                 if (g.torsion == undefined) {
-                    torsion[g.name] = [undefined, g.adams_filtration];
+                    torsion[g.name] = [undefined, g.af];
                 }
             } else {
-                torsion[g.name] = [g.torsion, g.adams_filtration];
+                torsion[g.name] = [g.torsion, g.af];
             }
         }
     });
@@ -345,9 +345,9 @@ export function handleDotClick(dot: string) {
     let content = `<span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>`;
     content += `<h4>Generator: ${gen.name}</h4>`;
     content += `<pre style="background-color: #00000000; margin: 0;">`;
-    content += `x: ${gen.x}\n`;
+    content += `stem: ${gen.stem}\n`;
     content += `y: ${gen.y}\n`;
-    content += `Adams filtration: ${gen.adams_filtration}\n`;
+    content += `Adams filtration: ${gen.af}\n`;
     content += `Module: ${gen.torsion !== undefined ? 'F2[τ]/τ^' + gen.torsion : 'F2[τ]'}\n`;
 
     if (gen.alg_name) {
@@ -479,7 +479,7 @@ export function update_ehp_chart() {
 
     // Hide all generators and differentials first
     activeData.generators.forEach((g) => {
-        ehpChart.display_dot(g.name, false, false, undefined, g.adams_filtration);
+        ehpChart.display_dot(g.name, false, false, undefined, g.af);
     });
     activeData.differentials.forEach((d) => {
         ehpChart.display_diff(d.from, d.to, false);

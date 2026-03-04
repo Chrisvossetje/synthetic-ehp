@@ -1,11 +1,11 @@
 export type Generators = {
     "name": string;
-    "x": number;
+    "stem": number;
     "y": number;
-    "adams_filtration": number,
+    "af": number,
     "born": number,
     "dies": number,
-    "induced_name": [number, string][],
+    "induced_name"?: [number, string][],
     "torsion"?: number,
     "alg_name"?: string;
     "hom_name"?: string;
@@ -29,7 +29,8 @@ export type Multiplication = {
 
 export type TauMult = {
     "from": string,
-    "to": string
+    "to": string,
+    "kind": "Real" | "Fake";
 }
 
 export type SyntheticEHP = {
