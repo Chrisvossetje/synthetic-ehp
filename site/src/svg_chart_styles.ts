@@ -39,7 +39,8 @@ export const EHP_CHART_CSS = `
 
 /* Generator label styles */
 .generator-label {
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: pointer;
     font-size: 0.04px;
     fill: #000;
     font-family: monospace;
@@ -47,7 +48,8 @@ export const EHP_CHART_CSS = `
 
 /* Filtration label styles */
 .generator-filtration-label {
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: pointer;
     font-size: 0.035px;
     fill: #666;
     font-family: monospace;
@@ -73,7 +75,8 @@ export const EHP_CHART_CSS = `
 .tau-mult-line {
     stroke: orange;
     stroke-width: 0.008;
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: pointer;
     opacity: 0.7;
 }
 `;
@@ -119,7 +122,8 @@ export const ASS_CHART_CSS = `
 
 /* Generator label styles - LARGER */
 .generator-label {
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: pointer;
     font-size: 0.06px;
     fill: #000;
     font-family: monospace;
@@ -128,7 +132,8 @@ export const ASS_CHART_CSS = `
 
 /* Filtration label styles - LARGER */
 .generator-filtration-label {
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: pointer;
     font-size: 0.05px;
     fill: #666;
     font-family: monospace;
@@ -154,7 +159,8 @@ export const ASS_CHART_CSS = `
 .tau-mult-line {
     stroke: orange;
     stroke-width: 0.012;
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: pointer;
     opacity: 0.7;
 }
 `;

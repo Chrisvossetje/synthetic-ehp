@@ -109,8 +109,10 @@ export function handleAssLineClick(from: string, to: string) {
     if (inferred.linked) {
         content += `\nLinked EHP differential:\n`;
         content += `  ${inferred.linked.from} -> ${inferred.linked.to}\n`;
-        if (inferred.linked.proof) {
-            content += `  Proof: ${inferred.linked.proof}\n`;
+        if ("proof" in inferred.linked) {
+            content += `  Proof: ${inferred.linked.proof ?? ""}\n`;
+        } else {
+            content += `  AEHP differential\n`;
         }
     }
     if (inferred.reason) {

@@ -419,10 +419,37 @@ export function handleLineClick(from: string, to: string) {
     if (diff.synthetic !== undefined) {
         content += `\nSynthetic Differential\n`;
     }
-    if (diff.proof) {
-        content += `\nProof: ${diff.proof}\n`;
+    if ("proof" in diff) {
+        content += `\nProof: ${diff.proof ?? ""}\n`;
+    } else {
+        content += `\nAEHP differential\n`;
     }
     
+    content += `</pre>`;
+
+    floatingBox.innerHTML = content;
+    floatingBox.style.display = 'block';
+}
+
+export function handleTauMultClick(from: string, to: string) {
+    const activeData = getActiveData();
+    if (!activeData) return;
+
+    const tauMult = activeData.tau_mults.find((t) => t.from === from && t.to === to);
+    if (!tauMult) return;
+
+    const floatingBox = document.getElementById('floatingBox');
+    if (!floatingBox) return;
+
+    let content = `<span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>`;
+    content += `<h4>τ Multiplication</h4>`;
+    content += `<pre style="background-color: #00000000; margin: 0;">`;
+    content += `From: ${tauMult.from}\n`;
+    content += `To: ${tauMult.to}\n`;
+    content += `Kind: ${tauMult.kind}\n`;
+    if ("proof" in tauMult) {
+        content += `\nProof: ${tauMult.proof ?? ""}\n`;
+    }
     content += `</pre>`;
 
     floatingBox.innerHTML = content;
@@ -438,6 +465,7 @@ export function fill_ehp_chart() {
     // Bind click handlers
     ehpChart.dotCallback = handleDotClick;
     ehpChart.lineCallback = handleLineClick;
+    ehpChart.tauMultCallback = handleTauMultClick;
 
     // Set all generators and differentials (complete data set)
     ehpChart.set_all_generators(activeData.generators);

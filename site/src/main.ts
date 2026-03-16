@@ -32,6 +32,9 @@ function updateActiveChart() {
     }
 }
 
+// TODO: REMOVE!
+switchDataSource();
+
 function setupUIControls() {
     // Keyboard controls
     setupKeyboardControls();

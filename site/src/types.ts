@@ -16,9 +16,8 @@ export type Differential = {
     "to": string,
     "coeff": number,
     "d": number,
-    "kind": "Real" | "Fake";
+    "kind": "Real" | "Fake" | "Unknown";
     "proof"?: string,
-    "synthetic"?,
 }
 
 export type Multiplication = {
@@ -30,7 +29,8 @@ export type Multiplication = {
 export type TauMult = {
     "from": string,
     "to": string,
-    "kind": "Real" | "Fake";
+    "kind": "Real" | "Fake" | "Unknown";
+    "proof"?: string,
 }
 
 export type SyntheticEHP = {

@@ -42,6 +42,7 @@ export class Chart {
 
     public dotCallback: Function;
     public lineCallback: Function;
+    public tauMultCallback: Function;
 
     constructor(containerId: string, mode: ChartMode) {
         this.mode = mode;
@@ -242,6 +243,12 @@ export class Chart {
         }
     }
 
+    handleTauMultClickEvent(from: string, to: string) {
+        if (this.tauMultCallback) {
+            this.tauMultCallback(from, to);
+        }
+    }
+
     // Sanitize names for use in HTML IDs (remove special characters)
     sanitizeId(name: string): string {
         return name.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -269,7 +276,7 @@ export class Chart {
     }
 
     generate_tau_mult(x1: number, y1: number, x2: number, y2: number, from: string, to: string, style: string = "") {
-        return `<line class="tau-mult-line" id="tau-mult-${from}-${to}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="${style}"/>`;
+        return `<line class="tau-mult-line" id="tau-mult-${from}-${to}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="${style}" onclick="window.chartInstance.handleTauMultClickEvent('${from}', '${to}')"/>`;
     }
 
     generate_label(x: number, y: number, name: string) {
@@ -277,7 +284,7 @@ export class Chart {
         const labelX = x - 0.05; // Position to the left
         const labelY = y; // Vertically centered with dot
 
-        return `<text class="generator-label" id="label-${name}" x="${labelX}" y="${labelY}" text-anchor="end" dominant-baseline="middle">${name}</text>`;
+        return `<text class="generator-label" id="label-${name}" x="${labelX}" y="${labelY}" text-anchor="end" dominant-baseline="middle" onclick="window.chartInstance.handleDotClickEvent('${name}')">${name}</text>`;
     }
 
     generate_filtration_label(x: number, y: number, name: string, filtration: number) {
@@ -285,7 +292,7 @@ export class Chart {
         const labelX = x + 0.05; // Position to the right
         const labelY = y; // Vertically centered with dot
 
-        return `<text class="generator-filtration-label" id="filtration-${name}" x="${labelX}" y="${labelY}" text-anchor="start" dominant-baseline="middle">${filtration}</text>`;
+        return `<text class="generator-filtration-label" id="filtration-${name}" x="${labelX}" y="${labelY}" text-anchor="start" dominant-baseline="middle" onclick="window.chartInstance.handleDotClickEvent('${name}')">${filtration}</text>`;
     }
 
     generate_stable_line(): string {
