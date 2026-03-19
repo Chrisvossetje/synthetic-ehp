@@ -230,7 +230,7 @@ this.svg.innerHTML =
         ]) {
             this[item] = this.shadowRoot.getElementById(`${item}`);
         }
-        this.bigGridPattern = this.shadowRoot.getElementById('bigGrid') as SVGPatternElement | null;
+        this.bigGridPattern = this.shadowRoot.querySelector<SVGPatternElement>('#bigGrid');
 
         this.select = select(this.svg);
         this.zoom = zoom().on('zoom', this._zoomFunc.bind(this));
