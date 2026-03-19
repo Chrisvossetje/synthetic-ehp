@@ -1,8 +1,9 @@
+use core::panic;
 use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{MAX_STEM, domain::model::SyntheticSS, data::naming::{generate_names_from_tag_special, name_to_sphere}, types::Torsion};
+use crate::{MAX_STEM, data::naming::{generate_names_from_tag_special, name_to_sphere}, domain::model::SyntheticSS, solve::ehp_ahss::set_metastable_range, types::Torsion};
 
 pub static D_R_REPEATS: LazyLock<Vec<usize>> = LazyLock::new(|| {
     let mut r = vec![];
@@ -26,133 +27,159 @@ pub enum Action {
     AddInt { from: String, to: String, page: i32, proof: String },
     AddExt { from: String, to: String, proof: String },
     SetE1 { tag: String, torsion: Torsion, proof: String },
+    SetInducedName { name: String, new_name: String, sphere: i32, proof: String },
     Revert { times: i32 },
 }
 
 pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Result<i32,()> {
     match action {
         Action::AddDiff { from, to, proof } => {
-            let from_tag = data.try_name_tag(&from)?;
-            let to_tag = data.try_name_tag(&to)?;
-
             let x_from = data.model.get_name(from).stem;
             let x_to = data.model.get_name(to).stem;
 
-            debug_assert_eq!(x_from - x_to, 1);
-
-            let d_y = data.model.get_name(&from).y - data.model.get_name(&to).y;
-
-            if d_y <= 0 {
-                panic!("Tried to add a differential from lower to higher filtration ?? (d_r <= 0)");
+            if x_from - x_to != 1 {
+                println!("Tried to add differential between two stems not 1 apart.");
+                return Err(())
             }
-
-            let from_start = name_to_sphere(&from);
-            let to_start = name_to_sphere(&to);
-
-            debug_assert_eq!(from_start-to_start, d_y);
-
-            let repeats = D_R_REPEATS[d_y as usize];
-            
-            // TODO: 
-            let a = (to_start-1) / (repeats as i32);
-            let from_start = from_start - a * (repeats as i32); 
-            let to_start = to_start - a * (repeats as i32); 
-
-
-            for (f, t) in generate_names_from_tag_special(from_tag, from_start, repeats).zip(generate_names_from_tag_special(to_tag, to_start, repeats)) {
-                let p = if &f == from {
-                    proof.clone()
-                } else {
-                    format!("By James periodicity it follows from the external tau from {from} to {to}")
-                };
-                if data.add_diff_name(f, t, Some(p)).is_err() {
-                    break;
-                }
-            }
-            
-            Ok(to_start)
-        },
-        Action::AddInt { from, to, page, proof } => {
-            let from_tag = data.try_name_tag(&from)?;
-            let to_tag = data.try_name_tag(&to)?;
-
-            let x_from = data.model.get_name(from).stem;
-            let x_to = data.model.get_name(to).stem;
-
-            debug_assert_eq!(x_from, x_to);
-
-            let d_y = data.model.get_name(&from).y - data.model.get_name(&to).y;
-
-            if d_y != 0 {
-                panic!("Tried to add an internal tau between different filtrations ??");
-            }
-
-            let from_start = name_to_sphere(&from);
-            let to_start = name_to_sphere(&to);
-
-            let repeats = D_R_REPEATS[(*page - 1) as usize];
-
-            // TODO: 
-            let a = (*page-1) / (repeats as i32);
-            let from_start = from_start - a * (repeats as i32); 
-            let to_start = to_start - a * (repeats as i32); 
-            
-            for (f, t) in generate_names_from_tag_special(from_tag, from_start, repeats).zip(generate_names_from_tag_special(to_tag, to_start, repeats)) {
-                let p = if &f == from {
-                    proof.clone()
-                } else {
-                    format!("By James periodicity it follows from the internal tau from {from} to {to}")
-                };
-                if data.add_int_tau_name(f, t, *page, Some(p)).is_err() {
-                    break;
-                }
-            }
-
-            Ok(to_start)
-        },
-        Action::AddExt { from, to, proof } => {
-            let from_tag = data.try_name_tag(&from)?;
-            let to_tag = data.try_name_tag(&to)?;
-            
-            let x_from = data.model.get_name(from).stem;
-            let x_to = data.model.get_name(to).stem;
-            
-            debug_assert_eq!(x_from, x_to);
             
             let d_y = data.model.get_name(&from).y - data.model.get_name(&to).y;
             
             if d_y <= 0 {
-                panic!("Tried to add an external tau between different filtrations ??");
-            }
-            let from_start = name_to_sphere(&from);
-            let to_start = name_to_sphere(&to);
-            
-            debug_assert_eq!(from_start-to_start, d_y);
-            
-            let mut repeats = D_R_REPEATS[d_y as usize];
-            
-            
-            // TODO: 
-            let a = (to_start - 1) / (repeats as i32);
-            if a > 0 {
-                repeats *= 2_usize.pow(a as u32);
-                // Then we must have seen this earlier. And as this not the case we must see it later.
+                println!("Tried to add a diff on a non positive page");
+                return Err(())
             }
             if ahss {
+                let from_tag = data.try_name_tag(&from)?;
+                let to_tag = data.try_name_tag(&to)?;
+    
+                let from_start = name_to_sphere(&from);
+                let to_start = name_to_sphere(&to);
+    
+                let repeats = D_R_REPEATS[d_y as usize];
+        
+                // TODO: 
+                let a = (to_start-1) / (repeats as i32);
+                let from_start = from_start - a * (repeats as i32); 
+                let to_start = to_start - a * (repeats as i32); 
+    
+    
                 for (f, t) in generate_names_from_tag_special(from_tag, from_start, repeats).zip(generate_names_from_tag_special(to_tag, to_start, repeats)) {
                     let p = if &f == from {
                         proof.clone()
                     } else {
                         format!("By James periodicity it follows from the external tau from {from} to {to}")
                     };
-                    
-                    if data.add_ext_tau_name(f, t, Some(p)).is_err() {
+                    if data.add_diff_name(f, t, Some(p)).is_err() {
                         break;
                     }
                 }
+                Ok(to_start)
+            } else {
+                data.add_diff_name(from.clone(), to.clone(), Some(proof.clone()))?;
+                Ok(2)
+            }
+            
+        },
+        Action::AddInt { from, to, page, proof } => {
+            let x_from = data.model.get_name(from).stem;
+            let x_to = data.model.get_name(to).stem;
+
+            if x_from != x_to {
+                println!("Tried to add an internal tau between different stems");
+                return Err(())
             }
 
-            Ok(to_start)
+            let d_y = data.model.get_name(&from).y - data.model.get_name(&to).y;
+
+            if d_y != 0 {
+                println!("Tried to add an internal tau between different filtrations");
+                return Err(());
+            }
+
+            if ahss {
+                let from_tag = data.try_name_tag(&from)?;
+                let to_tag = data.try_name_tag(&to)?;
+
+
+                let from_start = name_to_sphere(&from);
+                let to_start = name_to_sphere(&to);
+
+                let repeats = D_R_REPEATS[(*page - 1) as usize];
+
+                // TODO: 
+                let a = (*page-1) / (repeats as i32);
+                let from_start = from_start - a * (repeats as i32); 
+                let to_start = to_start - a * (repeats as i32); 
+        
+                for (f, t) in generate_names_from_tag_special(from_tag, from_start, repeats).zip(generate_names_from_tag_special(to_tag, to_start, repeats)) {
+                    let p = if &f == from {
+                        proof.clone()
+                    } else {
+                        format!("By James periodicity it follows from the internal tau from {from} to {to}")
+                    };
+                    if data.add_int_tau_name(f, t, *page, Some(p)).is_err() {
+                        break;
+                    }
+                } 
+                Ok(to_start)
+            } else {
+                data.add_int_tau_name(from.clone(), to.clone(), *page, Some(proof.clone()))?;
+                Ok(2)
+            }
+
+        },
+        Action::AddExt { from, to, proof } => {
+            let x_from = data.model.get_name(from).stem;
+            let x_to = data.model.get_name(to).stem;
+
+            if x_from != x_to {
+                println!("Tried to add an external tau between different stems");
+                return Err(())
+            }
+
+            let d_y = data.model.get_name(&from).y - data.model.get_name(&to).y;
+
+            if d_y <= 0 {
+                println!("Tried to add an external tau between wrong filtrations");
+                return Err(());
+            }
+
+            // If on E1 these already have valid source and target torsion / af. 
+            // Then we apply James periodicity 
+            if ahss {
+                if let Some(source_torsion) = data.model.get_name(from).torsion.0 {
+                    if data.model.get_name(from).af - source_torsion == data.model.get_name(to).af {
+                        let from_tag = data.try_name_tag(&from)?;
+                        let to_tag = data.try_name_tag(&to)?;
+                        let from_start = name_to_sphere(&from);
+                        let to_start = name_to_sphere(&to);
+                        
+                        let mut repeats = D_R_REPEATS[d_y as usize];
+                
+                        let a = (to_start - 1) / (repeats as i32);
+                        if a > 0 {
+                            repeats *= 2_usize.pow(a as u32);
+                        }
+    
+                        for (f, t) in generate_names_from_tag_special(from_tag, from_start, repeats).zip(generate_names_from_tag_special(to_tag, to_start, repeats)) {
+                            let p = if &f == from {
+                                proof.clone()
+                            } else {
+                                format!("By James periodicity it follows from the external tau from {from} to {to}")
+                            };
+                    
+                            if data.add_ext_tau_name(f, t, Some(p)).is_err() {
+                                break;
+                            }
+                        }
+                        return Ok(to_start);
+                    }
+                }
+            } 
+
+            data.add_ext_tau_name(from.clone(), to.clone(), Some(proof.clone()))?;
+            Ok(2)
+
         },
         Action::SetE1 { tag, torsion, proof: _ } => {  
             if !ahss {
@@ -168,8 +195,20 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
 
             Ok(to_start)
         },
+        Action::SetInducedName { name, new_name, sphere, proof: _ } => {
+            if ahss {
+                panic!("We have no induced names in AHSS mode")
+            }
+            let original_id = data.model.try_index(name).ok_or(())?;
+            
+            // This is not completely necessary but we do want the induced thing to be valid
+            let _ = data.model.try_index(new_name).ok_or(())?;
+
+            data.model.get_mut(original_id).induced_name.push((*sphere, new_name.clone()));
+            Ok(2)
+        },
         Action::Revert { times: _ } => {
-            return Err(())
+            Err(())
         },
     }
 }

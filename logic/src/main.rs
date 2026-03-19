@@ -1,6 +1,6 @@
-use std::time::{self, Duration, Instant};
+use std::{process::exit, time::{self, Duration, Instant}};
 
-use crate::{data::curtis::{generate_algebraic_data, generate_stable_algebraic_data}, domain::model::SyntheticSS, io::{cli::process_input, export::{get_log, write_all}}, solve::{action::{Action, process_action, revert_log_and_remake}, ehp_ahss::{self, set_metastable_range}, issues::find_ahss_issue, solve::auto_deduce}};
+use crate::{data::{compare::rp_truncations, curtis::{DATA, STABLE_DATA}}, domain::model::SyntheticSS, io::{cli::process_input, export::{get_log, write_all}}, solve::{action::{Action, process_action, revert_log_and_remake}, ahss::find_ahss_issues, ehp::{apply_ehp_recursively, find_ehp_issues, verify_geometric}, ehp_ahss::set_metastable_range, issues::compare_algebraic_spectral_sequence, solve::auto_deduce}};
 
 
 mod types;
@@ -13,9 +13,9 @@ mod domain;
 
 
 
-const MAX_STEM: i32 = 35;
+const MAX_STEM: i32 = 40;
 // TODO: AHSS CURTIS DATA IS VALID UNTIL STEM 48
-const MAX_VERIFY_STEM: i32 = 25;
+const MAX_VERIFY_STEM: i32 = 35;
 
 // const MAX_VERIFY_SPHERE: i32 = MAX_VERIFY_STEM + 2;
 // const MAX_UNEVEN_INPUT: i32 = (MAX_STEM + 1) * 2;
@@ -45,10 +45,10 @@ const MAX_VERIFY_STEM: i32 = 25;
 
 
 fn ahss() -> (SyntheticSS, Duration) {
-    let original_data = generate_stable_algebraic_data();
+    let original_data = STABLE_DATA.clone();
 
     let mut log = get_log(true).unwrap_or(vec![]);
-    let mut data = revert_log_and_remake(0, &mut log, &original_data, true);
+    let mut data = revert_log_and_remake(0, &mut log, &STABLE_DATA, true);
     
     write_all(&data, &log, true);
 
@@ -56,12 +56,20 @@ fn ahss() -> (SyntheticSS, Duration) {
 
     let mut total_input_time = Duration::ZERO;
 
+    println!("");
+    println!("----------------------------------------");
+    println!("");
+    println!("AHSS AHSS AHSS AHSS AHSS");
+    println!("");
+    println!("----------------------------------------");
+    println!("");
+
     'outer: while stem <= MAX_VERIFY_STEM {
         println!("----------");
         println!("Stem {stem}");
         println!("----------");
 
-        'middle: while let Err(issues) = find_ahss_issue(&data, stem) {
+        'middle: while let Err(issues) = find_ahss_issues(&data, stem) {
             for issue in &issues {
                 // Automatic
                 match auto_deduce(&data, &issue) {
@@ -107,6 +115,9 @@ fn ahss() -> (SyntheticSS, Duration) {
                                     break;
                                 },
                                 Err(_) => {
+                                    println!("\n---------------");
+                                    println!("ACTION ISSUE!");
+                                    println!("---------------\n");  
                                     println!("The following data was invalid {:?}. Please try again.", action);  
                                 },
                             }
@@ -128,17 +139,100 @@ fn ahss() -> (SyntheticSS, Duration) {
     return (data, total_input_time);
 }
 
-fn ehp(ahss: &SyntheticSS) -> SyntheticSS {
-    let mut original_data = generate_algebraic_data(); 
-    set_metastable_range(&mut original_data, ahss);
-
+fn ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
+    let mut original_data = DATA.clone();
+    set_metastable_range(&mut original_data, ahss).unwrap();
+    
     let mut log = get_log(false).unwrap_or(vec![]);
     let mut data = revert_log_and_remake(0, &mut log, &original_data, false);
     
     write_all(&data, &log, false);
 
-    let mut stem = 2;
+    let mut total_input_time = Duration::ZERO;
 
+    println!("");
+    println!("----------------------------------------");
+    println!("");
+    println!("EHP EHP EHP EHP EHP EHP");
+    println!("");
+    println!("----------------------------------------");
+    println!("");
+
+    let mut stem_minus_sphere = 2;
+
+    'outer: while stem_minus_sphere <= (MAX_VERIFY_STEM + MAX_STEM) {
+        print!("{stem_minus_sphere}-");
+        
+        'middle: while let Err(issues) = find_ehp_issues(&mut data, ahss, stem_minus_sphere) {
+            println!("");
+            write_all(&data, &log, false);
+            for issue in &issues {
+                // Automatic
+                match auto_deduce(&data, &issue) {
+                    Ok(action) => {
+                        match process_action(&mut data, &action, false) {
+                            Ok(_) => {
+                                println!("\n{:?}\n", issue);
+                                println!("\nAutomatically resolved the issue with the following action: {:?}\n", action);
+                                log.push(action);
+                                write_all(&data, &log, false);
+                                continue 'middle;
+                            },
+                            Err(_) => {
+                                panic!("Automated action was invalid ?? {action:?}");
+                            },
+                        }
+                    },
+                    Err(_) => {},
+                }
+            }
+
+            // Manual
+            loop {
+                println!("\n\nIssues:");
+                for issue in &issues {
+                    println!("{:?}", issue);
+                }
+                println!("");
+                let waited_on_input = Instant::now();
+                match process_input(false) {
+                    Ok(action) => {
+                        total_input_time += waited_on_input.elapsed();
+                        if let Action::Revert { times } = action {
+                            data = revert_log_and_remake(times, &mut log, &original_data, false);
+                            write_all(&data, &log, false);
+                            stem_minus_sphere = 2;
+                            break;
+                        } else {
+                            match process_action(&mut data, &action, false) {
+                                Ok(_) => {
+                                    stem_minus_sphere = 2;
+                                    log.push(action);
+                                    break;
+                                },
+                                Err(_) => {
+                                    println!("\n---------------");
+                                    println!("ACTION ISSUE!");
+                                    println!("---------------\n");
+                                    println!("The following data was invalid {:?}. Please try again.", action);  
+                                },
+                            }
+                        }
+                    },
+                    Err(_) => {
+                        total_input_time += waited_on_input.elapsed();
+                        println!("\ngoodbye!");  
+                        break 'outer;
+                    },
+                }
+            }
+            apply_ehp_recursively(&mut data, stem_minus_sphere);
+            write_all(&data, &log, false);
+        }
+
+        write_all(&data, &log, false);
+        stem_minus_sphere += 1;
+    }
     // add_diffs(&mut data);
     // add_induced_names(&mut data);
     // add_tau_mults(&mut data);
@@ -179,19 +273,23 @@ fn ehp(ahss: &SyntheticSS) -> SyntheticSS {
 
     // add_final_diagonal(&mut data);
     // write_typescript_file("../site/src/data.ts", "", &data).unwrap();
-    data
+    write_all(&data, &log, false);
+    (data, total_input_time)
 }
 
 fn main() {
     let start = Instant::now();
 
-    let (ahss, input_time) = ahss();
-    let e = ehp(&ahss);
+    let (ahss, input_time_ahss) = ahss();
+    let start_ehp = Instant::now();
+    let (ehp, input_time_ehp) = ehp(&ahss);
 
-    // verify_ehp_to_ahss(&e, &a);
-    
-    println!("\nCompute took: {:.2?}", start.elapsed() - input_time);
-    println!("Input took: {:.2?}", input_time);
+    verify_geometric(&ehp);
+
+    println!("\nAHSS Compute took: {:.2?}", start.elapsed() - input_time_ahss - start_ehp.elapsed());
+    println!("EHP Compute took: {:.2?}", start_ehp.elapsed() - input_time_ehp);
+    println!("Compute took: {:.2?}", start.elapsed() - input_time_ahss - input_time_ehp);
+    println!("\nInput took: {:.2?}", input_time_ahss + input_time_ehp);
     println!("Program took: {:.2?}", start.elapsed());
 }
 

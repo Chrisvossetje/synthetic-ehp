@@ -1,9 +1,27 @@
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, sync::LazyLock};
 
-use crate::{MAX_STEM, domain::{e1::E1, model::{Diff, SyntheticSS}}, io::export::Differential, data::naming::{name_get_tag, name_to_sphere}, types::{Generator, Kind}};
+use crate::{MAX_STEM, data::naming::{name_get_tag, name_to_sphere}, domain::{e1::E1, model::{Diff, SyntheticSS}, process::compute_pages, ss::SSPages}, io::export::Differential, types::{Generator, Kind}};
 
 static CURTIS_TXT: &str = include_str!("../../../curtis_table.txt");
 static STABLE_CURTIS_TXT: &str = include_str!("../../../stable_curtis_table.txt");
+
+
+pub static DATA: LazyLock<SyntheticSS> = LazyLock::new(|| {
+    generate_algebraic_data()
+});
+
+pub static DATA_PAGES: LazyLock<SSPages> = LazyLock::new(|| {
+    compute_pages(&DATA, 0, 256, 0, MAX_STEM).0
+});
+
+pub static STABLE_DATA: LazyLock<SyntheticSS> = LazyLock::new(|| {
+    generate_stable_algebraic_data()
+});
+
+pub static STABLE_DATA_PAGES: LazyLock<SSPages> = LazyLock::new(|| {
+    compute_pages(&STABLE_DATA, 0, 256, 0, MAX_STEM).0
+});
+
 
 #[derive(Debug, Clone)]
 pub struct Untagged {
@@ -186,15 +204,11 @@ fn parse_algebraic_data(
                 tag.right_origin + 1,
                 Some(tag.right_origin + 1),
             ));
-    
-            let d_r: i32 = tag.right_origin - tag.left_origin;
-    
+        
             // TODO: This is weird
             differentials.push(Differential {
                 from,
                 to,
-                coeff: 0,
-                d: d_r,
                 proof: None,
                 kind: Kind::Real,
             });
@@ -205,44 +219,23 @@ fn parse_algebraic_data(
     generators.sort_by_key(|x| x.y);
     generators.sort_by_key(|x| x.stem);
 
-    let mut diffs_page = vec![vec![]; (MAX_STEM + 1) as usize];
-    let internal_tau_page = vec![vec![]; (MAX_STEM + 1) as usize];
-    let external_tau_page = vec![];
-    let mut proven_from_to = HashMap::new();
-
-    let model = E1::new(generators);
-
-
+    let model = E1::new(generators);    
+    
+    let mut data = SyntheticSS::empty(model);
+    
     for d in differentials {
-        let from = model.get_index(&d.from);
-        let to = model.get_index(&d.to);
-        diffs_page[d.d as usize].push(Diff { from, to });
-        proven_from_to.insert((from, to), None);
+        data.add_diff_name(d.from, d.to, None);
     }
-
-    let in_diffs = proven_from_to.iter().map(|x| (x.0.1, x.0.0)).collect();
-
-    let data = SyntheticSS {
-        model,
-        diffs_page,
-        internal_tau_page,
-        external_tau_page,
-        proven_from_to,
-        disproven_from_to: HashMap::default(),
-        in_diffs,
-        out_ext_tau: HashMap::default(),
-        temp_fakes: HashSet::default(),
-    };
 
     data
 }
 
-pub fn generate_algebraic_data() -> SyntheticSS {
+fn generate_algebraic_data() -> SyntheticSS {
     let (untagged, tagged) = parse_curtis_table();
     parse_algebraic_data(&untagged, &tagged)
 }
 
-pub fn generate_stable_algebraic_data() -> SyntheticSS {
+fn generate_stable_algebraic_data() -> SyntheticSS {
     let (untagged, tagged) = parse_stable_curtis_table();
     parse_algebraic_data(&untagged, &tagged)
 }

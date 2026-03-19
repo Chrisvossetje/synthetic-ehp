@@ -2,10 +2,11 @@ use std::{cell::Cell, collections::{HashMap, HashSet}, iter::Enumerate, slice::I
 
 use serde::{Deserialize, Serialize};
 
-use crate::{domain::e1::E1, data::naming::name_get_tag, types::{Generator, Torsion}};
+use crate::{MAX_STEM, data::naming::name_get_tag, domain::e1::E1, types::{Generator, Torsion}};
 
 
 pub type FromTo = (usize, usize);
+pub type InducedName = Vec<(i32, String)>;
 
 // This should always implicitly reference some Model
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -27,12 +28,26 @@ pub struct SyntheticSS {
 
     pub temp_fakes: HashSet<FromTo>,
 
-    // Remember all incoming stuff
-    pub in_diffs: HashMap<usize, usize>,
-    pub out_ext_tau: HashMap<usize, usize>,
+    // Remember incoming/outgoing stuff
+    pub in_diffs: HashMap<usize, Vec<usize>>,
+    pub out_diffs: HashMap<usize, Vec<usize>>,
 }
 
 impl SyntheticSS {
+    pub fn empty(e1: E1) -> Self {
+        Self {
+            model: e1,
+            diffs_page: vec![vec![]; (MAX_STEM+1) as usize],
+            internal_tau_page: vec![vec![]; (MAX_STEM+1) as usize],
+            external_tau_page: vec![],
+            proven_from_to: HashMap::default(),
+            disproven_from_to: HashMap::default(),
+            temp_fakes: HashSet::default(),
+            in_diffs: HashMap::default(),
+            out_diffs: HashMap::default(),
+        }
+    }
+
     pub fn disprove_from_to(&mut self, from: usize, to: usize, proof: Option<String>) {
         self.disproven_from_to.insert((from, to), proof);
     }
@@ -42,7 +57,8 @@ impl SyntheticSS {
 
         if !self.proven_from_to.contains_key(&(from, to)) {
             self.diffs_page[d_y as usize].push(Diff { from, to });
-            self.in_diffs.insert(to, from);
+            self.in_diffs.entry(to).or_insert(vec![]).push(from);
+            self.out_diffs.entry(from).or_insert(vec![]).push(to);
             self.proven_from_to.insert((from, to), proof);
         }
         
@@ -59,7 +75,6 @@ impl SyntheticSS {
         if !self.proven_from_to.contains_key(&(from, to)) {
             self.external_tau_page.push(ExtTauMult { from, to });
             self.proven_from_to.insert((from, to), proof);
-            self.out_ext_tau.insert(from, to);
         }
     }
 
@@ -94,66 +109,86 @@ impl SyntheticSS {
         self.model.try_index(name).ok_or(())?;
         Ok(name_get_tag(name))
     }
-}
 
-pub type GeneratorState = (i32, Torsion);
-// TODO: Smallvec performance check ?
-pub type PagesGeneratorState = Vec<(i32, GeneratorState)>;
+    pub fn get_name_at_sphere(&self, elt: usize, sphere: i32) -> &str {
+        let l = &self.model.get(elt).induced_name;
+        let mut id = 0; 
 
-pub fn map_between_generators(from: GeneratorState, to: GeneratorState) -> Result<(GeneratorState, GeneratorState), (GeneratorState, GeneratorState)> {    
-    if from.1.alive() {
-        if !to.1.alive() {
-            return Err((from, to));
-        }
+        loop {
+            if id + 1 == l.len() {
+                return &l[id].1;
+            }
+            if l[id+1].0 > sphere {
+                return &l[id].1;
+            } 
+            id += 1;
+            if id == 1 {
 
-        let coeff = to.0 - from.0 - 1;
-        if coeff < 0 {
-            // TODO: Figure out if this should be branching or not ?
-            return Err((from, to));
-            // panic!("We encountered a negative coefficient, such a differential should never have been suggested ? And is unfixable ?");
+            }
         }
-    
-    
-        match to.1.0 {
-            Some(to_t) => match from.1.0 {
-                Some(from_t) => {
-                    // Delta represents how much F2 generators are actually hit
-                    let delta = to_t - coeff; 
-                    if delta > from_t {
-                        // TODO: 
-                        Err((from, to))
-                    } else {
-                        let new_from_af =  from.0 - delta;
-                        let new_from_t = from_t - delta;
-                        
-                        let from = (new_from_af, Torsion::new(new_from_t));
-                        let to = (to.0, Torsion::new(coeff));
-                        Ok((from, to))
-                    }
-                },
-                None => {
-                    let from = (from.0 - to_t + coeff, Torsion::default());
-                    let to = (to.0, Torsion::new(coeff));
-                    Ok((from, to))
-                },
-            },
-            None => match from.1.0 {
-                Some(_) => {
-                    // TODO: 
-                    Err((from, to))
-                },
-                None => {
-                    let from = (from.0, Torsion::zero());
-                    let to = (to.0, Torsion::new(coeff));
-                    Ok((from, to))
-                },
-            },
-        }
-    } else {
-        Ok((from, to))
     }
 
+    pub fn get_names(&self, from: usize, to: usize) -> (String, String) {
+        (self.model.name(from).to_string(), self.model.name(to).to_string())
+    }
 }
+
+
+
+// TODO : REMOVE!
+// pub fn map_between_generators(from_g: GeneratorState, to_g: GeneratorState) -> Result<(GeneratorState, GeneratorState), (GeneratorState, GeneratorState)> {    
+//     if from_g.1.alive() {
+//         if !to_g.1.alive() {
+//             return Err((from_g, to_g));
+//         }
+
+//         let coeff = to_g.0 - from_g.0 - 1;
+//         if coeff < 0 {
+//             // TODO: Figure out if this should be branching or not ?
+//             return Err((from_g, to_g));
+//             // panic!("We encountered a negative coefficient, such a differential should never have been suggested ? And is unfixable ?");
+//         }
+    
+    
+//         match to_g.1.0 {
+//             Some(to_t) => match from_g.1.0 {
+//                 Some(from_t) => {
+//                     // Delta represents how much F2 generators are actually hit
+//                     let delta = to_t - coeff; 
+//                     if delta > from_t {
+//                         // TODO: 
+//                         Err((from_g, to_g))
+//                     } else {
+//                         let new_from_af =  from_g.0 - delta;
+//                         let new_from_t = from_t - delta;
+                        
+//                         let from = (new_from_af, Torsion::new(new_from_t));
+//                         let to = (to_g.0, Torsion::new(coeff));
+//                         Ok((from, to))
+//                     }
+//                 },
+//                 None => {
+//                     let from = (from_g.0 - to_t + coeff, Torsion::default());
+//                     let to = (to_g.0, Torsion::new(coeff));
+//                     Ok((from, to))
+//                 },
+//             },
+//             None => match from_g.1.0 {
+//                 Some(_) => {
+//                     // TODO: 
+//                     Err((from_g, to_g))
+//                 },
+//                 None => {
+//                     let from = (from_g.0, Torsion::zero());
+//                     let to = (to_g.0, Torsion::new(coeff));
+//                     Ok((from, to))
+//                 },
+//             },
+//         }
+//     } else {
+//         Ok((from_g, to_g))
+//     }
+// }
 
 // A diff could also be defined just by where it is from to where it goes ?
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -177,74 +212,3 @@ pub struct ExtTauMult {
     pub to: usize,
 }
 
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct SSPages {
-    pub bot_trunc: i32,
-    pub top_trunc: i32,
-    
-    // Length of this should coincide with model and should always be filled
-    // Should i also add another Vec around this to filter on Stem ?
-    // TODO : SMALLVEC
-    pub generators: Vec<Option<PagesGeneratorState>>,
-}
-
-impl SSPages {
-    pub fn element_at_page(&self, page: i32, elt: usize) -> GeneratorState {
-        let l = self.generators[elt].as_ref().unwrap();
-        let mut id = 0; 
-
-        loop {
-            if id + 1 == l.len() {
-                return l[id].1;
-            }
-            if l[id+1].0 > page {
-                return l[id].1;
-            } 
-            id += 1;
-        }
-    }
-
-        
-
-    pub fn element_in_pages(&self, elt: usize) -> bool {
-        self.generators[elt].is_some()
-    }
-
-    pub fn element_final(&self, elt: usize) -> GeneratorState {
-        let a = &self.generators[elt];
-        let b = a.as_deref().unwrap();
-        b.last().unwrap().1.clone()
-    }
-
-    pub fn try_element_final(&self, elt: usize) -> Option<GeneratorState> {
-        let a = &self.generators[elt];
-        let b = a.as_deref()?;
-        Some(b.last().unwrap().1.clone())
-    }
-
-    pub fn push(&mut self, elt: usize, page: i32, g: GeneratorState) {
-        self.generators[elt].as_mut().unwrap().push((page, g));
-    }
-
-    pub fn pop(&mut self, elt: usize, page: i32, g: GeneratorState) {
-        self.generators[elt].as_mut().unwrap().push((page, g));
-    }
-
-    pub fn convergence_at_stem(&self, data: &SyntheticSS, stem: i32) -> HashMap<i32, Vec<Torsion>> {
-        let mut m = HashMap::new();
-        for id in data.model.gens_id_in_stem(stem) {
-            if self.element_in_pages(*id) {
-                let g = self.element_final(*id);
-                if g.1.alive() {
-                    m.entry(g.0).or_insert(vec![]).push(g.1);
-                }
-            }
-        }
-
-        for j in &mut m {
-            j.1.sort();
-        }
-        m
-    }
-}

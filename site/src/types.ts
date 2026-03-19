@@ -14,8 +14,8 @@ export type Generators = {
 export type Differential = {
     "from": string,
     "to": string,
-    "coeff": number,
-    "d": number,
+    "d"?: number,
+    "coeff"?: number,
     "kind": "Real" | "Fake" | "Unknown";
     "proof"?: string,
 }
@@ -23,10 +23,17 @@ export type Differential = {
 export type Multiplication = {
     "from": string,
     "to": string,
-    "internal": boolean
 }
 
-export type TauMult = {
+export type InternalTauMult = {
+    "from": string,
+    "to": string,
+    "page": number,
+    "kind": "Real" | "Fake" | "Unknown";
+    "proof"?: string,
+}
+
+export type ExternalTauMult = {
     "from": string,
     "to": string,
     "kind": "Real" | "Fake" | "Unknown";
@@ -37,5 +44,6 @@ export type SyntheticEHP = {
     "generators": Generators[],
     "differentials": Differential[],
     "multiplications": Multiplication[],
-    "tau_mults": TauMult[]
+    "internal_tau_mults": InternalTauMult[],
+    "external_tau_mults": ExternalTauMult[]
 }

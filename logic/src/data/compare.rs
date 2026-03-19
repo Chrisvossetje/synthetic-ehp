@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs::File, io::{BufRead, BufReader}, sync::LazyLo
 
 use itertools::chain;
 
-use crate::{MAX_STEM, MAX_VERIFY_STEM, data::curtis::{generate_algebraic_data, generate_stable_algebraic_data}, domain::process::compute_pages, solve::action::D_R_REPEATS, types::Torsion};
+use crate::{MAX_STEM, MAX_VERIFY_STEM, data::curtis::{DATA, STABLE_DATA}, domain::process::compute_pages, solve::action::D_R_REPEATS, types::Torsion};
 
 // (stem, af) -> Sorted vec of tau-modules
 #[allow(non_camel_case_types)]
@@ -12,27 +12,40 @@ type SYNTHETIC_COMPARE_DATA = HashMap<(i32,i32), Vec<Torsion>>;
 #[allow(non_camel_case_types)]
 type ALGEBRAIC_COMPARE_DATA = HashMap<(i32,i32), usize>;
 
-static RP_TRUNCATIONS: LazyLock<Vec<(i32, i32)>> = LazyLock::new(|| {
+pub static RP_TRUNCATIONS: LazyLock<Vec<(i32, i32)>> = LazyLock::new(|| {
     chain![
         vec![(1,2),(2,4),(3,5),(3,6)],
         (2..=MAX_STEM).step_by(2).map(|x| (1, x)),
-        (3..=MAX_STEM).rev().filter(|x| x&2 == 1).map(|x| (x, 256))
+        (3..=MAX_STEM).rev().filter(|x| x%2 == 1).map(|x| (x, 256))
     ]
     .collect()
 });
 
-static ALGEBRAIC_RP_TRUNCATIONS: LazyLock<Vec<(i32, i32)>> = LazyLock::new(|| {
+pub static ALGEBRAIC_RP_TRUNCATIONS: LazyLock<Vec<(i32, i32)>> = LazyLock::new(|| {
     chain![
-        vec![(1,3),(4,6)],
-        (4..30_i32).flat_map(|l| {
+        vec![(1,3),(4,6), (2,5), (4,7)],
+        (4..=MAX_STEM).flat_map(|l| {
             (0..(D_R_REPEATS[(l-1) as usize] as i32).min(50-l+1)).map(move |i| (1+i,l+i))
         })
     ]
     .collect()
 });
 
+pub static TRUNCS: LazyLock<Vec<(bool, i32, i32)>> = LazyLock::new(|| {
+    chain![
+        [(true,1,2),(true,2,4),(true,3,5),(true, 1,4),(true,3,6)],
+        [(false,1,3),(false,4,6), (false,2,5), (false,4,7)],
+        // (3..=MAX_STEM).rev().filter(|x| x%2 == 1).map(|x| (true, x, 256)),
+        // (4..=MAX_STEM).flat_map(|l| {
+        //     (0..(D_R_REPEATS[(l-1) as usize] as i32).min(50-l+1)).map(move |i| {
+        //         (synthetic_rp_truncations().contains(&(1+i,l+i)), 1+i,l+i)
+        //     })
+        // }),
+    ].collect()
+});
 
-pub fn rp_truncations() -> &'static [(i32, i32)] {
+
+pub fn synthetic_rp_truncations() -> &'static [(i32, i32)] {
     RP_TRUNCATIONS.as_slice()
 }
 
@@ -40,38 +53,47 @@ pub fn algebraic_rp_truncations() -> &'static [(i32, i32)] {
     ALGEBRAIC_RP_TRUNCATIONS.as_slice()
 }
 
+pub fn rp_truncations() -> &'static [(bool, i32, i32)] {
+    TRUNCS.as_slice()
+}
 
 
 
-static EMPTY_LIST: LazyLock<Vec<Torsion>> = LazyLock::new(|| {vec![]});
+pub static EMPTY_LIST_TORSION: LazyLock<Vec<Torsion>> = LazyLock::new(|| {vec![]});
+pub static EMPTY_LIST_USIZE: LazyLock<Vec<usize>> = LazyLock::new(|| {vec![]});
 
-static S0: LazyLock<SYNTHETIC_COMPARE_DATA> = 
+pub static S0_ZEROES: LazyLock<SYNTHETIC_COMPARE_DATA> = 
     LazyLock::new(|| {
         let file_name = format!("../AHSS_DATA/S0_AdamsE2_ss.csv",);
         read_csv(1, 256, &file_name, false, true)
     });
 
+pub static S0: LazyLock<SYNTHETIC_COMPARE_DATA> = 
+    LazyLock::new(|| {
+        let file_name = format!("../AHSS_DATA/S0_AdamsE2_ss.csv",);
+        read_csv(1, 256, &file_name, false, false)
+    });
+
 
 // (bot_trunc, top_trunc) -> Compare data
-static RP: LazyLock<HashMap<(i32,i32), SYNTHETIC_COMPARE_DATA>> = 
+pub static RP: LazyLock<HashMap<(i32,i32), SYNTHETIC_COMPARE_DATA>> = 
     LazyLock::new(|| {
         let mut m = HashMap::new();
-        for &(b,t) in rp_truncations() {
+        for &(b,t) in synthetic_rp_truncations() {
             // Top truncated
             m.insert((b,t), read_rp_csv(b, t, false));
         }
         m
     });
 
-static ALG_RP: LazyLock<HashMap<(i32,i32), ALGEBRAIC_COMPARE_DATA>> = 
+pub static ALG_RP: LazyLock<HashMap<(i32,i32), ALGEBRAIC_COMPARE_DATA>> = 
     LazyLock::new(|| {
-        let data = generate_stable_algebraic_data();
         let mut m = HashMap::new();
         for &(b,t) in algebraic_rp_truncations() {
             // Top truncated
-            let (pages, _) = compute_pages(&data, b, t, 0, MAX_STEM);
+            let (pages, _) = compute_pages(&STABLE_DATA, b, t, 0, MAX_STEM);
             let mut n = HashMap::new();
-            for (elt, g) in data.model.enumerate() {
+            for (elt, g) in STABLE_DATA.model.enumerate() {
                 if let Some((af, torsion)) = pages.try_element_final(elt) {
                     if torsion.alive() {
                         *n.entry((g.stem, af)).or_insert(0) += 1;
@@ -83,15 +105,14 @@ static ALG_RP: LazyLock<HashMap<(i32,i32), ALGEBRAIC_COMPARE_DATA>> =
         m
     });
 
-static ALG_SPHERES: LazyLock<HashMap<i32, ALGEBRAIC_COMPARE_DATA>> = 
+pub static ALG_SPHERES: LazyLock<HashMap<i32, ALGEBRAIC_COMPARE_DATA>> = 
     LazyLock::new(|| {
-        let data = generate_algebraic_data();
         let mut m = HashMap::new();
-        for sphere in 2..=MAX_STEM {
+        for sphere in 1..=MAX_STEM {
             // Top truncated
-            let (pages, _) = compute_pages(&data, 0, sphere + 1, 0, MAX_STEM);
+            let (pages, _) = compute_pages(&DATA, 0, sphere - 1, 0, MAX_STEM);
             let mut n = HashMap::new();
-            for (elt, g) in data.model.enumerate() {
+            for (elt, g) in DATA.model.enumerate() {
                 if let Some((af, torsion)) = pages.try_element_final(elt) {
                     if torsion.alive() {
                         *n.entry((g.stem, af)).or_insert(0) += 1;
@@ -104,37 +125,16 @@ static ALG_SPHERES: LazyLock<HashMap<i32, ALGEBRAIC_COMPARE_DATA>> =
     });
 
 
-
-pub fn synthetic_s0_keys() -> Vec<(i32,i32)> {
-    S0.keys().map(|x| *x).collect()
+pub fn synthetic_rp(bot_trunc: i32, top_trunc: i32) -> &'static HashMap<(i32, i32), Vec<Torsion>> {
+    RP.get(&(bot_trunc, top_trunc)).expect(&format!("There is no Synthetic data available for RP{bot_trunc}_{top_trunc}"))
 }
 
-pub fn synthetic_s0(stem: i32, af: i32) -> &'static Vec<Torsion> {
-    S0.get(&(stem, af)).unwrap_or(&EMPTY_LIST)
+pub fn algebraic_rp(bot_trunc: i32, top_trunc: i32) -> &'static HashMap<(i32, i32), usize> {
+    ALG_RP.get(&(bot_trunc, top_trunc)).expect(&format!("There is no Algebraic data available for RP{bot_trunc}_{top_trunc}"))
 }
 
-pub fn synthetic_rp_keys(bot_trunc: i32, top_trunc: i32) -> Vec<(i32,i32)> {
-    RP.get(&(bot_trunc, top_trunc)).expect(&format!("There is no Synthetic data available for RP{bot_trunc}_{top_trunc}")).keys().map(|x| *x).collect()
-}
-
-pub fn synthetic_rp(bot_trunc: i32, top_trunc: i32, stem: i32, af: i32) -> &'static Vec<Torsion> {
-    RP.get(&(bot_trunc, top_trunc)).expect(&format!("There is no Synthetic data available for RP{bot_trunc}_{top_trunc}")).get(&(stem, af)).unwrap_or(&EMPTY_LIST)
-}
-
-pub fn algebraic_rp_keys(bot_trunc: i32, top_trunc: i32) -> Vec<(i32,i32)> {
-    ALG_RP.get(&(bot_trunc, top_trunc)).expect(&format!("There is no Algebraic data available for RP{bot_trunc}_{top_trunc}")).keys().map(|x| *x).collect()
-}
-
-pub fn algebraic_rp(bot_trunc: i32, top_trunc: i32, stem: i32, af: i32) -> &'static usize {
-    ALG_RP.get(&(bot_trunc, top_trunc)).expect(&format!("There is no Algebraic data available for RP{bot_trunc}_{top_trunc}")).get(&(stem, af)).unwrap_or(&0)
-}
-
-pub fn algebraic_sphere_keys(sphere: i32) -> Vec<(i32,i32)> {
-    ALG_SPHERES.get(&sphere).expect(&format!("There is no Algebraic data available for S^{sphere}")).keys().map(|x| *x).collect()
-}
-
-pub fn algebraic_sphere(sphere: i32, stem: i32, af: i32) -> &'static usize {
-    ALG_SPHERES.get(&sphere).expect(&format!("There is no Algebraic data available for S^{sphere}")).get(&(stem, af)).unwrap_or(&0)
+pub fn algebraic_spheres(sphere: i32) -> &'static HashMap<(i32, i32), usize> {
+    ALG_SPHERES.get(&sphere).expect(&format!("There is no Algebraic data available for S^{sphere}"))
 }
 
 

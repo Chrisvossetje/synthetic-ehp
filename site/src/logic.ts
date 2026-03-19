@@ -1,6 +1,5 @@
-import { Chart } from "./chart";
-import { Differential, Generators, SyntheticEHP } from "./types";
-import { ehpChart } from "./main";
+import { Differential, Generators, InternalTauMult, SyntheticEHP } from "./types";
+import { MAX_STEM } from "./data";
 
 // Track which data is active
 let useStableData = false;
@@ -81,6 +80,288 @@ export enum Category {
     Geometric
 }
 
+type GeneratorState = {
+    af: number;
+    torsion: number | undefined;
+};
+
+type TorsionFiltration = [number | undefined, number];
+type GeneratorPageState = { page: number; state: GeneratorState };
+type SyntheticCache = {
+    data: SyntheticEHP;
+    truncation: number | undefined;
+    bottomTruncation: number | undefined;
+    limit_x: number | undefined;
+    pagesByGenerator: Record<string, GeneratorPageState[]>;
+    generatorNames: string[];
+    allDiffs: Differential[];
+};
+
+let syntheticCache: SyntheticCache | null = null;
+
+function torsionAlive(torsion: number | undefined): boolean {
+    return torsion !== 0;
+}
+
+function normalizeTorsion(torsion: number | null | undefined): number | undefined {
+    return torsion === null ? undefined : torsion;
+}
+
+function mapBetweenGenerators(from: GeneratorState, to: GeneratorState): { from: GeneratorState; to: GeneratorState; coeff: number } | null {
+    if (!torsionAlive(from.torsion)) {
+        return null;
+    }
+    if (!torsionAlive(to.torsion)) {
+        return null;
+    }
+
+    const coeff = to.af - from.af - 1;
+    if (coeff < 0) {
+        return null;
+    }
+
+    if (to.torsion !== undefined) {
+        if (from.torsion !== undefined) {
+            const delta = to.torsion - coeff;
+            if (delta > from.torsion) {
+                return null;
+            }
+            const newFromAf = from.af - delta;
+            const newFromTorsion = from.torsion - delta;
+            return {
+                from: { af: newFromAf, torsion: newFromTorsion },
+                to: { af: to.af, torsion: coeff },
+                coeff,
+            };
+        }
+
+        const newFromAf = from.af - to.torsion + coeff;
+        return {
+            from: { af: newFromAf, torsion: undefined },
+            to: { af: to.af, torsion: coeff },
+            coeff,
+        };
+    }
+
+    if (from.torsion !== undefined) {
+        return null;
+    }
+
+    return {
+        from: { af: from.af, torsion: 0 },
+        to: { af: to.af, torsion: coeff },
+        coeff,
+    };
+}
+
+function generatorSurvives(entry: TorsionFiltration | undefined): boolean {
+    if (!entry) {
+        return false;
+    }
+    return entry[0] === undefined || entry[0] > 0;
+}
+
+function applyTauMultiplication(
+    from: GeneratorState,
+    to: GeneratorState,
+    matchesFiltration: (fromAf: number, fromTorsion: number, toAf: number) => boolean
+): { from: GeneratorState; to: GeneratorState } | null {
+    if (!torsionAlive(from.torsion) || !torsionAlive(to.torsion)) {
+        return null;
+    }
+
+    if (from.torsion === undefined) {
+        return null;
+    }
+
+    if (!matchesFiltration(from.af, from.torsion, to.af)) {
+        return null;
+    }
+
+    const newFromTorsion = to.torsion !== undefined ? from.torsion + to.torsion : undefined;
+    return {
+        from: { af: from.af, torsion: newFromTorsion },
+        to: { af: to.af, torsion: 0 },
+    };
+}
+
+function applyInternalTauMultiplication(from: GeneratorState, to: GeneratorState): { from: GeneratorState; to: GeneratorState } | null {
+    return applyTauMultiplication(from, to, (fromAf, fromTorsion, toAf) => fromAf - fromTorsion === toAf);
+}
+
+function applyExternalTauMultiplication(from: GeneratorState, to: GeneratorState): { from: GeneratorState; to: GeneratorState } | null {
+    return applyTauMultiplication(from, to, (fromAf, fromTorsion, toAf) => fromAf - fromTorsion === toAf);
+}
+
+function buildYByName(data: SyntheticEHP): Record<string, number> {
+    const yByName: Record<string, number> = {};
+    data.generators.forEach((g) => {
+        yByName[g.name] = g.y;
+    });
+    return yByName;
+}
+
+function getDiffPage(diff: Differential, yByName: Record<string, number>): number | undefined {
+    if (Number.isFinite(diff.d)) {
+        return diff.d;
+    }
+    const fromY = yByName[diff.from];
+    const toY = yByName[diff.to];
+    if (!Number.isFinite(fromY) || !Number.isFinite(toY)) {
+        return undefined;
+    }
+    return fromY - toY;
+}
+
+function getStateAtPage(states: GeneratorPageState[], page: number): GeneratorState {
+    let idx = 0;
+
+    while (idx + 1 < states.length && states[idx + 1].page <= page) {
+        idx += 1;
+    }
+
+    return states[idx].state;
+}
+
+function buildSyntheticCache(
+    data: SyntheticEHP,
+    truncation: number | undefined,
+    bottomTruncation: number | undefined,
+    limit_x: number | undefined
+): SyntheticCache {
+    const yByName = buildYByName(data);
+    const pagesByGenerator: Record<string, GeneratorPageState[]> = {};
+    const currentState: Record<string, GeneratorState> = {};
+    const generatorNames: string[] = [];
+
+    data.generators.forEach((g) => {
+        const passesTop = !truncation || g.y <= truncation;
+        const passesBottom = bottomTruncation === undefined || g.y >= bottomTruncation;
+        const passesStem = !limit_x || (limit_x - 1 <= g.stem && g.stem <= limit_x + 1);
+        if (!passesTop || !passesBottom || !passesStem) {
+            return;
+        }
+        const initialTorsion = normalizeTorsion(g.torsion);
+        if (initialTorsion === 0) {
+            return;
+        }
+        const initialState = { af: g.af, torsion: initialTorsion };
+        pagesByGenerator[g.name] = [{ page: 1, state: initialState }];
+        currentState[g.name] = { ...initialState };
+        generatorNames.push(g.name);
+    });
+
+    const diffsByPage: Differential[][] = Array.from({ length: MAX_STEM + 1 }, () => []);
+    data.differentials.forEach((diff) => {
+        if (diff.kind !== "Real") return;
+        const diffPage = getDiffPage(diff, yByName);
+        if (!Number.isFinite(diffPage)) return;
+        if (diffPage < 0 || diffPage > MAX_STEM) return;
+        diffsByPage[diffPage].push(diff);
+    });
+    const internalTauByPage: InternalTauMult[][] = Array.from({ length: MAX_STEM + 1 }, () => []);
+    data.internal_tau_mults.forEach((tm) => {
+        if (tm.kind !== "Real") return;
+        if (!Number.isFinite(tm.page)) return;
+        if (tm.page < 0 || tm.page > MAX_STEM) return;
+        internalTauByPage[tm.page].push(tm);
+    });
+
+    const allDiffs: Differential[] = [];
+
+    for (let p = 0; p <= MAX_STEM; p++) {
+        const pageTauMults = internalTauByPage[p];
+        for (const tm of pageTauMults) {
+            const fromState = currentState[tm.from];
+            const toState = currentState[tm.to];
+            if (!fromState || !toState) {
+                continue;
+            }
+            const updated = applyInternalTauMultiplication(fromState, toState);
+            if (!updated) {
+                continue;
+            }
+            currentState[tm.from] = updated.from;
+            currentState[tm.to] = updated.to;
+            pagesByGenerator[tm.from]?.push({ page: p, state: updated.from });
+            pagesByGenerator[tm.to]?.push({ page: p, state: updated.to });
+        }
+
+        const pageDiffs = diffsByPage[p];
+        for (const diff of pageDiffs) {
+            const fromState = currentState[diff.from];
+            const toState = currentState[diff.to];
+            if (!fromState || !toState) {
+                continue;
+            }
+
+            const mapped = mapBetweenGenerators(fromState, toState);
+            if (!mapped) {
+                continue;
+            }
+
+            currentState[diff.from] = mapped.from;
+            currentState[diff.to] = mapped.to;
+            pagesByGenerator[diff.from]?.push({ page: p + 1, state: mapped.from });
+            pagesByGenerator[diff.to]?.push({ page: p + 1, state: mapped.to });
+            allDiffs.push({ ...diff, d: p });
+        }
+    }
+
+    return {
+        data,
+        truncation,
+        bottomTruncation,
+        limit_x,
+        pagesByGenerator,
+        generatorNames,
+        allDiffs,
+    };
+}
+
+function getSyntheticCache(
+    data: SyntheticEHP,
+    truncation: number | undefined,
+    bottomTruncation: number | undefined,
+    limit_x: number | undefined
+): SyntheticCache {
+    if (
+        syntheticCache &&
+        syntheticCache.data === data &&
+        syntheticCache.truncation === truncation &&
+        syntheticCache.bottomTruncation === bottomTruncation &&
+        syntheticCache.limit_x === limit_x
+    ) {
+        return syntheticCache;
+    }
+
+    syntheticCache = buildSyntheticCache(data, truncation, bottomTruncation, limit_x);
+    return syntheticCache;
+}
+
+function computeSyntheticPages(
+    data: SyntheticEHP,
+    truncation: number | undefined,
+    page: number,
+    limit_x: number | undefined,
+    _applyTauMults: boolean,
+    bottomTruncation: number | undefined
+): [Record<string, TorsionFiltration>, Differential[]] {
+    const cache = getSyntheticCache(data, truncation, bottomTruncation, limit_x);
+    const torsion: Record<string, TorsionFiltration> = {};
+    cache.generatorNames.forEach((name) => {
+        const states = cache.pagesByGenerator[name];
+        if (!states) {
+            return;
+        }
+        const st = getStateAtPage(states, page);
+        torsion[name] = [st.torsion, st.af];
+    });
+
+    const diffs = cache.allDiffs.filter((d) => d.d < page);
+    return [torsion, diffs];
+}
+
 // Current view settings
 export let viewSettings = {
     allDiffs: true,
@@ -136,7 +417,7 @@ export function getSphereLifecycleInfo(gen: Generators): { bornSphere: string; d
     if (explicitDies === null || explicitDies === undefined) {
         return {
             bornSphere: explicitBorn !== undefined ? String(explicitBorn) : "Unknown",
-            diesOnAlgebraicSphere: "survives stably / does not die"
+            diesOnAlgebraicSphere: "survives"
         };
     }
 
@@ -196,6 +477,12 @@ export function get_filtered_data(
     applyTauMults: boolean = false,
     bottomTruncation: number | undefined = undefined
 ): [Object, Differential[]] {
+    if (category == Category.Synthetic) {
+        return computeSyntheticPages(data, truncation, page, limit_x, applyTauMults, bottomTruncation);
+    }
+
+    const yByName = buildYByName(data);
+
     // name -> torsion + adams filtration
     const torsion = new Object();
     const original_af = new Object();
@@ -203,7 +490,7 @@ export function get_filtered_data(
     data.generators.forEach((g) => {
         original_af[g.name] = g.af;
 
-        const passesTop = !truncation || g.y < truncation;
+        const passesTop = !truncation || g.y <= truncation;
         const passesBottom = bottomTruncation === undefined || g.y >= bottomTruncation;
         if (passesTop && passesBottom && ((limit_x - 1 <= g.stem && g.stem <= limit_x + 1) || !limit_x)) {
             if (category == Category.Algebraic) { // Special Algebraic
@@ -223,47 +510,24 @@ export function get_filtered_data(
 
     // Find all generators killed by differentials before this page
     for (const diff of data.differentials) {
+        const diffPage = getDiffPage(diff, yByName);
+        if (!Number.isFinite(diffPage)) {
+            continue;
+        }
+        const coeff = diff.coeff ?? 0;
 
         // Make sure the elements exist
         if (torsion[diff.from] && torsion[diff.to]) {
 
             // Only calculate diffs which would have elemented before
-            if (diff.d < page && diff.kind == "Real") {
+            if (diffPage < page && diff.kind == "Real") {
                 
-                // Synthetic
-                if (category == Category.Synthetic) { 
-                    if (torsion[diff.to][0] == 0) {
-                        continue;
-                    }
-                    if (torsion[diff.from][0] == 0) {
-                        continue;
-                    }
-
-                    let coeff = diff.coeff - original_af[diff.to] + torsion[diff.to][1];
-
-                    if (torsion[diff.to][0] == undefined) {
-                        torsion[diff.from][0] = 0;
-                        torsion[diff.to][0] = coeff;
-                        diffs.push(diff);              
-                    } else {                         
-                        // This is where we have a diff mapping into a torsion module 
-                        if (torsion[diff.from][0] > 0) {
-                            torsion[diff.from][0] = torsion[diff.from][0] - torsion[diff.to][0] + coeff;
-                        }
-                        torsion[diff.from][1] = torsion[diff.from][1] - torsion[diff.to][0] + coeff;
-                        torsion[diff.to][0] = coeff;
-                        diffs.push(diff);              
-                    }    
-
-
-
-
                 // Algebraic
-                } else if (category == Category.Algebraic) { 
-                    if (diff.coeff == 0 && diff.synthetic === undefined) {
+                if (category == Category.Algebraic) { 
+                    if (coeff == 0 && diff.proof === undefined) {
                         torsion[diff.from][0] = 0;
                         torsion[diff.to][0] = 0;
-                        diffs.push(diff);              
+                        diffs.push({ ...diff, d: diffPage, coeff });              
                     }
 
 
@@ -273,7 +537,7 @@ export function get_filtered_data(
                     if (torsion[diff.to][0] || torsion[diff.to][0] != 0) {
                         torsion[diff.from][0] = 0;
                         torsion[diff.to][0] = 0;  
-                        diffs.push(diff);                  
+                        diffs.push({ ...diff, d: diffPage, coeff });                  
                     } else {
                         // Element had already been killed 
                         // This can occur in geometric !
@@ -283,312 +547,9 @@ export function get_filtered_data(
         }
     }
 
-    // At E_infinity in Synthetic, tau multiplications further kill classes.
-    if (applyTauMults && category == Category.Synthetic && page > 999) {
-        for (const tm of data.tau_mults) {
-            if (!torsion[tm.from] || !torsion[tm.to]) {
-                continue;
-            }
-
-            const fromTorsion = torsion[tm.from][0];
-            const fromAf = torsion[tm.from][1];
-            const toTorsion = torsion[tm.to][0];
-
-            if (fromTorsion === 0 || toTorsion === 0) {
-                continue;
-            }
-
-            if (fromTorsion === undefined) {
-                continue;
-            }
-
-            // tau*x = y forces y to die at E_infinity and can increase source torsion.
-            torsion[tm.to][0] = 0;
-            if (toTorsion !== undefined) {
-                torsion[tm.from][0] = fromTorsion + toTorsion;
-            } else {
-                torsion[tm.from][0] = undefined;
-            }
-            torsion[tm.from][1] = fromAf;
-        }
-    }
-
     return [torsion, diffs]
 }
 
-export function handleDotClick(dot: string) {
-    console.log('Dot clicked:', dot);
-    const gen = find(dot);
-    console.log(gen);
-
-    if (!gen) return;
-
-    setSelectedGenerator(dot);
-    applyEhpSelectionHighlight();
-
-    // Copy generator name to clipboard
-    navigator.clipboard.writeText(gen.name).then(() => {
-        console.log('Copied to clipboard:', gen.name);
-    }).catch(err => {
-        console.error('Failed to copy to clipboard:', err);
-    });
-
-    // Get generating name and what it generates
-    const genName = generated_by_name(gen);
-    const gensList = generates(gen);
-    const sphereInfo = getSphereLifecycleInfo(gen);
-
-    // Build the info display
-    const floatingBox = document.getElementById('floatingBox');
-    if (!floatingBox) return;
-
-    let content = `<span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>`;
-    content += `<h4>Generator: ${gen.name}</h4>`;
-    content += `<pre style="background-color: #00000000; margin: 0;">`;
-    content += `stem: ${gen.stem}\n`;
-    content += `y: ${gen.y}\n`;
-    content += `Adams filtration: ${gen.af}\n`;
-    content += `Module: ${gen.torsion !== undefined ? 'F2[τ]/τ^' + gen.torsion : 'F2[τ]'}\n`;
-
-    if (gen.alg_name) {
-        content += `Algebraic name: ${gen.alg_name}\n`;
-    }
-    if (gen.hom_name) {
-        content += `Homotopy name: ${gen.hom_name}\n`;
-    }
-    const filteredInducedNames = gen.induced_name.filter(([num, _]) => num !== 0);
-    if (filteredInducedNames.length > 0) {
-        const namesList = filteredInducedNames.map(([sphere, name]) => `${name} (sphere ${sphere})`).join(', ');
-        content += `Induced name: ${namesList}\n`;
-    }
-
-    content += `Born on sphere: ${sphereInfo.bornSphere}\n`;
-    content += `Dies on algebraic sphere: ${sphereInfo.diesOnAlgebraicSphere}\n`;
-
-    content += `</pre>`;
-
-    floatingBox.innerHTML = content;
-    floatingBox.style.display = 'block';
-}
-
-export function applyEhpSelectionHighlight() {
-    ehpChart.clear_selection_highlights();
-
-    const selected = getSelectedGenerator();
-    if (!selected) return;
-    const gen = find(selected);
-    if (!gen) return;
-
-    if (ehpChart.name_to_location.has(selected)) {
-        ehpChart.add_selection_highlight(selected, "#ff6a00", 2.2, 0.18, 0.55);
-    }
-
-    const genName = generated_by_name(gen);
-    const gensList = generates(gen);
-    if (ehpChart.name_to_location.has(genName)) {
-        ehpChart.add_selection_highlight(genName, "#00bcd4", 2.0, 0.14, 0.42);
-    }
-    gensList.forEach((g) => {
-        if (ehpChart.name_to_location.has(g.name)) {
-            ehpChart.add_selection_highlight(g.name, "#66bb00", 1.9, 0.12, 0.35);
-        }
-    });
-}
-
-export function handleLineClick(from: string, to: string) {
-    console.log('Line clicked:', from, '->', to);
-    const activeData = getActiveData();
-    if (!activeData) return;
-    const diff = activeData.differentials.find(d => d.from === from && d.to === to);
-    console.log(diff);
-
-    if (!diff) return;
-
-    // Build the info display
-    const floatingBox = document.getElementById('floatingBox');
-    if (!floatingBox) return;
-
-    let content = `<span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>`;
-    content += `<h4>Differential</h4>`;
-    content += `<pre style="background-color: #00000000; margin: 0;">`;
-    content += `From: ${diff.from}\n`;
-    content += `To: ${diff.to}\n`;
-    content += `Page: E${diff.d}\n`;
-    content += `Coefficient: ${diff.coeff === 0 ? '1' : 'τ^' + diff.coeff}\n`;
-    
-    if (diff.synthetic !== undefined) {
-        content += `\nSynthetic Differential\n`;
-    }
-    if ("proof" in diff) {
-        content += `\nProof: ${diff.proof ?? ""}\n`;
-    } else {
-        content += `\nAEHP differential\n`;
-    }
-    
-    content += `</pre>`;
-
-    floatingBox.innerHTML = content;
-    floatingBox.style.display = 'block';
-}
-
-export function handleTauMultClick(from: string, to: string) {
-    const activeData = getActiveData();
-    if (!activeData) return;
-
-    const tauMult = activeData.tau_mults.find((t) => t.from === from && t.to === to);
-    if (!tauMult) return;
-
-    const floatingBox = document.getElementById('floatingBox');
-    if (!floatingBox) return;
-
-    let content = `<span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>`;
-    content += `<h4>τ Multiplication</h4>`;
-    content += `<pre style="background-color: #00000000; margin: 0;">`;
-    content += `From: ${tauMult.from}\n`;
-    content += `To: ${tauMult.to}\n`;
-    content += `Kind: ${tauMult.kind}\n`;
-    if ("proof" in tauMult) {
-        content += `\nProof: ${tauMult.proof ?? ""}\n`;
-    }
-    content += `</pre>`;
-
-    floatingBox.innerHTML = content;
-    floatingBox.style.display = 'block';
-}
-
-export function fill_ehp_chart() {
-    const activeData = getActiveData();
-    if (!activeData) {
-        return;
-    }
-
-    // Bind click handlers
-    ehpChart.dotCallback = handleDotClick;
-    ehpChart.lineCallback = handleLineClick;
-    ehpChart.tauMultCallback = handleTauMultClick;
-
-    // Set all generators and differentials (complete data set)
-    ehpChart.set_all_generators(activeData.generators);
-    ehpChart.set_all_differentials(activeData.differentials);
-    ehpChart.set_all_multiplications(activeData.multiplications);
-    ehpChart.set_all_tau_mults(activeData.tau_mults);
-
-    ehpChart.init();
-}
-
-/**
- * Switch between data and data_stable
- */
-export async function switchDataSource() {
-    const nextUseStableData = !useStableData;
-    if (nextUseStableData && !stableData) {
-        await ensureStableDataLoading();
-    }
-    useStableData = nextUseStableData;
-
-    // Clear the chart
-    ehpChart.clear();
-
-    // Refill with the new data
-    fill_ehp_chart();
-
-    // Update the chart with current view settings
-    update_ehp_chart();
-}
-
-/**
- * Update the EHP chart with current filter settings
- */
-export function update_ehp_chart() {
-    const activeData = getActiveData();
-    if (!activeData) {
-        return;
-    }
-
-    // Hide all generators and differentials first
-    activeData.generators.forEach((g) => {
-        ehpChart.display_dot(g.name, false, false, undefined, g.af);
-    });
-    activeData.differentials.forEach((d) => {
-        ehpChart.display_diff(d.from, d.to, false);
-    });
-    activeData.multiplications.forEach((m) => {
-        ehpChart.display_mult(m.from, m.to, false);
-    });
-    activeData.tau_mults.forEach((t) => {
-        ehpChart.display_tau_mult(t.from, t.to, false);
-    });
-    const [gens, _] = get_filtered_data(
-        activeData,
-        viewSettings.category,
-        viewSettings.truncation,
-        viewSettings.page,
-        viewSettings.allDiffs,
-        undefined,
-        false,
-        viewSettings.bottomTruncation
-    );
-    const [perm_classes, diffs] = get_filtered_data(
-        activeData,
-        viewSettings.category,
-        viewSettings.truncation,
-        1000,
-        viewSettings.allDiffs,
-        undefined,
-        false,
-        viewSettings.bottomTruncation
-    );
-
-    const real_diffs = diffs.filter((d) => {
-        if (!gens[d.from] || !gens[d.to]) {
-            return false;
-        }
-        if (!viewSettings.allDiffs && d.d != viewSettings.page) {
-            return false;
-        }
-        if (gens[d.from][0] == undefined || gens[d.from][0] > 0) {
-            if (gens[d.to][0] == undefined || gens[d.to][0] > 0) {
-                return true;
-            }
-        }
-        return false;
-    });
-
-    Object.entries(gens).forEach(([name, [torsion, filtration]]) => {
-        if (torsion == undefined || torsion > 0) {
-            let perm = perm_classes[name] != undefined && (perm_classes[name][0] == undefined || perm_classes[name][0] > 0);
-            ehpChart.display_dot(name, true, perm, torsion, filtration);
-        }
-    });
-    real_diffs.forEach((d) => {
-        let torsion = d.coeff;
-        if (viewSettings.category != Category.Synthetic) {
-            torsion = 0;
-        }
-        if (d.d >= viewSettings.page) {
-            ehpChart.display_diff(d.from, d.to, true, torsion);
-        }
-    });
-
-    // Display multiplications only when both generators are alive
-    activeData.multiplications.forEach((m) => {
-        const fromAlive = gens[m.from] && (gens[m.from][0] == undefined || gens[m.from][0] > 0);
-        const toAlive = gens[m.to] && (gens[m.to][0] == undefined || gens[m.to][0] > 0);
-        if (fromAlive && toAlive) {
-            ehpChart.display_mult(m.from, m.to, true);
-        }
-    });
-
-    // Display tau multiplications only when both generators are alive
-    activeData.tau_mults.forEach((t) => {
-        if (viewSettings.category == Category.Synthetic) {
-            const fromAlive = gens[t.from] && (gens[t.from][0] == undefined || gens[t.from][0] > 0);
-            const toAlive = gens[t.to] && (gens[t.to][0] == undefined || gens[t.to][0] > 0);
-            if (fromAlive && toAlive) {
-                ehpChart.display_tau_mult(t.from, t.to, true);
-            }
-        }
-    });
-
-    applyEhpSelectionHighlight();
+export function survivesFilteredGenerator(entry: TorsionFiltration | undefined): boolean {
+    return generatorSurvives(entry);
 }

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, convert::identity};
 use itertools::{self, Itertools};
 
-use crate::{MAX_VERIFY_STEM, helper::diff_sorted, issues::Issue, model::SyntheticSS, naming::{generate_names_from_tag, name_get_tag}, static_compare_data::{synthetic_s0, synthetic_s0_keys}, types::Torsion};
+use crate::{MAX_VERIFY_STEM, issues::Issue, model::SyntheticSS, naming::{generate_names_from_tag, name_get_tag}, static_compare_data::{synthetic_s0, synthetic_s0_keys}, types::Torsion};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct GeneratorChange {
@@ -114,7 +114,7 @@ struct GeneratorChange {
 //     let options = get_e1_solutions(data, &issues[issue]);
 
 //     // This would mean NO solutions were found, meaning that the algebraic data is WRONG
-//     debug_assert_ne!(options.len(), 0);
+//     assert_ne!(options.len(), 0);
 
 //     // Easy, no choice te make!
 //     if options.len() == 1 {

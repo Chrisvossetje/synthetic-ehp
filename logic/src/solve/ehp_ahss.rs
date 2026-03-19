@@ -1,6 +1,4 @@
-use crate::domain::model::SyntheticSS;
-
-
+use crate::{domain::model::SyntheticSS, solve::issues::Issue};
 
 
 fn in_metastable_range(y: i32, stem: i32) -> bool {
@@ -19,7 +17,7 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
             let g_to = ahss.model.get(d.to);
             if in_metastable_range(g_to.y, g_to.stem) {
                 let proof = ahss.proven_from_to.get(&(d.from, d.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting differentials not done carefully enough.");
-                ehp.add_diff_name(g_from.name.clone(), g_to.name.clone(), proof.clone())?;
+                ehp.add_diff_name(g_from.name.clone(), g_to.name.clone(), proof.clone().map(|x| {format!("{x} (Metastable)")}) )?;
             }
         }
     }
@@ -29,7 +27,7 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
             let g_to = ahss.model.get(t.to);
             if in_metastable_range(g_to.y, g_to.stem) {
                 let proof = ahss.proven_from_to.get(&(t.from, t.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting internal tau's not done carefully enough.");
-                ehp.add_int_tau_name(g_from.name.clone(), g_to.name.clone(), page as i32, proof.clone())?;
+                ehp.add_int_tau_name(g_from.name.clone(), g_to.name.clone(), page as i32, proof.clone().map(|x| {format!("{x} (Metastable)")}))?;
             }
         }
     }
@@ -39,10 +37,23 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
         let g_to = ahss.model.get(e.to);
         if in_metastable_range(g_to.y, g_to.stem) {
             let proof = ahss.proven_from_to.get(&(e.from, e.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting external tau's not done carefully enough.");
-            ehp.add_ext_tau_name(g_from.name.clone(), g_to.name.clone(), proof.clone())?;
+            ehp.add_ext_tau_name(g_from.name.clone(), g_to.name.clone(), proof.clone().map(|x| {format!("{x} (Metastable)")}))?;
         }
     }
 
 
     Ok(())
+}
+
+
+pub fn compare_ehp_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS, stem: i32) -> Result<(), Vec<Issue>> {
+    let mut issues = vec![];
+
+
+
+    if issues.len() == 0 {
+        Ok(())
+    } else {
+        Err(issues)
+    }
 }

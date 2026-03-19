@@ -73,11 +73,21 @@ export const EHP_CHART_CSS = `
 
 /* Tau multiplication line styles */
 .tau-mult-line {
-    stroke: orange;
+    stroke: #FFA500;
     stroke-width: 0.008;
     pointer-events: auto;
     cursor: pointer;
     opacity: 0.7;
+    transition: all 0.15s ease;
+}
+
+.tau-mult-line:hover {
+    stroke: #ffbc3e	;
+    stroke-width: 0.016;
+}
+
+.tau-mult-line:active {
+    stroke: #ffcd70;
 }
 `;
 

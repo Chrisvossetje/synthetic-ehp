@@ -1,5 +1,6 @@
 import { Chart } from "./chart";
-import { ehpChart } from "./main";
+import { ehpChart } from "./charts";
+import { getComputedDiffCoeff } from "./ehp_chart";
 import { isUsingStableData, viewSettings, get_filtered_data, Category } from "./logic";
 
 // Screenshot state
@@ -224,7 +225,8 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
         const toLoc = chart.name_to_location.get(diff.to);
         if (!fromLoc || !toLoc) continue;
 
-        const color = getTikzColor(diff.coeff);
+        const computedCoeff = getComputedDiffCoeff(diff.from, diff.to);
+        const color = getTikzColor(computedCoeff ?? diff.coeff);
         const lineStyle = diff.kind == "Fake" ? ",dotted" : "";
         const fromYFlip = flipY(fromLoc[1]);
         const toYFlip = flipY(toLoc[1]);

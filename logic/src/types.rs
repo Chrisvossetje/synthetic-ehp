@@ -21,6 +21,10 @@ impl Torsion {
     pub fn alive(&self) -> bool {
         self.0 != Some(0)
     }
+    
+    pub fn free(&self) -> bool {
+        self.0 == None
+    }
 }
 
 
@@ -63,12 +67,14 @@ pub struct Generator {
 
     // As this is somewhat variable, do we want this information here ?
     // Yes as this generator should represent E1
+    #[serde(skip_serializing_if = "Torsion::free")]
     pub torsion: Torsion,
 
     // This is purely algebraic!
     pub born: i32,
     pub dies: Option<i32>,
 
+    pub induced_name: Vec<(i32, String)>,
 }
 
 impl Generator {
@@ -81,6 +87,7 @@ impl Generator {
             torsion: Torsion::default(),
             born,
             dies,
+            induced_name: vec![(0, name)],
         }
     }
 }

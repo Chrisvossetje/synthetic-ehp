@@ -79,18 +79,28 @@
         <option value = 2>Geometric</option>
       </select>
       <div style="width: 10px;"></div>
-      <label style="margin: 0px;">Truncation:
-        <input type="checkbox" name="valid" id="truncation-checkbox"/>
-      </label>
-      <div style="width: 70px;">
-        <input style="margin: 0px;" type="number" min="2" max="50" name="Truncation" value="5" aria-label="Text">
+      <div id="sphere-controls" style="display: flex; align-items: center; width: 300px;">
+        <label style="margin: 0px; margin-left: auto;">Sphere:
+          <input type="checkbox" name="valid" id="sphere-truncation-checkbox"/>
+        </label>
+        <div style="width: 70px;">
+          <input style="margin: 0px;" type="number" min="2" max="50" name="Sphere" value="7" aria-label="Sphere">
+        </div>
       </div>
-      <div style="width: 10px;"></div>
-      <label style="margin: 0px;">Bottom:
-        <input type="checkbox" name="valid" id="bottom-truncation-checkbox"/>
-      </label>
-      <div style="width: 70px;">
-        <input style="margin: 0px;" type="number" min="0" max="50" name="BottomTruncation" value="0" aria-label="Bottom Truncation">
+      <div id="truncation-controls" style="display: none; align-items: center; width: 300px;">
+        <label style="margin: 0px;">Bottom:
+          <input type="checkbox" name="valid" id="bottom-truncation-checkbox"/>
+        </label>
+        <div style="width: 70px;">
+          <input style="margin: 0px;" type="number" min="0" max="50" name="BottomTruncation" value="0" aria-label="Bottom Truncation">
+        </div>
+        <div style="width: 10px;"></div>
+        <label style="margin: 0px;">Top:
+          <input type="checkbox" name="valid" id="truncation-checkbox"/>
+        </label>
+        <div style="width: 70px;">
+          <input style="margin: 0px;" type="number" min="2" max="50" name="Truncation" value="5" aria-label="Text">
+        </div>
       </div>
     </div>
     <div style="width: 20px;"></div>

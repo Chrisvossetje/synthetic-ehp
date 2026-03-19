@@ -67,6 +67,7 @@ export class SvgChart extends HTMLElement {
     public topBorder: HTMLElement;
     public leftBorder: HTMLElement;
     public bottomBorder: HTMLElement;
+    private bigGridPattern: SVGPatternElement | null;
 
     public node_style: HTMLElement;
     public line_style: HTMLElement;
@@ -117,7 +118,16 @@ export class SvgChart extends HTMLElement {
         this.maxY = this.mode === ChartMode.ASS ? maxy + 0.5 : maxy + SvgChart.GRID_MARGIN;
 
         // Resize/re-anchor is handled centrally in onResize.
+        this.updateAssBigGridOffset();
         this.onResize();
+    }
+
+    private updateAssBigGridOffset() {
+        if (this.mode !== ChartMode.ASS || !this.bigGridPattern) {
+            return;
+        }
+        const offset = ((Math.round(this.chartMaxY) % 4) + 4) % 4;
+        this.bigGridPattern.setAttribute('patternTransform', `translate(0 ${offset})`);
     }
 
     constructor(chartMode: ChartMode = ChartMode.EHP) {
@@ -184,11 +194,11 @@ this.svg.innerHTML =
 `
 <defs>
   <pattern id="smallGrid" width="1" height="1" patternUnits="userSpaceOnUse">
-    <path d="M 1 1 L 0 1 0 0" fill="none" stroke="black" stroke-width="0.01" />
+    <path d="M 0 0 L 1 0 0 0 0 1" fill="none" stroke="black" stroke-width="0.01" />
   </pattern>
   <pattern id="bigGrid" width="4" height="4" patternUnits="userSpaceOnUse">
     <rect width="4" height="4" fill="url(#smallGrid)" />
-    <path d="M 4 4 L 0 4 0 0" fill="none" stroke="black" stroke-width="0.03" />
+    <path d="M 0 0 L 4 0 0 0 0 4" fill="none" stroke="black" stroke-width="0.03" />
   </pattern>
 </defs>
 <g id="inner">
@@ -220,6 +230,7 @@ this.svg.innerHTML =
         ]) {
             this[item] = this.shadowRoot.getElementById(`${item}`);
         }
+        this.bigGridPattern = this.shadowRoot.getElementById('bigGrid') as SVGPatternElement | null;
 
         this.select = select(this.svg);
         this.zoom = zoom().on('zoom', this._zoomFunc.bind(this));

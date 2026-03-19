@@ -1,6 +1,7 @@
 import { Category, find, getActiveData, get_filtered_data, getSelectedGenerator, getSphereLifecycleInfo, setSelectedGenerator } from "./logic";
-import { assChart } from "./main";
+import { assChart } from "./charts";
 import { Differential, Generators } from "./types";
+import { buildGeneratorInfoLines, showInfoPanel } from "./ui/info_panel";
 
 type InferredAssDifferential = {
     sourceBase: string;
@@ -41,38 +42,13 @@ export function handleAssDotClick(dot: string) {
     });
 
     const sphereInfo = getSphereLifecycleInfo(gen);
+    const lines = buildGeneratorInfoLines(gen, sphereInfo, {
+        xLabel: "x",
+        yLabel: "y",
+        moduleLabel: "Torsion",
+    });
 
-    // Build the info display
-    const floatingBox = document.getElementById('floatingBox');
-    if (!floatingBox) return;
-
-    let content = `<span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>`;
-    content += `<h4>Generator: ${gen.name}</h4>`;
-    content += `<pre style="background-color: #00000000; margin: 0;">`;
-    content += `x: ${gen.stem}\n`;
-    content += `y: ${gen.y}\n`;
-    content += `Adams filtration: ${gen.af}\n`;
-    content += `Torsion: ${gen.torsion !== undefined ? 'F2[τ]/τ^' + gen.torsion : 'F2[τ]'}\n`;
-
-    if (gen.alg_name) {
-        content += `Algebraic name: ${gen.alg_name}\n`;
-    }
-    if (gen.hom_name) {
-        content += `Homotopy name: ${gen.hom_name}\n`;
-    }
-    const filteredInducedNames = gen.induced_name.filter(([num, _]) => num !== 0);
-    if (filteredInducedNames.length > 0) {
-        const namesList = filteredInducedNames.map(([sphere, name]) => `${name} (sphere ${sphere})`).join(', ');
-        content += `Induced name: ${namesList}\n`;
-    }
-
-    content += `Born on sphere: ${sphereInfo.bornSphere}\n`;
-    content += `Dies on algebraic sphere: ${sphereInfo.diesOnAlgebraicSphere}\n`;
-
-    content += `</pre>`;
-
-    floatingBox.innerHTML = content;
-    floatingBox.style.display = 'block';
+    showInfoPanel(`Generator: ${gen.name}`, lines);
 }
 
 function applyAssSelectionHighlight() {
@@ -95,34 +71,28 @@ export function handleAssLineClick(from: string, to: string) {
     const inferred = inferredAssDifferentials.get(key);
     if (!inferred) return;
 
-    const floatingBox = document.getElementById('floatingBox');
-    if (!floatingBox) return;
+    const lines = [
+        `From: ${inferred.sourceBase}`,
+        `To: ${inferred.targetBase}`,
+        `Page: d_${inferred.page}`,
+        `Coefficient: ${inferred.torsion === 0 ? "1" : "τ^" + inferred.torsion}`,
+    ];
 
-    let content = `<span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>`;
-    content += `<h4>ASS Differential</h4>`;
-    content += `<pre style="background-color: #00000000; margin: 0;">`;
-    content += `From: ${inferred.sourceBase}\n`;
-    content += `To: ${inferred.targetBase}\n`;
-    content += `Page: d_${inferred.page}\n`;
-    content += `Coefficient: ${inferred.torsion === 0 ? "1" : "τ^" + inferred.torsion}\n`;
-
+    const extraLines: string[] = [];
     if (inferred.linked) {
-        content += `\nLinked EHP differential:\n`;
-        content += `  ${inferred.linked.from} -> ${inferred.linked.to}\n`;
+        extraLines.push("Linked EHP differential:");
+        extraLines.push(`  ${inferred.linked.from} -> ${inferred.linked.to}`);
         if ("proof" in inferred.linked) {
-            content += `  Proof: ${inferred.linked.proof ?? ""}\n`;
+            extraLines.push(`  Proof: ${inferred.linked.proof ?? ""}`);
         } else {
-            content += `  AEHP differential\n`;
+            extraLines.push("  AEHP differential");
         }
     }
     if (inferred.reason) {
-        content += `\nReason: ${inferred.reason}\n`;
+        extraLines.push(`Reason: ${inferred.reason}`);
     }
 
-    content += `</pre>`;
-
-    floatingBox.innerHTML = content;
-    floatingBox.style.display = 'block';
+    showInfoPanel("ASS Differential", lines, extraLines);
 }
 
 /**
@@ -149,7 +119,7 @@ export function update_ass_chart(
     assChart.lineCallback = handleAssLineClick;
 
     // Compare synthetic and algebraic E_infinity states.
-    const [syntheticClasses] = get_filtered_data(
+    const [syntheticClasses, syntheticDiffs] = get_filtered_data(
         activeData,
         Category.Synthetic,
         truncation,
@@ -230,11 +200,11 @@ export function update_ass_chart(
         });
 
         let linked: Differential | undefined;
-        const exactMatch = activeData.differentials.find(d => d.to === g.name && d.coeff === syntheticTorsion && d.d === syntheticTorsion + 1);
+        const exactMatch = syntheticDiffs.find(d => d.to === g.name && d.coeff === syntheticTorsion && d.d === syntheticTorsion + 1);
         if (exactMatch) {
             linked = exactMatch;
         } else {
-            linked = activeData.differentials.find(d => d.to === g.name && d.coeff === syntheticTorsion);
+            linked = syntheticDiffs.find(d => d.to === g.name && d.coeff === syntheticTorsion);
         }
 
         const reason = (linked === undefined && g.torsion !== undefined && g.torsion > 0)

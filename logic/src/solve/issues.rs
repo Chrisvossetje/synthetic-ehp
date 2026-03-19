@@ -1,9 +1,9 @@
+use core::panic;
 use std::collections::HashMap;
 
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::{data::compare::{algebraic_rp, algebraic_rp_keys, algebraic_rp_truncations, rp_truncations, synthetic_rp, synthetic_rp_keys, synthetic_s0, synthetic_s0_keys}, domain::{model::{SSPages, SyntheticSS}, process::compute_pages}, types::Torsion};
+use crate::{data::{compare::EMPTY_LIST_TORSION, curtis::{DATA_PAGES, STABLE_DATA_PAGES}}, domain::{model::SyntheticSS, process::compute_pages}, types::Torsion};
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -15,13 +15,7 @@ pub enum Issue {
         expected: Vec<Torsion>,
         observed: Vec<Torsion>,
     },
-    InvalidTorsion {
-        from: usize,
 
-        // Only to can be the problem, as it must be lower by some page
-        to: usize,
-        to_needed: Torsion,
-    },
     SyntheticConvergence {
         bot_trunc: i32,
         top_trunc: i32,
@@ -31,6 +25,7 @@ pub enum Issue {
         expected: Vec<Torsion>,
         observed: Vec<Torsion>,
     },
+
     AlgebraicConvergence {
         bot_trunc: i32,
         top_trunc: i32,
@@ -40,34 +35,83 @@ pub enum Issue {
         expected: usize,
         observed: usize,
     },
+
+    InvalidTorsion {
+        from: usize,
+        to: usize,
+        from_name: String,
+        to_name: String,
+        to_needed: Torsion,
+    },
+    
+    InvalidCoeff {
+        from: usize,
+        to: usize,
+        from_name: String,
+        to_name: String,
+        coeff: i32,
+    },
+
+    InvalidAFRecursion {
+        from: usize,
+        to: usize,
+        from_name: String,
+        to_name: String,
+    },
+    
     InvalidAEHP {
         from: usize,
         to: usize,
+        from_name: String,
+        to_name: String,
     },
+    
+    InvalidTauMult {
+        from: usize,
+        to: usize,
+        from_name: String,
+        to_name: String,
+    },
+    
+    UselessDifferential {
+        from: usize,
+        to: usize,
+        bot_trunc: i32,
+        top_trunc: i32,
+        from_name: String,
+        to_name: String,
+    },
+
+    InvalidName {
+        original_name: String,
+        unexpected_name: String,
+        sphere: i32,
+        stem: i32,
+        af: i32,
+    }
 }
 
 
-pub fn verify_convergence(data: &SyntheticSS, pages: &SSPages, bot_trunc: i32, top_trunc: i32, stem: i32) -> Result<(), Vec<Issue>> {
-    let observed = pages.convergence_at_stem(data, stem);
-    
+pub fn compare_synthetic(observed: &HashMap<i32, Vec<Torsion>>, expected: &HashMap<(i32, i32), Vec<Torsion>>, bot_trunc: i32, top_trunc: i32, stem: i32) -> Result<(), Vec<Issue>> {
     let mut issues = vec![];
 
-    for (s, af) in synthetic_rp_keys(bot_trunc, top_trunc) {
-        if  s == stem && !observed.contains_key(&(af)) {
+    for (s, af) in expected.keys() {
+        if  *s == stem && !observed.contains_key(&(af)) {
             issues.push(Issue::SyntheticConvergence { 
-                bot_trunc, top_trunc, stem, af,
-                expected: synthetic_rp(bot_trunc, top_trunc, stem, af).clone(), 
+                bot_trunc, top_trunc, stem, af: *af,
+                expected: expected.get(&(stem, *af)).unwrap().clone(), 
                 observed: vec![] });
             
         }
     }
 
-    for &af in observed.keys().sorted() {
+    for &af in observed.keys() {
         let obs = &observed[&(af)];
-        if synthetic_rp(bot_trunc, top_trunc, stem, af) != obs {
+        let exp = expected.get(&(stem, af)).unwrap_or(&EMPTY_LIST_TORSION);
+        if exp != obs {
             issues.push(Issue::SyntheticConvergence { 
                 bot_trunc, top_trunc, stem, af,
-                expected: synthetic_rp(bot_trunc, top_trunc, stem, af).clone(), 
+                expected: exp.clone(), 
                 observed:  obs.clone() 
             });
         }
@@ -79,38 +123,27 @@ pub fn verify_convergence(data: &SyntheticSS, pages: &SSPages, bot_trunc: i32, t
     }
 }
 
-pub fn verify_algebraic_convergence(data: &SyntheticSS, pages: &SSPages, bot_trunc: i32, top_trunc: i32, stem: i32) -> Result<(), Vec<Issue>> {
-    let observed_minus_one = pages.convergence_at_stem(data, stem - 1);
-    let observed = pages.convergence_at_stem(data, stem);
 
-    let mut observed: HashMap<_, _> = observed.iter().map(|(k,v)| (*k, v.len())).collect();
-    for (j, l) in &observed_minus_one {
-        for i in l {
-            if let Some(torsion) = i.0 {
-                let b = j - torsion - 1;
-                *observed.entry(b).or_insert(0) += 1;
-            }
-        }
-    }
-    
+pub fn compare_algebraic(observed: &HashMap<i32, usize>, expected: &HashMap<(i32, i32), usize>, bot_trunc: i32, top_trunc: i32, stem: i32) -> Result<(), Vec<Issue>> {
     let mut issues = vec![];
 
-    for (s, af) in algebraic_rp_keys(bot_trunc, top_trunc) {
+    for &(s, af) in expected.keys() {
         if  s == stem && !observed.contains_key(&(af)) {
             issues.push(Issue::AlgebraicConvergence { 
                 bot_trunc, top_trunc, stem, af,
-                expected: *algebraic_rp(bot_trunc, top_trunc, stem, af), 
+                expected: expected.get(&(stem, af)).unwrap().clone(), 
                 observed: 0 
             });
         }
     }
 
-    for &af in observed.keys().sorted() {
+    for &af in observed.keys() {
         let obs = &observed[&(af)];
-        if algebraic_rp(bot_trunc, top_trunc, stem, af) != obs {
+        let exp = expected.get(&(stem, af)).unwrap_or(&0);
+        if exp != obs {
             issues.push(Issue::AlgebraicConvergence { 
                 bot_trunc, top_trunc, stem, af,
-                expected: *algebraic_rp(bot_trunc, top_trunc, stem, af), 
+                expected: *exp, 
                 observed: *obs 
             });
         }
@@ -122,71 +155,68 @@ pub fn verify_algebraic_convergence(data: &SyntheticSS, pages: &SSPages, bot_tru
     }
 }
 
-pub fn find_ahss_issue(data: &SyntheticSS, stem: i32) -> Result<(), Vec<Issue>> {
-    ahss_synthetic_e1_issue(data, stem)?;
 
-    for &(bot_trunc, top_trunc) in algebraic_rp_truncations() {
-        let (pages, issues) = compute_pages(data, bot_trunc, top_trunc, stem-1, stem);
-        // First check convergence
-        verify_algebraic_convergence(&data, &pages, bot_trunc, top_trunc, stem)?;
-
-        // Then check for structural issues in the computed pages
-        if issues.len() != 0 {
-            return Err(issues);
-        }
-    }
-    for &(bot_trunc, top_trunc) in rp_truncations() {
-        let (pages, issues) = compute_pages(data, bot_trunc, top_trunc, stem, stem);
-        // First check convergence
-        verify_convergence(&data, &pages, bot_trunc, top_trunc, stem)?;
-
-        // Then check for structural issues in the computed pages
-        if issues.len() != 0 {
-            return Err(issues);
-        }
-    }
+pub fn compare_algebraic_spectral_sequence(data: &SyntheticSS, stem: i32, ahss: bool) -> Result<(), Vec<Issue>> {
+    // We just check the algebraic diffs, and then if their sources are correct ?
+    // Most notably differerntials OUT of a stem
+    let (pages, _) = compute_pages(data, 0, 256, stem, stem);
     
-
-    
-    Ok(())
-}
-
-pub fn ahss_synthetic_e1_issue(data: &SyntheticSS, stem: i32) -> Result<(), Vec<Issue>> {
-    let mut observed = HashMap::new();
-    for id in data.model.gens_id_in_stem(stem) {
-        let g = data.model.get(*id);
-        if g.y == 1 && g.stem == stem {
-            observed.entry((g.stem - 1, g.af - 1)).or_insert(vec![]).push(g.torsion);
-        }
-    }
+    let alg_pages = if ahss { &STABLE_DATA_PAGES } else { &DATA_PAGES };
 
     let mut issues = vec![];
 
-    for j in &mut observed {
-        j.1.sort();
+    for (&from, tos) in &data.out_diffs {
+        for &to in tos {
+            if data.model.stem(from) == stem {
+                let alg = data.proven_from_to.get(&(from, to)).unwrap().is_none();
+                
+                if alg {
+                    if !data.model.original_torsion(to).alive() && data.model.original_torsion(from).alive() {
+                        let page = data.model.y(from) - data.model.y(to);
+                        // From should die before the corresponding page.
+                        if pages.element_at_page(page, from).1.alive() {
+                            let (from_name, to_name) = data.get_names(from, to);
+                            issues.push(Issue::InvalidAEHP { 
+                                from, 
+                                to, 
+                                from_name, 
+                                to_name });
+                        }
+                    }
+                } else {
+                    if data.model.original_torsion(from).alive() {
+                        let coeff = data.model.original_af(to) - data.model.original_af(from);
+                        let page = data.model.y(from) - data.model.y(to);
+                        let (af, tor) = pages.element_at_page(page, from);
+                        let or_af = data.model.original_af(from);
+                        
+                        // af == or_af means that from actually maps to something in Algebraic
+                        if coeff == 1 && af == or_af && tor.alive() {
+
+                            // Now we could have that the target was already dead in the Algebraic part
+                            if alg_pages.element_at_page(page, to).1.alive() {
+                                let (from_name, to_name) = data.get_names(from, to);
+                                issues.push(Issue::InvalidAEHP { 
+                                    from, 
+                                    to, 
+                                    from_name, 
+                                    to_name });
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    for (s, af) in synthetic_s0_keys() {
-        if s == stem - 1 && !observed.contains_key(&(s, af)) && s != 0 {
-            panic!("1) Algebraic Data is strictly smaller then what i can compare it to! On E1 page, y=1, stem={}, af={}", stem, af+1);
-        }
-    }
+
+
+    // We should also check that any coeff 0 diff (seen from the ORIGINAL AF) is an algebraic one
+
+
     
-    for &(s, af) in observed.keys().sorted_by_key(|x| x.1) {
-        let obs = &observed[&(s, af)];
-        if synthetic_s0(s, af) != obs {
-            if obs.len() != synthetic_s0(s, af).len() {
-                panic!("2) Algebraic Data is strictly smaller then what i can compare it to! On E1 page, y=1, stem={}, af={}", stem, af);
-            }
-            issues.push(Issue::SyntheticE1Page { 
-                stem, 
-                af: af + 1, 
-                observed: obs.clone(), 
-                expected: synthetic_s0(s, af).clone() 
-            });
-        }
-    }
-    if issues.is_empty() {
+
+    if issues.len() == 0 {
         Ok(())
     } else {
         Err(issues)

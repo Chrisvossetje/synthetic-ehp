@@ -2,7 +2,7 @@ use std::{collections::HashMap, iter::Enumerate, slice::Iter};
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Generator, Torsion};
+use crate::{data::compare::{EMPTY_LIST_TORSION, EMPTY_LIST_USIZE}, types::{Generator, Torsion}};
 
 
 // This should represent the E1 page ? Is this necessary ?
@@ -12,6 +12,7 @@ pub struct E1 {
     index: HashMap<String, usize>,
     stem: HashMap<i32, Vec<usize>>,
     stem_af: HashMap<(i32, i32), Vec<usize>>,
+    stem_y: HashMap<(i32, i32), Vec<usize>>,
 }
 
 impl E1 {
@@ -19,11 +20,13 @@ impl E1 {
         let mut index = HashMap::new();
         let mut stem = HashMap::new();
         let mut stem_af = HashMap::new();
+        let mut stem_y = HashMap::new();
 
         for (i, g) in generators.iter().enumerate() {
             index.insert(g.name.clone(), i);
             stem.entry(g.stem).or_insert(vec![]).push(i);
             stem_af.entry((g.stem, g.af)).or_insert(vec![]).push(i);
+            stem_y.entry((g.stem, g.y)).or_insert(vec![]).push(i);
         }
         
         Self {
@@ -31,6 +34,7 @@ impl E1 {
             index,
             stem,
             stem_af,
+            stem_y,
         }
     }
 
@@ -92,5 +96,9 @@ impl E1 {
     
     pub fn gens_id_in_stem_af(&self, stem: i32, af: i32) -> &Vec<usize> {
         &self.stem_af.get(&(stem, af)).unwrap()
-    } 
+    }
+
+    pub fn gens_id_in_stem_y(&self, stem: i32, y: i32) -> &Vec<usize> {
+        &self.stem_y.get(&(stem, y)).unwrap_or(&EMPTY_LIST_USIZE)
+    }
 }

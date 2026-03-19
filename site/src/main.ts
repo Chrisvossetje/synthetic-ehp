@@ -1,14 +1,11 @@
-import { Chart } from "./chart";
-import { viewSettings, update_ehp_chart, fill_ehp_chart, Category, switchDataSource, isUsingStableData, initializeData, ensureStableDataLoading, isStableDataReady } from "./logic";
+import type { Chart } from "./chart";
+import { viewSettings, Category, isUsingStableData, initializeData, ensureStableDataLoading, isStableDataReady } from "./logic";
+import { fill_ehp_chart, switchDataSource, update_ehp_chart } from "./ehp_chart";
 import { update_ass_chart } from "./ass_logic";
-import { ChartMode } from "./chartMode";
+import { ehpChart, assChart } from "./charts";
+import { applyTruncationFromControls, syncSphereControlsFromState } from "./truncation";
+import type { TruncationControls } from "./truncation";
 import { startScreenshot, handleScreenshotPointerDown, handleScreenshotPointerMove, handleScreenshotPointerUp, cancelScreenshot, isScreenshotMode } from "./screenshot";
-
-// Create two separate chart instances
-export const ehpChart = new Chart('svgchart-ehp', ChartMode.EHP);
-export const assChart = new Chart('svgchart-ass', ChartMode.ASS);
-ehpChart.set_label_display(true, true);
-assChart.set_label_display(false, false);
 
 // Track which chart is currently active
 let isEHPActive = true;
@@ -32,8 +29,54 @@ function updateActiveChart() {
     }
 }
 
-// TODO: REMOVE!
-switchDataSource();
+function getTruncationControls(): TruncationControls | null {
+    const truncationCheckbox = document.getElementById('truncation-checkbox') as HTMLInputElement | null;
+    const truncationInput = document.querySelector('input[name="Truncation"]') as HTMLInputElement | null;
+    const bottomTruncationCheckbox = document.getElementById('bottom-truncation-checkbox') as HTMLInputElement | null;
+    const bottomTruncationInput = document.querySelector('input[name="BottomTruncation"]') as HTMLInputElement | null;
+    const sphereCheckbox = document.getElementById('sphere-truncation-checkbox') as HTMLInputElement | null;
+    const sphereInput = document.querySelector('input[name="Sphere"]') as HTMLInputElement | null;
+
+    if (!truncationCheckbox || !truncationInput || !bottomTruncationCheckbox || !bottomTruncationInput || !sphereCheckbox || !sphereInput) {
+        return null;
+    }
+
+    return {
+        truncationCheckbox,
+        truncationInput,
+        bottomTruncationCheckbox,
+        bottomTruncationInput,
+        sphereCheckbox,
+        sphereInput,
+    };
+}
+
+function syncViewControlsForDataSource(updateChart = true) {
+    const dataSourceSwitch = document.getElementById('data-source-switch') as HTMLInputElement | null;
+    const truncationControls = document.getElementById('truncation-controls') as HTMLDivElement | null;
+    const sphereControls = document.getElementById('sphere-controls') as HTMLDivElement | null;
+    const controls = getTruncationControls();
+
+    if (!dataSourceSwitch || !truncationControls || !sphereControls || !controls) {
+        return;
+    }
+
+    if (dataSourceSwitch.checked) {
+        truncationControls.style.display = 'flex';
+        sphereControls.style.display = 'none';
+        syncSphereControlsFromState(controls, viewSettings, true);
+        applyTruncationFromControls("ahss", controls, viewSettings);
+    } else {
+        truncationControls.style.display = 'none';
+        sphereControls.style.display = 'flex';
+        syncSphereControlsFromState(controls, viewSettings, false);
+        applyTruncationFromControls("sphere", controls, viewSettings);
+    }
+
+    if (updateChart) {
+        updateActiveChart();
+    }
+}
 
 function setupUIControls() {
     // Keyboard controls
@@ -41,15 +84,6 @@ function setupUIControls() {
 
     // Data source switch (data.ts vs data_stable.ts)
     const dataSourceSwitch = document.getElementById('data-source-switch') as HTMLInputElement;
-    if (dataSourceSwitch) {
-        dataSourceSwitch.addEventListener('change', async () => {
-            dataSourceSwitch.disabled = true;
-            await switchDataSource();
-            dataSourceSwitch.checked = isUsingStableData();
-            dataSourceSwitch.disabled = false;
-            updateActiveChart();
-        });
-    }
 
     // EHP/ASS mode switch
     const ehpAssSwitch = document.getElementById('ehp-ass-switch') as HTMLInputElement;
@@ -98,60 +132,100 @@ function setupUIControls() {
     });
 
     // Truncation checkbox and input (affects both charts)
-    const truncationCheckbox = document.getElementById('truncation-checkbox') as HTMLInputElement;
-    const truncationInput = document.querySelector('input[name="Truncation"]') as HTMLInputElement;
-    const bottomTruncationCheckbox = document.getElementById('bottom-truncation-checkbox') as HTMLInputElement;
-    const bottomTruncationInput = document.querySelector('input[name="BottomTruncation"]') as HTMLInputElement;
+    const truncationControls = getTruncationControls();
+    if (!truncationControls) {
+        return;
+    }
 
-    truncationCheckbox.addEventListener('change', () => {
-        if (truncationCheckbox.checked) {
-            const value = parseInt(truncationInput.value);
-            viewSettings.truncation = isNaN(value) ? null : value;
-        } else {
-            viewSettings.truncation = null;
+    const usingAhssViewSettings = () => !!dataSourceSwitch?.checked;
+
+    truncationControls.truncationCheckbox.addEventListener('change', () => {
+        if (!usingAhssViewSettings()) {
+            return;
         }
+        applyTruncationFromControls("ahss", truncationControls, viewSettings);
         updateActiveChart();
     });
 
     let truncationDebounceTimeout: number | null = null;
-    truncationInput.addEventListener('input', () => {
-        if (truncationCheckbox.checked) {
+    truncationControls.truncationInput.addEventListener('input', () => {
+        if (!usingAhssViewSettings()) {
+            return;
+        }
+        if (truncationControls.truncationCheckbox.checked) {
             if (truncationDebounceTimeout !== null) {
                 window.clearTimeout(truncationDebounceTimeout);
             }
             truncationDebounceTimeout = window.setTimeout(() => {
-                const value = parseInt(truncationInput.value);
-                viewSettings.truncation = isNaN(value) ? null : value;
+                applyTruncationFromControls("ahss", truncationControls, viewSettings);
                 updateActiveChart();
                 truncationDebounceTimeout = null;
             }, 120);
         }
     });
 
-    bottomTruncationCheckbox.addEventListener('change', () => {
-        if (bottomTruncationCheckbox.checked) {
-            const value = parseInt(bottomTruncationInput.value);
-            viewSettings.bottomTruncation = isNaN(value) ? 0 : value;
-        } else {
-            viewSettings.bottomTruncation = undefined;
+    truncationControls.bottomTruncationCheckbox.addEventListener('change', () => {
+        if (!usingAhssViewSettings()) {
+            return;
         }
+        applyTruncationFromControls("ahss", truncationControls, viewSettings);
         updateActiveChart();
     });
 
     let bottomTruncationDebounceTimeout: number | null = null;
-    bottomTruncationInput.addEventListener('input', () => {
-        if (bottomTruncationCheckbox.checked) {
+    truncationControls.bottomTruncationInput.addEventListener('input', () => {
+        if (!usingAhssViewSettings()) {
+            return;
+        }
+        if (truncationControls.bottomTruncationCheckbox.checked) {
             if (bottomTruncationDebounceTimeout !== null) {
                 window.clearTimeout(bottomTruncationDebounceTimeout);
             }
             bottomTruncationDebounceTimeout = window.setTimeout(() => {
-                const value = parseInt(bottomTruncationInput.value);
-                viewSettings.bottomTruncation = isNaN(value) ? 0 : value;
+                applyTruncationFromControls("ahss", truncationControls, viewSettings);
                 updateActiveChart();
                 bottomTruncationDebounceTimeout = null;
             }, 120);
         }
     });
+
+    let sphereDebounceTimeout: number | null = null;
+    truncationControls.sphereInput.addEventListener('input', () => {
+        if (usingAhssViewSettings()) {
+            return;
+        }
+        if (!truncationControls.sphereCheckbox.checked) {
+            return;
+        }
+        if (sphereDebounceTimeout !== null) {
+            window.clearTimeout(sphereDebounceTimeout);
+        }
+        sphereDebounceTimeout = window.setTimeout(() => {
+            applyTruncationFromControls("sphere", truncationControls, viewSettings);
+            updateActiveChart();
+            sphereDebounceTimeout = null;
+        }, 120);
+    });
+
+    truncationControls.sphereCheckbox.addEventListener('change', () => {
+        if (usingAhssViewSettings()) {
+            return;
+        }
+        applyTruncationFromControls("sphere", truncationControls, viewSettings);
+        updateActiveChart();
+    });
+
+    if (dataSourceSwitch) {
+        dataSourceSwitch.addEventListener('change', async () => {
+            dataSourceSwitch.disabled = true;
+            await switchDataSource();
+            dataSourceSwitch.checked = isUsingStableData();
+            dataSourceSwitch.disabled = false;
+            syncViewControlsForDataSource();
+        });
+    }
+
+    syncViewControlsForDataSource();
 }
 
 function setupScreenshotHandlers() {
@@ -207,27 +281,31 @@ function setupKeyboardControls() {
         let needsUpdate = false;
         const pageSelect = document.getElementById('ss-page') as HTMLSelectElement;
         const categorySelect = document.getElementById('ss-category') as HTMLSelectElement;
-        const truncationCheckbox = document.getElementById('truncation-checkbox') as HTMLInputElement;
-        const truncationInput = document.querySelector('input[name="Truncation"]') as HTMLInputElement;
-        const bottomTruncationCheckbox = document.getElementById('bottom-truncation-checkbox') as HTMLInputElement;
-        const bottomTruncationInput = document.querySelector('input[name="BottomTruncation"]') as HTMLInputElement;
+        const truncationControls = getTruncationControls();
+        if (!truncationControls) {
+            return;
+        }
+        const {
+            truncationCheckbox,
+            truncationInput,
+            bottomTruncationCheckbox,
+            bottomTruncationInput,
+            sphereCheckbox,
+            sphereInput
+        } = truncationControls;
         const ehpAssSwitch = document.getElementById('ehp-ass-switch') as HTMLInputElement;
         const allDiffCheckbox = document.getElementById('all-diff-checkbox') as HTMLInputElement;
         const dataSourceSwitch = document.getElementById('data-source-switch') as HTMLInputElement;
+        const usingAhssViewSettings = () => !!dataSourceSwitch?.checked;
 
         switch(e.key) {
             // Data source switch
             case 's':
             case 'S':
                 if (dataSourceSwitch) {
-                    dataSourceSwitch.disabled = true;
+                    dataSourceSwitch.checked = !dataSourceSwitch.checked;
+                    dataSourceSwitch.dispatchEvent(new Event('change'));
                 }
-                await switchDataSource();
-                if (dataSourceSwitch) {
-                    dataSourceSwitch.checked = isUsingStableData();
-                    dataSourceSwitch.disabled = false;
-                }
-                updateActiveChart();
                 return;
 
             // EHP/ASS mode switch
@@ -305,95 +383,155 @@ function setupKeyboardControls() {
 
             // Truncation controls
             case 'j':
-            case 'J':
+            case 'J': {
+                if (!usingAhssViewSettings()) {
+                    if (!sphereCheckbox.checked) {
+                        sphereCheckbox.checked = true;
+                    }
+                    const current = parseInt(sphereInput.value);
+                    const base = isNaN(current) ? 7 : current;
+                    const newValue = Math.max(2, base - 1);
+                    sphereInput.value = newValue.toString();
+                    applyTruncationFromControls("sphere", truncationControls, viewSettings);
+                    needsUpdate = true;
+                    break;
+                }
                 // Lower truncation (enable if disabled)
                 if (!truncationCheckbox.checked) {
                     truncationCheckbox.checked = true;
                     const value = parseInt(truncationInput.value);
-                    viewSettings.truncation = isNaN(value) ? 5 : value;
+                    if (isNaN(value)) {
+                        truncationInput.value = "5";
+                    }
                 }
-                if (viewSettings.truncation !== null && viewSettings.truncation !== undefined) {
-                    const newValue = Math.max(2, viewSettings.truncation - 1);
-                    viewSettings.truncation = newValue;
-                    truncationInput.value = newValue.toString();
-                }
+                const currentTop = parseInt(truncationInput.value);
+                const topBase = isNaN(currentTop) ? 5 : currentTop;
+                const newValue = Math.max(2, topBase - 1);
+                truncationInput.value = newValue.toString();
+                applyTruncationFromControls("ahss", truncationControls, viewSettings);
                 needsUpdate = true;
                 break;
+            }
 
             case 'k':
-            case 'K':
+            case 'K': {
+                if (!usingAhssViewSettings()) {
+                    if (!sphereCheckbox.checked) {
+                        sphereCheckbox.checked = true;
+                    }
+                    const current = parseInt(sphereInput.value);
+                    const base = isNaN(current) ? 7 : current;
+                    const newValue = Math.min(50, base + 1);
+                    sphereInput.value = newValue.toString();
+                    applyTruncationFromControls("sphere", truncationControls, viewSettings);
+                    needsUpdate = true;
+                    break;
+                }
                 // Higher truncation (enable if disabled)
                 if (!truncationCheckbox.checked) {
                     truncationCheckbox.checked = true;
                     const value = parseInt(truncationInput.value);
-                    viewSettings.truncation = isNaN(value) ? 5 : value;
+                    if (isNaN(value)) {
+                        truncationInput.value = "5";
+                    }
                 }
-                if (viewSettings.truncation !== null && viewSettings.truncation !== undefined) {
-                    const newValue = Math.min(50, viewSettings.truncation + 1);
-                    viewSettings.truncation = newValue;
-                    truncationInput.value = newValue.toString();
-                }
+                const currentTopInc = parseInt(truncationInput.value);
+                const topBaseInc = isNaN(currentTopInc) ? 5 : currentTopInc;
+                const newValue = Math.min(50, topBaseInc + 1);
+                truncationInput.value = newValue.toString();
+                applyTruncationFromControls("ahss", truncationControls, viewSettings);
                 needsUpdate = true;
                 break;
+            }
 
             case 'l':
-            case 'L':
+            case 'L': {
+                if (!usingAhssViewSettings()) {
+                    sphereCheckbox.checked = !sphereCheckbox.checked;
+                    if (sphereCheckbox.checked) {
+                        const value = parseInt(sphereInput.value);
+                        const sphereValue = isNaN(value) ? 7 : value;
+                        sphereInput.value = sphereValue.toString();
+                    }
+                    applyTruncationFromControls("sphere", truncationControls, viewSettings);
+                    needsUpdate = true;
+                    break;
+                }
                 // Toggle truncation
                 truncationCheckbox.checked = !truncationCheckbox.checked;
                 if (truncationCheckbox.checked) {
                     const value = parseInt(truncationInput.value);
-                    viewSettings.truncation = isNaN(value) ? null : value;
-                } else {
-                    viewSettings.truncation = null;
+                    if (isNaN(value)) {
+                        truncationInput.value = "5";
+                    }
                 }
+                applyTruncationFromControls("ahss", truncationControls, viewSettings);
                 needsUpdate = true;
                 break;
+            }
 
             case 'u':
-            case 'U':
+            case 'U': {
+                if (!usingAhssViewSettings()) {
+                    break;
+                }
                 // Lower bottom truncation (enable if disabled)
                 if (!bottomTruncationCheckbox.checked) {
                     bottomTruncationCheckbox.checked = true;
                     const value = parseInt(bottomTruncationInput.value);
-                    viewSettings.bottomTruncation = isNaN(value) ? 0 : value;
+                    if (isNaN(value)) {
+                        bottomTruncationInput.value = "0";
+                    }
                 }
-                if (viewSettings.bottomTruncation !== undefined) {
-                    const newValue = Math.max(0, viewSettings.bottomTruncation - 1);
-                    viewSettings.bottomTruncation = newValue;
-                    bottomTruncationInput.value = newValue.toString();
-                }
+                const currentBottom = parseInt(bottomTruncationInput.value);
+                const bottomBase = isNaN(currentBottom) ? 0 : currentBottom;
+                const newBottom = Math.max(0, bottomBase - 1);
+                bottomTruncationInput.value = newBottom.toString();
+                applyTruncationFromControls("ahss", truncationControls, viewSettings);
                 needsUpdate = true;
                 break;
+            }
 
             case 'i':
-            case 'I':
+            case 'I': {
+                if (!usingAhssViewSettings()) {
+                    break;
+                }
                 // Higher bottom truncation (enable if disabled)
                 if (!bottomTruncationCheckbox.checked) {
                     bottomTruncationCheckbox.checked = true;
                     const value = parseInt(bottomTruncationInput.value);
-                    viewSettings.bottomTruncation = isNaN(value) ? 0 : value;
+                    if (isNaN(value)) {
+                        bottomTruncationInput.value = "0";
+                    }
                 }
-                if (viewSettings.bottomTruncation !== undefined) {
-                    const maxTop = viewSettings.truncation ?? 50;
-                    const newValue = Math.min(maxTop - 1, viewSettings.bottomTruncation + 1);
-                    viewSettings.bottomTruncation = Math.max(0, newValue);
-                    bottomTruncationInput.value = viewSettings.bottomTruncation.toString();
-                }
+                const currentBottomInc = parseInt(bottomTruncationInput.value);
+                const bottomBaseInc = isNaN(currentBottomInc) ? 0 : currentBottomInc;
+                const maxTop = viewSettings.truncation ?? 50;
+                const newValue = Math.min(maxTop - 1, bottomBaseInc + 1);
+                bottomTruncationInput.value = Math.max(0, newValue).toString();
+                applyTruncationFromControls("ahss", truncationControls, viewSettings);
                 needsUpdate = true;
                 break;
+            }
 
             case 'o':
-            case 'O':
+            case 'O': {
+                if (!usingAhssViewSettings()) {
+                    break;
+                }
                 // Toggle bottom truncation
                 bottomTruncationCheckbox.checked = !bottomTruncationCheckbox.checked;
                 if (bottomTruncationCheckbox.checked) {
                     const value = parseInt(bottomTruncationInput.value);
-                    viewSettings.bottomTruncation = isNaN(value) ? 0 : value;
-                } else {
-                    viewSettings.bottomTruncation = undefined;
+                    if (isNaN(value)) {
+                        bottomTruncationInput.value = "0";
+                    }
                 }
+                applyTruncationFromControls("ahss", truncationControls, viewSettings);
                 needsUpdate = true;
                 break;
+            }
 
             // Screenshot mode
             case 'p':

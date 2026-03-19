@@ -1,6 +1,6 @@
 import { ToStringMap } from "./stringmap";
 import { SvgChart } from "./svgchart";
-import { Differential, Generators, Multiplication, TauMult } from "./types";
+import { Differential, ExternalTauMult, Generators, InternalTauMult, Multiplication } from "./types";
 import { ChartMode } from "./chartMode";
 import { svgNS } from "./svgchart";
 
@@ -22,7 +22,7 @@ export class Chart {
     public generators: Generators[] = [];
     public differentials: Differential[] = [];
     public multiplications: Multiplication[] = [];
-    public tau_mults: TauMult[] = [];
+    public tau_mults: (InternalTauMult | ExternalTauMult)[] = [];
 
     // Cached element references
     private dotElements: Map<string, SVGCircleElement> = new Map();
@@ -119,7 +119,7 @@ export class Chart {
     }
 
     // Set all tau multiplications (complete data set)
-    set_all_tau_mults(tau_mults: TauMult[]) {
+    set_all_tau_mults(tau_mults: (InternalTauMult | ExternalTauMult)[]) {
         this.tau_mults = tau_mults;
     }
 
@@ -534,7 +534,7 @@ export class Chart {
                 return "";
             }
 
-            const style = diff.kind == "Fake" && this.mode !== ChartMode.ASS ? "stroke-dasharray: 0.025,0.02;" : "";
+            const style = diff.kind !== "Real" && this.mode !== ChartMode.ASS ? "stroke-dasharray: 0.025,0.02;" : "";
             return this.generate_diff(from_loc[0], from_loc[1], to_loc[0], to_loc[1], diff.from, diff.to, style);
         }).join("\n");
     }
@@ -552,7 +552,8 @@ export class Chart {
                 return "";
             }
 
-            return this.generate_mult(from_loc[0], from_loc[1], to_loc[0], to_loc[1], mult.from, mult.to, mult.internal, "");
+            const internal = "internal" in mult ? !!(mult as { internal?: boolean }).internal : false;
+            return this.generate_mult(from_loc[0], from_loc[1], to_loc[0], to_loc[1], mult.from, mult.to, internal, "");
         }).join("\n");
     }
 
