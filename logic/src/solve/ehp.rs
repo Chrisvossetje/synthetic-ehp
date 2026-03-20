@@ -31,9 +31,9 @@ fn verify_algebraic_convergence(data: &SyntheticSS, pages: &SSPages, sphere: i32
     compare_algebraic(&observed, algebraic_spheres(sphere), 0, sphere, stem)
 }
 
-fn ehp_iterate(stem_minus_sphere: i32) -> FilterMap<RangeInclusive<i32>, impl FnMut(i32) -> Option<(i32, i32)>> {
+fn ehp_iterate(stem_minus_sphere: i32, slanted: bool) -> FilterMap<RangeInclusive<i32>, impl FnMut(i32) -> Option<(i32, i32)>> {
     (1..=(MAX_STEM)).filter_map(move |i| {
-        let stem = stem_minus_sphere - (i / 2);
+        let stem = if slanted {stem_minus_sphere - (i / 2)} else {stem_minus_sphere};
         let sphere = 1 + i;
         if stem < 2 {
             None
@@ -48,20 +48,27 @@ fn ehp_iterate(stem_minus_sphere: i32) -> FilterMap<RangeInclusive<i32>, impl Fn
     })
 }
 
-pub fn apply_ehp_recursively(ehp: &mut SyntheticSS, stem_minus_sphere: i32) -> Result<(), Vec<Issue>> {
-    for (stem, sphere) in ehp_iterate(stem_minus_sphere).rev() {
+pub fn apply_ehp_recursively(ehp: &mut SyntheticSS, stem_minus_sphere: i32, slanted: bool) -> Result<(), Vec<Issue>> {
+    for (stem, sphere) in ehp_iterate(stem_minus_sphere, slanted).rev() {
         if sphere % 2 != 1 {
             continue;
         }
+        if sphere - 2 >= stem {
+            // Stable
+            continue;
+        }
+        if (sphere+2)/2 + stem >= MAX_STEM {
+            continue;
+        } 
         ehp_recursion(ehp, sphere, stem)?;
     }
 
     Ok(())
 }
 
-pub fn find_ehp_issues(ehp: &mut SyntheticSS, ahss: &SyntheticSS, stem_minus_sphere: i32) -> Result<(), Vec<Issue>> {
+pub fn find_ehp_issues(ehp: &mut SyntheticSS, ahss: &SyntheticSS, stem_minus_sphere: i32, slanted: bool) -> Result<(), Vec<Issue>> {
     // If there is an issue i prefer to first check the algebraic convergence though
-    match apply_ehp_recursively(ehp, stem_minus_sphere) {
+    match apply_ehp_recursively(ehp, stem_minus_sphere, slanted) {
         Ok(_) => {
 
         },
@@ -84,19 +91,18 @@ pub fn find_ehp_issues(ehp: &mut SyntheticSS, ahss: &SyntheticSS, stem_minus_sph
     }
 
 
-    for (stem, sphere) in ehp_iterate(stem_minus_sphere) {
+    for (stem, sphere) in ehp_iterate(stem_minus_sphere, slanted).rev() {
         if stem > MAX_VERIFY_STEM {
             continue;
         }
         
         if sphere - 2 == stem {
+            // Stable
             let pages = try_compute_pages(ehp, 0, sphere - 1, stem, stem)?;            
-            
             ehp_stable_verify(ehp, ahss, &pages, stem)?;
         } else {
-            // Unstable stuff
+            // Unstable
             let pages = try_compute_pages(ehp, 0, sphere - 1, stem-1, stem)?;
-            
             verify_algebraic_convergence(ehp, &pages, sphere, stem)?;
         }
     }
@@ -136,12 +142,14 @@ pub fn verify_geometric(data: &SyntheticSS) {
             .map(|x| geometric_gens[x as usize][(sphere - 1) as usize].trailing_zeros())
             .collect();
 
-        for a in 0..=CLASSICAL_MAX_STEM {
-            if geometric_order[a as usize] != conv_gens[a as usize] {
-                eprintln!(
-                    "Geometric homotopy groups on the {sphere} Sphere do not agree on stem {a}. Expect: {}, Got: {}",
-                    geometric_order[a as usize], conv_gens[a as usize]
-                );
+        for stem in 0..=CLASSICAL_MAX_STEM {
+            if geometric_order[stem as usize] != conv_gens[stem as usize] {
+                if geometric_gens[stem as usize][(sphere-1) as usize] != -2 {
+                    eprintln!(
+                        "Geometric homotopy groups on the {sphere} Sphere do not agree on stem {stem}. Expect: {}, Got: {}",
+                        geometric_order[stem as usize], conv_gens[stem as usize]
+                    );
+                }
             }
         }
     }

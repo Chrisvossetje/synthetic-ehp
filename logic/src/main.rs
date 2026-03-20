@@ -15,7 +15,7 @@ mod domain;
 
 const MAX_STEM: i32 = 40;
 // TODO: AHSS CURTIS DATA IS VALID UNTIL STEM 48
-const MAX_VERIFY_STEM: i32 = 35;
+const MAX_VERIFY_STEM: i32 = 36;
 
 // const MAX_VERIFY_SPHERE: i32 = MAX_VERIFY_STEM + 2;
 // const MAX_UNEVEN_INPUT: i32 = (MAX_STEM + 1) * 2;
@@ -159,11 +159,12 @@ fn ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
     println!("");
 
     let mut stem_minus_sphere = 2;
+    let mut slanted = true;
 
     'outer: while stem_minus_sphere <= (MAX_VERIFY_STEM + MAX_STEM) {
         print!("{stem_minus_sphere}-");
         
-        'middle: while let Err(issues) = find_ehp_issues(&mut data, ahss, stem_minus_sphere) {
+        'middle: while let Err(issues) = find_ehp_issues(&mut data, ahss, stem_minus_sphere, slanted) {
             println!("");
             write_all(&data, &log, false);
             for issue in &issues {
@@ -226,11 +227,11 @@ fn ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
                     },
                 }
             }
-            apply_ehp_recursively(&mut data, stem_minus_sphere);
-            write_all(&data, &log, false);
+            // apply_ehp_recursively(&mut data, stem_minus_sphere, slanted);
+            // write_all(&data, &log, false);
         }
 
-        write_all(&data, &log, false);
+        // write_all(&data, &log, false);
         stem_minus_sphere += 1;
     }
     // add_diffs(&mut data);
@@ -269,7 +270,10 @@ fn ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
     // }
 
     // // TODO : Do a verify Hopf Inv One maps thing ?
-    
+
+    for i in 2..=MAX_VERIFY_STEM {
+        apply_ehp_recursively(&mut data, stem_minus_sphere, false); 
+    }    
 
     // add_final_diagonal(&mut data);
     // write_typescript_file("../site/src/data.ts", "", &data).unwrap();

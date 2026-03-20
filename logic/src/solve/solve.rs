@@ -100,8 +100,6 @@ pub fn auto_deduce(data: &SyntheticSS, issue: &Issue) -> Result<Action, ()> {
             Err(())
         },
         Issue::InvalidName { original_name, unexpected_name, sphere, stem, af } => {
-            let or_id = data.model.get_index(&original_name);
-
             let (pages, _) = compute_pages(data, 0, sphere-1, *stem, *stem);
             let (alg_pages, _) = compute_pages(&DATA, 0, sphere-1, *stem, *stem);
 
@@ -111,14 +109,16 @@ pub fn auto_deduce(data: &SyntheticSS, issue: &Issue) -> Result<Action, ()> {
                 if pages.element_in_pages(*id) {
                     let g = pages.element_final(*id);
                     if g.1.alive() && g.0 == *af {
-                        syn.push(*id);
+                        let name = data.get_name_at_sphere(*id, *sphere);
+                        syn.push(name);
                     }
                 }
 
                 if alg_pages.element_in_pages(*id) {
                     let g = alg_pages.element_final(*id);
                     if g.1.alive() && g.0 == *af {
-                        alg.push(*id);
+                        let name = DATA.model.name(*id);
+                        alg.push(name);
                     }
                 }
             }
@@ -127,11 +127,10 @@ pub fn auto_deduce(data: &SyntheticSS, issue: &Issue) -> Result<Action, ()> {
             let fil_alg: Vec<_> = alg.iter().filter(|i| !syn.contains(i)).collect();
 
             if fil_syn.len() == 1 && fil_alg.len() == 1 {
-                let alg_id = fil_alg[0];
-                let name = DATA.model.name(*alg_id).to_string();
+                let name = fil_alg[0];
                 return Ok(Action::SetInducedName { 
                     name: original_name.clone(), 
-                    new_name: name, 
+                    new_name: name.to_string(), 
                     sphere: *sphere, 
                     proof: format!("Only one choice which could represent this recursion. (auto)") });
             } if fil_alg.len() == 0 {

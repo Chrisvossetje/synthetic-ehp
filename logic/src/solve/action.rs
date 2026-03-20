@@ -34,6 +34,9 @@ pub enum Action {
 pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Result<i32,()> {
     match action {
         Action::AddDiff { from, to, proof } => {
+            let from_tag = data.try_name_tag(&from)?;
+            let to_tag = data.try_name_tag(&to)?;
+
             let x_from = data.model.get_name(from).stem;
             let x_to = data.model.get_name(to).stem;
 
@@ -48,10 +51,7 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                 println!("Tried to add a diff on a non positive page");
                 return Err(())
             }
-            if ahss {
-                let from_tag = data.try_name_tag(&from)?;
-                let to_tag = data.try_name_tag(&to)?;
-    
+            if ahss {    
                 let from_start = name_to_sphere(&from);
                 let to_start = name_to_sphere(&to);
     
@@ -81,6 +81,9 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
             
         },
         Action::AddInt { from, to, page, proof } => {
+            let from_tag = data.try_name_tag(&from)?;
+            let to_tag = data.try_name_tag(&to)?;
+
             let x_from = data.model.get_name(from).stem;
             let x_to = data.model.get_name(to).stem;
 
@@ -97,10 +100,6 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
             }
 
             if ahss {
-                let from_tag = data.try_name_tag(&from)?;
-                let to_tag = data.try_name_tag(&to)?;
-
-
                 let from_start = name_to_sphere(&from);
                 let to_start = name_to_sphere(&to);
 
@@ -129,6 +128,9 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
 
         },
         Action::AddExt { from, to, proof } => {
+            let from_tag = data.try_name_tag(&from)?;
+            let to_tag = data.try_name_tag(&to)?;
+            
             let x_from = data.model.get_name(from).stem;
             let x_to = data.model.get_name(to).stem;
 
@@ -149,8 +151,6 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
             if ahss {
                 if let Some(source_torsion) = data.model.get_name(from).torsion.0 {
                     if data.model.get_name(from).af - source_torsion == data.model.get_name(to).af {
-                        let from_tag = data.try_name_tag(&from)?;
-                        let to_tag = data.try_name_tag(&to)?;
                         let from_start = name_to_sphere(&from);
                         let to_start = name_to_sphere(&to);
                         
