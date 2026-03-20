@@ -29,6 +29,8 @@ fn apply_diff(data: &SyntheticSS, pages: &mut SSPages, page: i32, from: usize, t
     let from_g = pages.element_final(from);
     let to_g = pages.element_final(to);
 
+    let stem = data.model.stem(from);
+
     let (new_from_g, new_to_g) = 
         if from_g.1.alive() {
             if !to_g.1.alive() {
@@ -55,7 +57,7 @@ fn apply_diff(data: &SyntheticSS, pages: &mut SSPages, page: i32, from: usize, t
                         let delta = to_t - coeff; 
                         if delta > from_t {
                             let (from_name, to_name) = data.get_names(from, to);
-                            return Err(Issue::InvalidTorsion { from, to, to_needed: Torsion::new(from_t + coeff), from_name, to_name })
+                            return Err(Issue::InvalidTorsion { from, to, stem, to_needed: Torsion::new(from_t + coeff), from_name, to_name })
                         } else {
                             let new_from_af =  from_g.0 - delta;
                             let new_from_t = from_t - delta;
@@ -74,7 +76,7 @@ fn apply_diff(data: &SyntheticSS, pages: &mut SSPages, page: i32, from: usize, t
                 None => match from_g.1.0 {
                     Some(t) => { 
                         let (from_name, to_name) = data.get_names(from, to);
-                        return Err(Issue::InvalidTorsion { from, to, to_needed: Torsion::new(t + coeff), from_name, to_name })
+                        return Err(Issue::InvalidTorsion { from, to, stem, to_needed: Torsion::new(t + coeff), from_name, to_name })
                     },
                     None => {
                         let from = (from_g.0, Torsion::zero());

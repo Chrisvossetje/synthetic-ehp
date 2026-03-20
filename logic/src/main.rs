@@ -159,7 +159,7 @@ fn ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
     println!("");
 
     let mut stem_minus_sphere = 2;
-    let mut slanted = true;
+    let mut slanted = false;
 
     'outer: while stem_minus_sphere <= (MAX_VERIFY_STEM + MAX_STEM) {
         print!("{stem_minus_sphere}-");
@@ -272,7 +272,7 @@ fn ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
     // // TODO : Do a verify Hopf Inv One maps thing ?
 
     for i in 2..=MAX_VERIFY_STEM {
-        apply_ehp_recursively(&mut data, stem_minus_sphere, false); 
+        apply_ehp_recursively(&mut data, i, false); 
     }    
 
     // add_final_diagonal(&mut data);

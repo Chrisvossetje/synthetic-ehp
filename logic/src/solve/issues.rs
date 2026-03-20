@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{data::{compare::EMPTY_LIST_TORSION, curtis::{DATA_PAGES, STABLE_DATA_PAGES}}, domain::{model::SyntheticSS, process::compute_pages}, types::Torsion};
+use crate::{data::{compare::EMPTY_LIST_TORSION, curtis::{DATA_PAGES, STABLE_DATA_PAGES}}, domain::{model::SyntheticSS, process::{compute_pages, try_compute_pages}}, types::Torsion};
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -39,6 +39,7 @@ pub enum Issue {
     InvalidTorsion {
         from: usize,
         to: usize,
+        stem: i32,
         from_name: String,
         to_name: String,
         to_needed: Torsion,
@@ -62,6 +63,7 @@ pub enum Issue {
     InvalidAEHP {
         from: usize,
         to: usize,
+        stem: i32,
         from_name: String,
         to_name: String,
     },
@@ -159,17 +161,20 @@ pub fn compare_algebraic(observed: &HashMap<i32, usize>, expected: &HashMap<(i32
 pub fn compare_algebraic_spectral_sequence(data: &SyntheticSS, stem: i32, ahss: bool) -> Result<(), Vec<Issue>> {
     // We just check the algebraic diffs, and then if their sources are correct ?
     // Most notably differerntials OUT of a stem
-    let (pages, _) = compute_pages(data, 0, 256, stem, stem);
+    let pages = try_compute_pages(data, 0, 256, stem, stem)?;
     
     let alg_pages = if ahss { &STABLE_DATA_PAGES } else { &DATA_PAGES };
 
     let mut issues = vec![];
 
+    // TODO: This should be somewhat dependent on the top_truncation.
+    // At least for EHP this is important
+    
+
     for (&from, tos) in &data.out_diffs {
         for &to in tos {
             if data.model.stem(from) == stem {
                 let alg = data.proven_from_to.get(&(from, to)).unwrap().is_none();
-                
                 if alg {
                     if !data.model.original_torsion(to).alive() && data.model.original_torsion(from).alive() {
                         let page = data.model.y(from) - data.model.y(to);
@@ -179,6 +184,7 @@ pub fn compare_algebraic_spectral_sequence(data: &SyntheticSS, stem: i32, ahss: 
                             issues.push(Issue::InvalidAEHP { 
                                 from, 
                                 to, 
+                                stem,
                                 from_name, 
                                 to_name });
                         }
@@ -199,6 +205,7 @@ pub fn compare_algebraic_spectral_sequence(data: &SyntheticSS, stem: i32, ahss: 
                                 issues.push(Issue::InvalidAEHP { 
                                     from, 
                                     to, 
+                                    stem,
                                     from_name, 
                                     to_name });
                             }

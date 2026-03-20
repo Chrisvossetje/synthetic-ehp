@@ -1,4 +1,4 @@
-import { Differential, Generators, InternalTauMult, SyntheticEHP } from "./types";
+import { Differential, ExternalTauMult, Generators, InternalTauMult, SyntheticEHP } from "./types";
 import { MAX_STEM } from "./data";
 
 // Track which data is active
@@ -227,6 +227,7 @@ function buildSyntheticCache(
     data: SyntheticEHP,
     truncation: number | undefined,
     bottomTruncation: number | undefined,
+    applyTauMults: boolean,
     limit_x: number | undefined
 ): SyntheticCache {
     const yByName = buildYByName(data);
@@ -265,6 +266,12 @@ function buildSyntheticCache(
         if (!Number.isFinite(tm.page)) return;
         if (tm.page < 0 || tm.page > MAX_STEM) return;
         internalTauByPage[tm.page].push(tm);
+    });
+
+    const externalTaus: ExternalTauMult[] = [];
+    data.external_tau_mults.forEach((tm) => {
+        if (tm.kind !== "Real") return;
+        externalTaus.push(tm);
     });
 
     const allDiffs: Differential[] = [];
@@ -308,6 +315,26 @@ function buildSyntheticCache(
         }
     }
 
+    if (applyTauMults) {
+        for (const tm of externalTaus) {
+            const fromState = currentState[tm.from];
+            const toState = currentState[tm.to];
+            if (!fromState || !toState) {
+                continue;
+            }
+
+            const updated = applyInternalTauMultiplication(fromState, toState);
+            if (!updated) {
+                continue;
+            }
+
+            currentState[tm.from] = updated.from;
+            currentState[tm.to] = updated.to;
+            pagesByGenerator[tm.from]?.push({ page: 500, state: updated.from });
+            pagesByGenerator[tm.to]?.push({ page: 500, state: updated.to });
+        }
+    }
+
     return {
         data,
         truncation,
@@ -323,6 +350,7 @@ function getSyntheticCache(
     data: SyntheticEHP,
     truncation: number | undefined,
     bottomTruncation: number | undefined,
+    applyTauMults: boolean, 
     limit_x: number | undefined
 ): SyntheticCache {
     if (
@@ -335,7 +363,7 @@ function getSyntheticCache(
         return syntheticCache;
     }
 
-    syntheticCache = buildSyntheticCache(data, truncation, bottomTruncation, limit_x);
+    syntheticCache = buildSyntheticCache(data, truncation, bottomTruncation, applyTauMults, limit_x);
     return syntheticCache;
 }
 
@@ -344,10 +372,10 @@ function computeSyntheticPages(
     truncation: number | undefined,
     page: number,
     limit_x: number | undefined,
-    _applyTauMults: boolean,
+    applyTauMults: boolean,
     bottomTruncation: number | undefined
 ): [Record<string, TorsionFiltration>, Differential[]] {
-    const cache = getSyntheticCache(data, truncation, bottomTruncation, limit_x);
+    const cache = getSyntheticCache(data, truncation, bottomTruncation, applyTauMults, limit_x);
     const torsion: Record<string, TorsionFiltration> = {};
     cache.generatorNames.forEach((name) => {
         const states = cache.pagesByGenerator[name];
@@ -408,6 +436,21 @@ function parseSphereFromName(name: string): number | undefined {
     const match = name.match(/\[(\d+)\]$/);
     if (!match) return undefined;
     return parseInt(match[1], 10);
+}
+
+export function get_induced_name(gen: Generators, sphere: number): string {
+    let l = gen.induced_name;
+    let id = 0; 
+
+    while (true) {
+        if (id + 1 == l.length) {
+            return l[id][1];
+        }
+        if (l[id+1][0] > sphere) {
+            return l[id][1];
+        } 
+        id += 1;
+    }
 }
 
 export function getSphereLifecycleInfo(gen: Generators): { bornSphere: string; diesOnAlgebraicSphere: string } {

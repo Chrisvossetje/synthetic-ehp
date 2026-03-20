@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, iter::{FilterMap, Rev}, ops::RangeInclusive};
 
-use crate::{MAX_STEM, MAX_VERIFY_STEM, data::compare::{S0, algebraic_spheres}, domain::{model::SyntheticSS, process::{compute_pages, ehp_recursion, try_compute_pages}, ss::SSPages}, solve::{ehp_ahss::compare_ehp_ahss, issues::{Issue, compare_algebraic, compare_synthetic}}};
+use crate::{MAX_STEM, MAX_VERIFY_STEM, data::compare::{S0, algebraic_spheres}, domain::{model::SyntheticSS, process::{compute_pages, ehp_recursion, try_compute_pages}, ss::SSPages}, solve::{ehp_ahss::compare_ehp_ahss, issues::{Issue, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic}}};
 
 
 
@@ -67,7 +67,7 @@ pub fn apply_ehp_recursively(ehp: &mut SyntheticSS, stem_minus_sphere: i32, slan
 }
 
 pub fn find_ehp_issues(ehp: &mut SyntheticSS, ahss: &SyntheticSS, stem_minus_sphere: i32, slanted: bool) -> Result<(), Vec<Issue>> {
-    // If there is an issue i prefer to first check the algebraic convergence though
+    // If there is an issue i prefer to first check the algebraic convergence though    
     match apply_ehp_recursively(ehp, stem_minus_sphere, slanted) {
         Ok(_) => {
 
@@ -95,6 +95,7 @@ pub fn find_ehp_issues(ehp: &mut SyntheticSS, ahss: &SyntheticSS, stem_minus_sph
         if stem > MAX_VERIFY_STEM {
             continue;
         }
+        compare_algebraic_spectral_sequence(ehp, stem, false)?;
         
         if sphere - 2 == stem {
             // Stable

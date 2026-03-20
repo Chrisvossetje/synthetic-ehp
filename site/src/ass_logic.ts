@@ -1,4 +1,4 @@
-import { Category, find, getActiveData, get_filtered_data, getSelectedGenerator, getSphereLifecycleInfo, setSelectedGenerator } from "./logic";
+import { Category, find, getActiveData, get_filtered_data, getSelectedGenerator, getSphereLifecycleInfo, setSelectedGenerator, get_induced_name } from "./logic";
 import { assChart } from "./charts";
 import { Differential, Generators } from "./types";
 import { buildGeneratorInfoLines, showInfoPanel } from "./ui/info_panel";
@@ -129,96 +129,84 @@ export function update_ass_chart(
         true,
         bottomTruncation
     );
-    const [algebraicClasses] = get_filtered_data(
-        activeData,
-        Category.Algebraic,
-        truncation,
-        1000,
-        true,
-        undefined,
-        false,
-        bottomTruncation
-    );
 
     // Build ASS nodes/differentials:
     // - Free classes: one black dot.
     // - Torsion classes: two black dots with a colored differential between them.
     const gens: Generators[] = [];
     const diffs: Differential[] = [];
-    Object.entries(algebraicClasses).forEach(([name, [_torsion, filtration]]) => {
-        const syntheticEntry = syntheticClasses[name];
-        const syntheticTorsion = syntheticEntry ? syntheticEntry[0] : 0;
-        if (!(syntheticTorsion == undefined || syntheticTorsion > 0)) {
+    Object.entries(syntheticClasses).forEach(([name, [torsion, filtration]]) => {
+        if (!(torsion == undefined || torsion > 0)) {
             return;
         }
 
         const g = find(name);
         if (!g) return;
+        
+        let algebraic_name = get_induced_name(g, truncation - 1);
 
-        if (syntheticTorsion == undefined) {
+        if (torsion == undefined) {
             gens.push({
                 name: g.name,
                 stem: g.stem,
                 y: filtration,
                 af: filtration,
-                induced_name: [[0, g.name]],
+                induced_name: [[0, algebraic_name]],
                 born: g.born,
                 dies: g.dies,
             });
-            return;
-        }
 
-        const sourceName = `${g.name}__ass_src`;
-        const targetName = `${g.name}__ass_tgt`;
-        const targetFiltration = filtration - (syntheticTorsion + 1);
-
-        gens.push({
-            name: sourceName,
-            stem: g.stem,
-            y: filtration,
-            af: filtration,
-            induced_name: [[0, g.name]],
-            born: g.born,
-            dies: g.dies,
-        });
-        gens.push({
-            name: targetName,
-            stem: g.stem + 1,
-            y: targetFiltration,
-            af: targetFiltration,
-            induced_name: [[0, g.name]],
-            born: -1,
-            dies: -1,
-        });
-        diffs.push({
-            from: sourceName,
-            to: targetName,
-            coeff: syntheticTorsion,
-            d: syntheticTorsion + 1,
-            kind: "Real",
-            proof: "Inferred from ASS torsion."
-        });
-
-        let linked: Differential | undefined;
-        const exactMatch = syntheticDiffs.find(d => d.to === g.name && d.coeff === syntheticTorsion && d.d === syntheticTorsion + 1);
-        if (exactMatch) {
-            linked = exactMatch;
         } else {
-            linked = syntheticDiffs.find(d => d.to === g.name && d.coeff === syntheticTorsion);
+            const sourceName = `${g.name}__ass_src`;
+            const targetName = `${g.name}__ass_tgt`;
+            const targetFiltration = filtration - (torsion + 1);
+    
+            gens.push({
+                name: sourceName,
+                stem: g.stem,
+                y: filtration,
+                af: filtration,
+                induced_name: [[0, algebraic_name]],
+                born: g.born,
+                dies: g.dies,
+            });
+            gens.push({
+                name: targetName,
+                stem: g.stem + 1,
+                y: targetFiltration,
+                af: targetFiltration,
+                induced_name: [[0, g.name]],
+                born: -1,
+                dies: -1,
+            });
+            diffs.push({
+                from: sourceName,
+                to: targetName,
+                coeff: torsion,
+                d: torsion + 1,
+                kind: "Real",
+                proof: "Inferred from ASS torsion."
+            });
+    
+            // let linked: Differential | undefined;
+            // const exactMatch = syntheticDiffs.find(d => d.to === g.name && d.coeff === syntheticTorsion && d.d === syntheticTorsion + 1);
+            // if (exactMatch) {
+            //     linked = exactMatch;
+            // } else {
+            //     linked = syntheticDiffs.find(d => d.to === g.name && d.coeff === syntheticTorsion);
+            // }
+    
+            // const reason = (linked === undefined && g.torsion !== undefined && g.torsion > 0)
+            //     ? "On E1 page the target of this differential was already torsion"
+            //     : undefined;
+    
+            inferredAssDifferentials.set(`${sourceName}->${targetName}`, {
+                sourceBase: g.name,
+                targetBase: g.name,
+                torsion: torsion,
+                page: torsion + 1,
+            });
         }
-
-        const reason = (linked === undefined && g.torsion !== undefined && g.torsion > 0)
-            ? "On E1 page the target of this differential was already torsion"
-            : undefined;
-
-        inferredAssDifferentials.set(`${sourceName}->${targetName}`, {
-            sourceBase: g.name,
-            targetBase: g.name,
-            torsion: syntheticTorsion,
-            page: syntheticTorsion + 1,
-            linked,
-            reason
-        });
     });
 
     assChart.set_all_generators(gens);
