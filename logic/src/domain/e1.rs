@@ -2,8 +2,10 @@ use std::{collections::HashMap, iter::Enumerate, slice::Iter};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{data::compare::{EMPTY_LIST_TORSION, EMPTY_LIST_USIZE}, types::{Generator, Torsion}};
-
+use crate::{
+    data::compare::EMPTY_LIST_USIZE,
+    types::{Generator, Torsion},
+};
 
 // This should represent the E1 page ? Is this necessary ?
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -28,7 +30,7 @@ impl E1 {
             stem_af.entry((g.stem, g.af)).or_insert(vec![]).push(i);
             stem_y.entry((g.stem, g.y)).or_insert(vec![]).push(i);
         }
-        
+
         Self {
             generators,
             index,
@@ -84,16 +86,16 @@ impl E1 {
 
     pub fn gens(&self) -> &Vec<Generator> {
         &self.generators
-    } 
-    
+    }
+
     pub fn enumerate(&self) -> Enumerate<Iter<'_, Generator>> {
         self.generators.iter().enumerate()
-    } 
-    
+    }
+
     pub fn gens_id_in_stem(&self, stem: i32) -> &Vec<usize> {
         &self.stem.get(&stem).unwrap()
-    } 
-    
+    }
+
     pub fn gens_id_in_stem_af(&self, stem: i32, af: i32) -> &Vec<usize> {
         &self.stem_af.get(&(stem, af)).unwrap()
     }

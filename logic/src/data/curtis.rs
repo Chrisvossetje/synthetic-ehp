@@ -1,27 +1,24 @@
-use std::{collections::{HashMap, HashSet}, sync::LazyLock};
+use std::sync::LazyLock;
 
-use crate::{MAX_STEM, data::naming::{name_get_tag, name_to_sphere}, domain::{e1::E1, model::{Diff, SyntheticSS}, process::compute_pages, ss::SSPages}, io::export::Differential, types::{Generator, Kind}};
+use crate::{
+    MAX_STEM,
+    domain::{e1::E1, model::SyntheticSS, process::compute_pages, ss::SSPages},
+    io::export::Differential,
+    types::{Generator, Kind},
+};
 
 static CURTIS_TXT: &str = include_str!("../../../curtis_table.txt");
-static STABLE_CURTIS_TXT: &str = include_str!("../../../stable_curtis_table.txt");
+static STABLE_CURTIS_TXT: &str = include_str!("../../../curtis_table_stable.txt");
 
+pub static DATA: LazyLock<SyntheticSS> = LazyLock::new(|| generate_algebraic_data());
 
-pub static DATA: LazyLock<SyntheticSS> = LazyLock::new(|| {
-    generate_algebraic_data()
-});
+pub static DATA_PAGES: LazyLock<SSPages> =
+    LazyLock::new(|| compute_pages(&DATA, 0, 256, 0, MAX_STEM, true).0);
 
-pub static DATA_PAGES: LazyLock<SSPages> = LazyLock::new(|| {
-    compute_pages(&DATA, 0, 256, 0, MAX_STEM).0
-});
+pub static STABLE_DATA: LazyLock<SyntheticSS> = LazyLock::new(|| generate_stable_algebraic_data());
 
-pub static STABLE_DATA: LazyLock<SyntheticSS> = LazyLock::new(|| {
-    generate_stable_algebraic_data()
-});
-
-pub static STABLE_DATA_PAGES: LazyLock<SSPages> = LazyLock::new(|| {
-    compute_pages(&STABLE_DATA, 0, 256, 0, MAX_STEM).0
-});
-
+pub static STABLE_DATA_PAGES: LazyLock<SSPages> =
+    LazyLock::new(|| compute_pages(&STABLE_DATA, 0, 256, 0, MAX_STEM, true).0);
 
 #[derive(Debug, Clone)]
 pub struct Untagged {
@@ -46,11 +43,11 @@ fn name_to_tag_origin(name: &str) -> (i32, String) {
         Some((first, second)) => {
             let initial: i32 = first.parse().unwrap();
             (initial, second.to_string())
-        },
+        }
         None => {
             let initial: i32 = name.parse().unwrap();
             (initial, "".to_string())
-        },
+        }
     }
 }
 
@@ -62,18 +59,31 @@ fn parse_curtis_table() -> (Vec<Untagged>, Vec<Tagged>) {
         let line = line.trim_end_matches(")\n").trim_start_matches("((");
         let parts: Vec<&str> = line.split('#').collect();
 
-        let stemfilt = parts[0].trim_end_matches(") ").split(' ').collect::<Vec<&str>>();
+        let stemfilt = parts[0]
+            .trim_end_matches(") ")
+            .split(' ')
+            .collect::<Vec<&str>>();
         let stem: i32 = stemfilt[0].parse().unwrap();
         let filt: i32 = stemfilt[1].parse().unwrap();
 
         if parts.len() == 3 {
             // Tagged entry
-            let lname = parts[1].trim_start_matches('(').split(')').next().unwrap().to_string();
+            let lname = parts[1]
+                .trim_start_matches('(')
+                .split(')')
+                .next()
+                .unwrap()
+                .to_string();
             let (left_origin, left_tag) = name_to_tag_origin(&lname);
-            
-            let rname = parts[2].trim_start_matches('(').split(')').next().unwrap().to_string();
+
+            let rname = parts[2]
+                .trim_start_matches('(')
+                .split(')')
+                .next()
+                .unwrap()
+                .to_string();
             let (right_origin, right_tag) = name_to_tag_origin(&rname);
-            
+
             tagged.push(Tagged {
                 stem,
                 filt,
@@ -84,7 +94,12 @@ fn parse_curtis_table() -> (Vec<Untagged>, Vec<Tagged>) {
             });
         } else {
             // Untagged entry
-            let unt = parts[1].trim_start_matches('(').split(')').next().unwrap().to_string();
+            let unt = parts[1]
+                .trim_start_matches('(')
+                .split(')')
+                .next()
+                .unwrap()
+                .to_string();
             let (origin, tag) = name_to_tag_origin(&unt);
             untagged.push(Untagged {
                 stem,
@@ -98,8 +113,6 @@ fn parse_curtis_table() -> (Vec<Untagged>, Vec<Tagged>) {
     (untagged, tagged)
 }
 
-
-
 fn stable_name_to_tag_origin(name: &str) -> (i32, String) {
     let (first, second) = name.strip_prefix('(').unwrap().split_once(')').unwrap();
     let y: i32 = first.parse().unwrap();
@@ -110,7 +123,7 @@ fn parse_stable_curtis_table() -> (Vec<Untagged>, Vec<Tagged>) {
     let mut untagged = Vec::new();
     let mut tagged = Vec::new();
 
-    let mut current_degree = (0,0);
+    let mut current_degree = (0, 0);
 
     for line in STABLE_CURTIS_TXT.lines() {
         if line.len() == 0 {
@@ -120,8 +133,14 @@ fn parse_stable_curtis_table() -> (Vec<Untagged>, Vec<Tagged>) {
             continue;
         }
         if line.contains(',') {
-            let strip: Vec<_> = line.strip_prefix('(').unwrap().strip_suffix(')').unwrap().split(',').collect();
-            let (l,r) = (strip[0], strip[1]);
+            let strip: Vec<_> = line
+                .strip_prefix('(')
+                .unwrap()
+                .strip_suffix(')')
+                .unwrap()
+                .split(',')
+                .collect();
+            let (l, r) = (strip[0], strip[1]);
             current_degree = (l.trim().parse().unwrap(), r.trim().parse().unwrap());
             continue;
         }
@@ -139,8 +158,7 @@ fn parse_stable_curtis_table() -> (Vec<Untagged>, Vec<Tagged>) {
                 left_origin,
                 right_tag,
                 right_origin,
-
-            });            
+            });
         } else {
             // Untagged
             let (origin, tag) = stable_name_to_tag_origin(line.trim());
@@ -148,26 +166,21 @@ fn parse_stable_curtis_table() -> (Vec<Untagged>, Vec<Tagged>) {
                 stem: current_degree.0,
                 filt: current_degree.1,
                 tag,
-                origin
-            });            
+                origin,
+            });
         }
     }
 
     (untagged, tagged)
 }
 
-
-fn parse_algebraic_data(
-    untagged: &[Untagged],
-    tagged: &[Tagged],
-) -> SyntheticSS {
+fn parse_algebraic_data(untagged: &[Untagged], tagged: &[Tagged]) -> SyntheticSS {
     let mut generators = Vec::new();
     let mut differentials = Vec::new();
 
     // Add initial generator
     generators.push(Generator::new("[0]".to_string(), 0, 0, 0, 1, None));
 
-    
     // Stable generators
     for unt in untagged {
         if unt.stem <= MAX_STEM {
@@ -195,7 +208,7 @@ fn parse_algebraic_data(
                 tag.left_origin + 1,
                 Some(tag.right_origin + 1),
             ));
-                
+
             generators.push(Generator::new(
                 from.clone(),
                 tag.stem + 1,
@@ -204,7 +217,7 @@ fn parse_algebraic_data(
                 tag.right_origin + 1,
                 Some(tag.right_origin + 1),
             ));
-        
+
             // TODO: This is weird
             differentials.push(Differential {
                 from,
@@ -219,10 +232,10 @@ fn parse_algebraic_data(
     generators.sort_by_key(|x| x.y);
     generators.sort_by_key(|x| x.stem);
 
-    let model = E1::new(generators);    
-    
+    let model = E1::new(generators);
+
     let mut data = SyntheticSS::empty(model);
-    
+
     for d in differentials {
         data.add_diff_name(d.from, d.to, None);
     }

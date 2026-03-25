@@ -1,7 +1,6 @@
 use std::io::{self, Write};
 
-use crate::{solve::{action::Action, issues::Issue}, types::Torsion};
-
+use crate::{solve::action::Action, types::Torsion};
 
 fn read_line() -> String {
     let mut input = String::new();
@@ -18,9 +17,9 @@ fn read_int(positive: bool) -> i32 {
                     print!("Please enter a positive integer: ");
                     io::stdout().flush().unwrap();
                 } else {
-                    return v
+                    return v;
                 }
-            },
+            }
             Err(_) => {
                 print!("Please enter a valid integer: ");
                 io::stdout().flush().unwrap();
@@ -29,7 +28,7 @@ fn read_int(positive: bool) -> i32 {
     }
 }
 
-pub fn process_input(ahss: bool) -> Result<Action, ()>{
+pub fn process_input(ahss: bool) -> Result<Action, ()> {
     loop {
         if ahss {
             println!("Select AHSS option:");
@@ -52,17 +51,17 @@ pub fn process_input(ahss: bool) -> Result<Action, ()>{
         } else {
             println!("0 - Exit");
         }
-    
+
         print!("\nChoice: ");
         io::stdout().flush().unwrap();
-    
+
         let choice = read_int(true);
-    
+
         match choice {
             0 => {
                 return Err(());
             }
-    
+
             1 => {
                 print!("\nFrom: ");
                 io::stdout().flush().unwrap();
@@ -73,9 +72,9 @@ pub fn process_input(ahss: bool) -> Result<Action, ()>{
                 print!("\nProof: ");
                 io::stdout().flush().unwrap();
                 let proof = read_line();
-                return Ok(Action::AddDiff { from, to, proof })
+                return Ok(Action::AddDiff { from, to, proof });
             }
-            
+
             2 => {
                 print!("\nFrom: ");
                 io::stdout().flush().unwrap();
@@ -89,9 +88,14 @@ pub fn process_input(ahss: bool) -> Result<Action, ()>{
                 print!("\nProof: ");
                 io::stdout().flush().unwrap();
                 let proof = read_line();
-                return Ok(Action::AddInt { from, to, page, proof })
+                return Ok(Action::AddInt {
+                    from,
+                    to,
+                    page,
+                    proof,
+                });
             }
-            
+
             3 => {
                 print!("\nFrom: ");
                 io::stdout().flush().unwrap();
@@ -99,38 +103,51 @@ pub fn process_input(ahss: bool) -> Result<Action, ()>{
                 print!("\nTo: ");
                 io::stdout().flush().unwrap();
                 let to = read_line();
+                print!("\nValid for AF (can insert 0 if always): ");
+                io::stdout().flush().unwrap();
+                let af = read_int(true);
                 print!("\nProof: ");
                 io::stdout().flush().unwrap();
                 let proof = read_line();
-                return Ok(Action::AddExt { from, to, proof })
-            },
+                return Ok(Action::AddExt {
+                    from,
+                    to,
+                    af,
+                    proof,
+                });
+            }
             4 => {
                 if !ahss {
                     println!("Cannot set E1 generators in EHP mode\n");
                     continue;
                 }
                 let tag = loop {
-                    print!("\nName: ");    
+                    print!("\nName: ");
                     io::stdout().flush().unwrap();
                     let elt = read_line();
                     let name = elt.split_once('[');
                     if let Some((tag, _)) = name {
                         break tag.to_string();
                     }
-                    println!("Name was not a valid name. It didn't contain [, so the tag could not be deduced.");
+                    println!(
+                        "Name was not a valid name. It didn't contain [, so the tag could not be deduced."
+                    );
                 };
-                
-                print!("\nTorsion: ");    
+
+                print!("\nTorsion: ");
                 io::stdout().flush().unwrap();
                 let torsion = read_int(true);
 
-                print!("\nProof: ");    
+                print!("\nProof: ");
                 io::stdout().flush().unwrap();
                 let proof = read_line();
-                
-                return Ok(Action::SetE1 { tag, proof, torsion: Torsion::new(torsion) })
-                
-            },
+
+                return Ok(Action::SetE1 {
+                    tag,
+                    proof,
+                    torsion: Torsion::new(torsion),
+                });
+            }
             5 => {
                 if ahss {
                     println!("Cannot set induced names in AHSS mode");
@@ -149,24 +166,26 @@ pub fn process_input(ahss: bool) -> Result<Action, ()>{
                 io::stdout().flush().unwrap();
                 let proof = read_line();
 
-                return Ok(Action::SetInducedName { name: from, new_name: to, sphere, proof });
+                return Ok(Action::SetInducedName {
+                    name: from,
+                    new_name: to,
+                    sphere,
+                    proof,
+                });
             }
             7 => {
                 return Ok(Action::Revert { times: 1 });
-            },
+            }
             8 => {
-                print!("\nTimes: ");    
+                print!("\nTimes: ");
                 io::stdout().flush().unwrap();
                 let times = read_int(true);
                 return Ok(Action::Revert { times });
-            },
-            
+            }
+
             _ => {
                 println!("Unknown option.");
             }
         }
     }
 }
-
-
-

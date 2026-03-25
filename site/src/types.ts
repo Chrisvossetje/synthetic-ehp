@@ -14,9 +14,9 @@ export type Generators = {
 export type Differential = {
     "from": string,
     "to": string,
+    "kind": "Real" | "Fake" | "Unknown";
     "d"?: number,
     "coeff"?: number,
-    "kind": "Real" | "Fake" | "Unknown";
     "proof"?: string,
 }
 

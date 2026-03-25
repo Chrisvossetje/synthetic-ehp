@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-
 /// Convert algebraic tags to human-readable names
 /// This is currently unused but kept for potential future use
 #[allow(dead_code)]
@@ -42,7 +41,10 @@ fn tag_to_name(n: &str, x: i32, y: i32, af: i32) -> Option<String> {
         ("3", "h_2"),
         ("1", "h_1"),
         ("0", "h_0"),
-    ].iter().cloned().collect();
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     loop {
         let mut flag = false;

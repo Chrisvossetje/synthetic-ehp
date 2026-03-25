@@ -21,12 +21,23 @@ impl Torsion {
     pub fn alive(&self) -> bool {
         self.0 != Some(0)
     }
-    
+
     pub fn free(&self) -> bool {
-        self.0 == None
+        self.0.is_none()
+    }
+
+    pub fn can_map_with_coeff(&self, from: &Self, coeff: i32) -> bool {
+        if let Some(t) = self.0 {
+            if let Some(f_t) = self.0 {
+                f_t + coeff >= t
+            } else {
+                false
+            }
+        } else {
+            if from.0.is_some() { false } else { true }
+        }
     }
 }
-
 
 // a <= b iff a can map to b
 impl Ord for Torsion {
@@ -57,7 +68,6 @@ pub enum Kind {
     Unknown,
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Generator {
     pub name: String,
@@ -78,7 +88,14 @@ pub struct Generator {
 }
 
 impl Generator {
-    pub fn new(name: String, stem: i32, y: i32, af: i32, born: i32, dies: Option<i32>) -> Generator {
+    pub fn new(
+        name: String,
+        stem: i32,
+        y: i32,
+        af: i32,
+        born: i32,
+        dies: Option<i32>,
+    ) -> Generator {
         Generator {
             name: name.clone(),
             stem,
@@ -90,5 +107,14 @@ impl Generator {
             induced_name: vec![(0, name)],
         }
     }
-}
 
+    pub fn push_induced_name(&mut self, sphere: i32, name: String) -> Result<(), ()> {
+        if let Some(_) = self.induced_name.iter().find(|x| x.0 == sphere) {
+            return Err(());
+        }
+
+        todo!();
+
+        Ok(())
+    }
+}
