@@ -254,7 +254,7 @@ function buildSyntheticCache(
 
     const diffsByPage: Differential[][] = Array.from({ length: MAX_STEM + 1 }, () => []);
     data.differentials.forEach((diff) => {
-        if (diff.kind !== "Real") return;
+        // if (diff.kind !== "Real") return;
         const diffPage = getDiffPage(diff, yByName);
         if (!Number.isFinite(diffPage)) return;
         if (diffPage < 0 || diffPage > MAX_STEM) return;
@@ -307,10 +307,12 @@ function buildSyntheticCache(
                 continue;
             }
 
-            currentState[diff.from] = mapped.from;
-            currentState[diff.to] = mapped.to;
-            pagesByGenerator[diff.from]?.push({ page: p + 1, state: mapped.from });
-            pagesByGenerator[diff.to]?.push({ page: p + 1, state: mapped.to });
+            if (diff.kind == "Real") {
+                currentState[diff.from] = mapped.from;
+                currentState[diff.to] = mapped.to;
+                pagesByGenerator[diff.from]?.push({ page: p + 1, state: mapped.from });
+                pagesByGenerator[diff.to]?.push({ page: p + 1, state: mapped.to });
+            }
             allDiffs.push({ ...diff, d: p });
         }
     }
@@ -563,8 +565,7 @@ export function get_filtered_data(
         if (torsion[diff.from] && torsion[diff.to]) {
 
             // Only calculate diffs which would have elemented before
-            if (diffPage < page && diff.kind == "Real") {
-                
+            if (diffPage < page) {
                 // Algebraic
                 if (category == Category.Algebraic) { 
                     if (coeff == 0 && diff.proof === undefined) {
@@ -572,19 +573,23 @@ export function get_filtered_data(
                         torsion[diff.to][0] = 0;
                         diffs.push({ ...diff, d: diffPage, coeff });              
                     }
-
-
-
-                // Geometric
+                    
+                    
+                    
+                    // Geometric
                 } else { 
-                    if (torsion[diff.to][0] || torsion[diff.to][0] != 0) {
-                        torsion[diff.from][0] = 0;
-                        torsion[diff.to][0] = 0;  
-                        diffs.push({ ...diff, d: diffPage, coeff });                  
+                    if (diff.kind == "Real") {
+                        if (torsion[diff.to][0] || torsion[diff.to][0] != 0) {
+                            torsion[diff.from][0] = 0;
+                            torsion[diff.to][0] = 0;  
+                            diffs.push({ ...diff, d: diffPage, coeff });                  
+                        } else {
+                            // Element had already been killed 
+                            // This can occur in geometric !
+                        }               
                     } else {
-                        // Element had already been killed 
-                        // This can occur in geometric !
-                    }               
+                        diffs.push({ ...diff, d: diffPage, coeff });                  
+                    }
                 }
             }
         }

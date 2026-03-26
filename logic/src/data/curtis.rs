@@ -237,7 +237,7 @@ fn parse_algebraic_data(untagged: &[Untagged], tagged: &[Tagged]) -> SyntheticSS
     let mut data = SyntheticSS::empty(model);
 
     for d in differentials {
-        data.add_diff_name(d.from, d.to, None);
+        data.add_diff_name(d.from, d.to, None, Kind::Real);
     }
 
     data

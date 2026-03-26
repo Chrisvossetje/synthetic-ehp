@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{MAX_STEM, data::naming::name_get_tag, domain::e1::E1, types::Torsion};
+use crate::{MAX_STEM, data::naming::name_get_tag, domain::e1::E1, types::{Kind, Torsion}};
 
 pub type FromTo = (usize, usize);
 
@@ -71,34 +71,53 @@ impl SyntheticSS {
         }
     }
 
-    pub fn disprove_from_to(&mut self, from: usize, to: usize, proof: Option<String>) {
-        self.disproven_from_to.insert((from, to), proof);
-    }
-
-    pub fn add_diff(&mut self, from: usize, to: usize, proof: Option<String>) {
+    pub fn add_diff(&mut self, from: usize, to: usize, proof: Option<String>, kind: Kind,) {
         let d_y = self.model.y(from) - self.model.y(to);
-
-        if !self.proven_from_to.contains_key(&(from, to)) {
-            self.diffs_page[d_y as usize].push(Diff { from, to });
-            self.in_diffs.entry(to).or_insert(vec![]).push(from);
-            self.out_diffs.entry(from).or_insert(vec![]).push(to);
-            self.proven_from_to.insert((from, to), proof);
+        
+        if !self.proven_from_to.contains_key(&(from, to)) || !self.disproven_from_to.contains_key(&(from, to)) {
+            match kind {
+                Kind::Real => {
+                    self.diffs_page[d_y as usize].push(Diff { from, to });
+                    self.in_diffs.entry(to).or_insert(vec![]).push(from);
+                    self.out_diffs.entry(from).or_insert(vec![]).push(to);
+                    self.proven_from_to.insert((from, to), proof);
+                },
+                _ => {
+                    self.disproven_from_to.insert((from, to), proof);
+                    
+                },
+            }
         }
     }
 
-    pub fn add_int_tau(&mut self, from: usize, to: usize, page: i32, proof: Option<String>) {
-        if !self.proven_from_to.contains_key(&(from, to)) {
-            self.internal_tau_page[page as usize].push(IntTauMult { from, to });
-            self.proven_from_to.insert((from, to), proof);
+    pub fn add_int_tau(&mut self, from: usize, to: usize, page: i32, proof: Option<String>, kind: Kind,) {
+        if !self.proven_from_to.contains_key(&(from, to)) || !self.disproven_from_to.contains_key(&(from, to)) {
+            match kind {
+                Kind::Real => {
+                    self.internal_tau_page[page as usize].push(IntTauMult { from, to });
+                    self.proven_from_to.insert((from, to), proof);
+                },
+                _ => {
+                    self.disproven_from_to.insert((from, to), proof); 
+                },
+            }
         }
     }
 
-    pub fn add_ext_tau(&mut self, from: usize, to: usize, af: i32, proof: Option<String>) {
-        if !self.proven_from_to.contains_key(&(from, to)) {
-            let y_from = self.model.y(from);
-            let y_diff = self.model.y(from) - self.model.y(to);
-            self.external_tau_page[y_from as usize][y_diff as usize].push(ExtTauMult { from, to, af });
-            self.proven_from_to.insert((from, to), proof);
+    pub fn add_ext_tau(&mut self, from: usize, to: usize, af: i32, proof: Option<String>, kind: Kind,) {
+        if !self.proven_from_to.contains_key(&(from, to)) || !self.disproven_from_to.contains_key(&(from, to)) {
+            match kind {
+                Kind::Real => {
+                    let y_from = self.model.y(from);
+                    let y_diff = self.model.y(from) - self.model.y(to);
+                    self.external_tau_page[y_from as usize][y_diff as usize].push(ExtTauMult { from, to, af });
+                    self.proven_from_to.insert((from, to), proof);
+                },
+                _ => {
+                    self.disproven_from_to.insert((from, to), proof);
+                    
+                },
+            }
         }
     }
 
@@ -107,10 +126,11 @@ impl SyntheticSS {
         from: String,
         to: String,
         proof: Option<String>,
+        kind: Kind,
     ) -> Result<(), ()> {
         let from = self.model.try_index(&from).ok_or(())?;
         let to = self.model.try_index(&to).ok_or(())?;
-        self.add_diff(from, to, proof);
+        self.add_diff(from, to, proof, kind);
         Ok(())
     }
 
@@ -120,10 +140,11 @@ impl SyntheticSS {
         to: String,
         page: i32,
         proof: Option<String>,
+        kind: Kind,
     ) -> Result<(), ()> {
         let from = self.model.try_index(&from).ok_or(())?;
         let to = self.model.try_index(&to).ok_or(())?;
-        self.add_int_tau(from, to, page, proof);
+        self.add_int_tau(from, to, page, proof, kind);
         Ok(())
     }
 
@@ -133,10 +154,11 @@ impl SyntheticSS {
         to: String,
         af: i32,
         proof: Option<String>,
+        kind: Kind,
     ) -> Result<(), ()> {
         let from = self.model.try_index(&from).ok_or(())?;
         let to = self.model.try_index(&to).ok_or(())?;
-        self.add_ext_tau(from, to, af, proof);
+        self.add_ext_tau(from, to, af, proof, kind);
         Ok(())
     }
 

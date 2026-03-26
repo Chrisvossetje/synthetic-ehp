@@ -166,30 +166,30 @@ pub fn write_typescript_file(
         }
     }
 
-    for (from, to) in &data.temp_fakes {
+    for ((from, to), p) in &data.disproven_from_to {
         let d_y = data.model.y(*from) - data.model.y(*to);
         let d_stem = data.model.stem(*from) - data.model.stem(*to);
         if d_y == 0 {
             int_tau_mults.push(InternalTauMult {
                 from: data.model.name(*from).to_string(),
                 to: data.model.name(*to).to_string(),
-                kind: Kind::Unknown,
-                proof: Some(format!("Unknown")),
+                kind: Kind::Fake,
+                proof: p.clone(),
                 page: 500,
             });
         } else if d_stem == 0 {
             ext_tau_mults.push(ExternalTauMult {
                 from: data.model.name(*from).to_string(),
                 to: data.model.name(*to).to_string(),
-                kind: Kind::Unknown,
-                proof: Some(format!("Unknown")),
+                kind: Kind::Fake,
+                proof: p.clone(),
             });
         } else {
             differentials.push(Differential {
                 from: data.model.name(*from).to_string(),
                 to: data.model.name(*to).to_string(),
-                kind: Kind::Unknown,
-                proof: Some(format!("Unknown")),
+                kind: Kind::Fake,
+                proof: p.clone(),
             });
         }
     }

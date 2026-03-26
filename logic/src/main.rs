@@ -8,11 +8,7 @@ use crate::{
         export::{get_log, write_all},
     },
     solve::{
-        action::{Action, process_action, revert_log_and_remake},
-        ahss::find_ahss_issues,
-        ehp::{apply_ehp_recursively, find_ehp_issues, verify_geometric},
-        ehp_ahss::{ehp_to_ahss_map, set_metastable_range},
-        solve::auto_deduce,
+        action::{Action, process_action, revert_log_and_remake}, ahss::find_ahss_issues, automated::ahss_solver, ehp::{apply_ehp_recursively, find_ehp_issues, verify_geometric}, ehp_ahss::{ehp_to_ahss_map, set_metastable_range}, solve::auto_deduce
     },
 };
 
@@ -323,11 +319,16 @@ fn temp_lol(data: &SyntheticSS) {
 fn main() {
     let start = Instant::now();
 
+    // let (ahss_log, ahss) = ahss_solver();
+
+    // write_all(&ahss, &ahss_log, true);
+    
+    
     let (ahss, input_time_ahss) = ahss();
-
-
     let start_ehp = Instant::now();
     let (ehp, input_time_ehp) = ehp(&ahss);
+
+    temp_lol(&ehp);
 
     verify_geometric(&ehp);
 

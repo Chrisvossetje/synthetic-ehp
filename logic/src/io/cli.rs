@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use crate::{solve::action::Action, types::Torsion};
+use crate::{solve::action::Action, types::{Kind, Torsion}};
 
 fn read_line() -> String {
     let mut input = String::new();
@@ -72,7 +72,7 @@ pub fn process_input(ahss: bool) -> Result<Action, ()> {
                 print!("\nProof: ");
                 io::stdout().flush().unwrap();
                 let proof = read_line();
-                return Ok(Action::AddDiff { from, to, proof });
+                return Ok(Action::AddDiff { from, to, proof, kind: Kind::Real });
             }
 
             2 => {
@@ -93,6 +93,7 @@ pub fn process_input(ahss: bool) -> Result<Action, ()> {
                     to,
                     page,
                     proof,
+                    kind: Kind::Real
                 });
             }
 
@@ -114,6 +115,7 @@ pub fn process_input(ahss: bool) -> Result<Action, ()> {
                     to,
                     af,
                     proof,
+                    kind: Kind::Real,
                 });
             }
             4 => {

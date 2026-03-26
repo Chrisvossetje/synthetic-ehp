@@ -7,7 +7,7 @@ use crate::{
     MAX_STEM,
     data::naming::{generate_names_from_tag_special, name_to_sphere},
     domain::model::SyntheticSS,
-    types::Torsion,
+    types::{Kind, Torsion},
 };
 
 pub static D_R_REPEATS: LazyLock<Vec<usize>> = LazyLock::new(|| {
@@ -31,18 +31,21 @@ pub enum Action {
         from: String,
         to: String,
         proof: String,
+        kind: Kind,
     },
     AddInt {
         from: String,
         to: String,
         page: i32,
         proof: String,
+        kind: Kind,
     },
     AddExt {
         from: String,
         to: String,
         af: i32,
         proof: String,
+        kind: Kind,
     },
     SetE1 {
         tag: String,
@@ -62,7 +65,7 @@ pub enum Action {
 
 pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Result<i32, ()> {
     match action {
-        Action::AddDiff { from, to, proof } => {
+        Action::AddDiff { from, to, proof, kind } => {
             let from_tag = data.try_name_tag(&from)?;
             let to_tag = data.try_name_tag(&to)?;
 
@@ -101,13 +104,13 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                             "By James periodicity it follows from the external tau from {from} to {to}"
                         )
                     };
-                    if data.add_diff_name(f, t, Some(p)).is_err() {
+                    if data.add_diff_name(f, t, Some(p), *kind).is_err() {
                         break;
                     }
                 }
                 Ok(to_start)
             } else {
-                data.add_diff_name(from.clone(), to.clone(), Some(proof.clone()))?;
+                data.add_diff_name(from.clone(), to.clone(), Some(proof.clone()), *kind)?;
                 Ok(2)
             }
         }
@@ -116,6 +119,7 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
             to,
             page,
             proof,
+            kind,
         } => {
             let from_tag = data.try_name_tag(&from)?;
             let to_tag = data.try_name_tag(&to)?;
@@ -156,13 +160,13 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                             "By James periodicity it follows from the internal tau from {from} to {to}"
                         )
                     };
-                    if data.add_int_tau_name(f, t, *page, Some(p)).is_err() {
+                    if data.add_int_tau_name(f, t, *page, Some(p), *kind).is_err() {
                         break;
                     }
                 }
                 Ok(to_start)
             } else {
-                data.add_int_tau_name(from.clone(), to.clone(), *page, Some(proof.clone()))?;
+                data.add_int_tau_name(from.clone(), to.clone(), *page, Some(proof.clone()), *kind)?;
                 Ok(2)
             }
         }
@@ -170,8 +174,8 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
             from,
             to,
             af,
-            proof,
-        } => {
+            proof, 
+            kind } => {
             let from_tag = data.try_name_tag(&from)?;
             let to_tag = data.try_name_tag(&to)?;
 
@@ -216,7 +220,7 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                                 )
                             };
 
-                            if data.add_ext_tau_name(f, t, *af, Some(p)).is_err() {
+                            if data.add_ext_tau_name(f, t, *af, Some(p), *kind).is_err() {
                                 break;
                             }
                         }
@@ -225,7 +229,7 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                 }
             }
 
-            data.add_ext_tau_name(from.clone(), to.clone(), *af, Some(proof.clone()))?;
+            data.add_ext_tau_name(from.clone(), to.clone(), *af, Some(proof.clone()), *kind)?;
             Ok(2)
         }
         Action::SetE1 {

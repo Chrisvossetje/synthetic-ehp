@@ -1,4 +1,4 @@
-use crate::{domain::{model::SyntheticSS, process::compute_pages, ss::SSPages}, solve::issues::Issue, types::Torsion};
+use crate::{domain::{model::SyntheticSS, process::compute_pages, ss::SSPages}, solve::issues::Issue, types::{Kind, Torsion}};
 
 
 // (EHP -> AHSS, Lifts from AHSS -> EHP)
@@ -19,11 +19,12 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
             let g_from = ahss.model.get(d.from);
             let g_to = ahss.model.get(d.to);
             if in_metastable_range(g_to.y, g_to.stem) {
-                let proof = ahss.proven_from_to.get(&(d.from, d.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting differentials not done carefully enough.");
+                let proof = ahss.proven_from_to.get(&(d.from, d.to)).expect("If there is no reference to a proof here (note that the string can still be empty), then inserting differentials not done carefully enough.");
                 ehp.add_diff_name(
                     g_from.name.clone(),
                     g_to.name.clone(),
                     proof.clone().map(|x| format!("{x} (Metastable)")),
+                    Kind::Real // TODO! <<
                 )?;
             }
         }
@@ -39,6 +40,7 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
                     g_to.name.clone(),
                     page as i32,
                     proof.clone().map(|x| format!("{x} (Metastable)")),
+                    Kind::Real // TODO! <<
                 )?;
             }
         }
@@ -56,6 +58,7 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
                         g_to.name.clone(),
                         e.af,
                         proof.clone().map(|x| format!("{x} (Metastable)")),
+                        Kind::Real // TODO! <<
                     )?;
                 }
             }
@@ -153,6 +156,11 @@ pub fn compare_ehp_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS, (ehp_ahss, ahss_e
             if let Some(ahss_id) = ehp_ahss[ehp_id] {
                 if ehp.model.original_torsion(ehp_id).alive() {
                     if ehp.model.original_torsion(ehp_id) > ahss.model.original_torsion(ahss_id) {
+                        issues.push(Issue::InvalidEHPAHSSGen { name: ehp.model.name(ehp_id).to_string(), stem });
+                    }
+                }
+                if ehp_p.element_in_pages(ehp_id) {
+                    if ehp_p.element_final(ehp_id).1 > ahss_p.element_final(ehp_id).1 {
                         issues.push(Issue::InvalidEHPAHSSGen { name: ehp.model.name(ehp_id).to_string(), stem });
                     }
                 }
