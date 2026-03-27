@@ -296,11 +296,14 @@ fn temp_lol(data: &SyntheticSS) {
         if proof.is_none() {
             if page.element_in_pages(from) && page.element_in_pages(to) {
                 let d_y = data.model.y(from) - data.model.y(to);
+
                 let from_af = data.model.original_af(from);
                 let to_af = data.model.original_af(to);
 
                 if page.element_at_page(d_y, from).0 != from_af
                     || page.element_at_page(d_y, to).0 != to_af
+                    || !page.element_at_page(d_y, to).1.alive()
+                    // || !page.element_at_page(d_y, from).1.alive()
                 {
                     if data.model.stem(from) <= MAX_VERIFY_STEM {
                         println!(
