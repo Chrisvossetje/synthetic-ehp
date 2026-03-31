@@ -30,7 +30,7 @@ pub enum Action {
     AddDiff {
         from: String,
         to: String,
-        proof: String,
+        proof: Option<String>,
         kind: Kind,
     },
     AddInt {
@@ -100,17 +100,17 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                     let p = if &f == from {
                         proof.clone()
                     } else {
-                        format!(
+                        Some(format!(
                             "By James periodicity it follows from the external tau from {from} to {to}"
-                        )
+                        ))
                     };
-                    if data.add_diff_name(f, t, Some(p), *kind).is_err() {
+                    if data.add_diff_name(f, t, p, *kind).is_err() {
                         break;
                     }
                 }
                 Ok(to_start)
             } else {
-                data.add_diff_name(from.clone(), to.clone(), Some(proof.clone()), *kind)?;
+                data.add_diff_name(from.clone(), to.clone(), proof.clone(), *kind)?;
                 Ok(2)
             }
         }

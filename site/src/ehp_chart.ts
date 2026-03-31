@@ -117,6 +117,7 @@ export function handleLineClick(from: string, to: string) {
     const lines = [
         `From: ${rawDiff?.from ?? from}`,
         `To: ${rawDiff?.to ?? to}`,
+        `Kind: ${rawDiff?.kind}`,
         `Page: E${page}`,
         `Coefficient: ${coeff === 0 ? '1' : 'τ^' + coeff}`,
     ];

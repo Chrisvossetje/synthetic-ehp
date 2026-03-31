@@ -221,7 +221,7 @@ pub fn compare_algebraic_spectral_sequence(
 
     for (&from, tos) in &data.out_diffs {
         for &to in tos {
-            if data.model.stem(from) == stem
+            if data.model.stem(to) == stem
                 && bot_trunc <= data.model.y(to)
                 && data.model.y(from) <= top_trunc
             {

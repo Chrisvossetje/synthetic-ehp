@@ -322,31 +322,29 @@ fn temp_lol(data: &SyntheticSS) {
 fn main() {
     let start = Instant::now();
 
-    // let (ahss_log, ahss) = ahss_solver();
+    let (ahss_log, ahss) = ahss_solver();
 
-    // write_all(&ahss, &ahss_log, true);
+    write_all(&ahss, &ahss_log, true);
     
     
-    let (ahss, input_time_ahss) = ahss();
-    let start_ehp = Instant::now();
-    let (ehp, input_time_ehp) = ehp(&ahss);
+    // let (ahss, input_time_ahss) = ahss();
+    // let start_ehp = Instant::now();
+    // let (ehp, input_time_ehp) = ehp(&ahss);
 
-    temp_lol(&ehp);
+    // verify_geometric(&ehp);
 
-    verify_geometric(&ehp);
-
-    println!(
-        "\nAHSS Compute took: {:.2?}",
-        start.elapsed() - input_time_ahss - start_ehp.elapsed()
-    );
-    println!(
-        "EHP Compute took: {:.2?}",
-        start_ehp.elapsed() - input_time_ehp
-    );
-    println!(
-        "Compute took: {:.2?}",
-        start.elapsed() - input_time_ahss - input_time_ehp
-    );
-    println!("\nInput took: {:.2?}", input_time_ahss + input_time_ehp);
+    // println!(
+    //     "\nAHSS Compute took: {:.2?}",
+    //     start.elapsed() - input_time_ahss - start_ehp.elapsed()
+    // );
+    // println!(
+    //     "EHP Compute took: {:.2?}",
+    //     start_ehp.elapsed() - input_time_ehp
+    // );
+    // println!(
+    //     "Compute took: {:.2?}",
+    //     start.elapsed() - input_time_ahss - input_time_ehp
+    // );
+    // println!("\nInput took: {:.2?}", input_time_ahss + input_time_ehp);
     println!("Program took: {:.2?}", start.elapsed());
 }

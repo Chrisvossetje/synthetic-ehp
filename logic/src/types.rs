@@ -27,14 +27,14 @@ impl Torsion {
     }
 
     pub fn can_map_with_coeff(&self, from: &Self, coeff: i32) -> bool {
-        if let Some(t) = self.0 {
-            if let Some(f_t) = self.0 {
-                f_t + coeff >= t
+        if let Some(from_torsion) = from.0 {
+            if let Some(to_torsion) = self.0 {
+                from_torsion + coeff >= to_torsion
             } else {
                 false
             }
         } else {
-            if from.0.is_some() { false } else { true }
+            true
         }
     }
 }

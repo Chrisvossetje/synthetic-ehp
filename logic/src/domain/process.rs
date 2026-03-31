@@ -47,6 +47,8 @@ fn apply_diff(
 ) -> Result<(), Issue> {
     let from_g = pages.element_final(from);
     let to_g = pages.element_final(to);
+    
+    let (from_name, to_name) = data.get_names(from, to);
 
     let stem = data.model.stem(from);
 
@@ -78,33 +80,49 @@ fn apply_diff(
         }
 
         match to_g.1.0 {
-            Some(to_t) => match from_g.1.0 {
-                Some(from_t) => {
-                    // Delta represents how much F2 generators are actually hit
-                    let delta = to_t - coeff;
-                    if delta > from_t {
-                        let (from_name, to_name) = data.get_names(from, to);
-                        return Err(Issue::InvalidTorsion {
-                            from,
-                            to,
-                            stem,
-                            to_needed: Torsion::new(from_t + coeff),
-                            from_name,
-                            to_name,
-                        });
-                    } else {
-                        let new_from_af = from_g.0 - delta;
-                        let new_from_t = from_t - delta;
+            Some(to_t) => {
+                // Delta represents how much F2 generators are actually hit
+                let delta = to_t - coeff;
+                // If this is non-positive then the differential is useless
+                if delta > 0 {
+                    match from_g.1.0 {
+                        Some(from_t) => {
+                            if delta > from_t {
+                                let (from_name, to_name) = data.get_names(from, to);
+                                return Err(Issue::InvalidTorsion {
+                                    from,
+                                    to,
+                                    stem,
+                                    to_needed: Torsion::new(from_t + coeff),
+                                    from_name,
+                                    to_name,
+                                });
+                            } else {
+                                let new_from_af = from_g.0 - delta;
+                                let new_from_t = from_t - delta;
 
-                        let from = (new_from_af, Torsion::new(new_from_t));
-                        let to = (to_g.0, Torsion::new(coeff));
-                        (from, to)
+                                let from = (new_from_af, Torsion::new(new_from_t));
+                                let to = (to_g.0, Torsion::new(coeff));
+                                (from, to)
+                            }
+                        },
+                        None => {
+                            let from = (from_g.0 - delta, Torsion::default());
+                            let to = (to_g.0, Torsion::new(coeff));
+                            (from, to)
+                        }   
                     }
-                }
-                None => {
-                    let from = (from_g.0 - to_t + coeff, Torsion::default());
-                    let to = (to_g.0, Torsion::new(coeff));
-                    (from, to)
+                } else {
+                    // Useless
+                    let (from_name, to_name) = data.get_names(from, to);
+                    return Err(Issue::UselessDifferential {
+                        from,
+                        to,
+                        bot_trunc: pages.bot_trunc,
+                        top_trunc: pages.top_trunc,
+                        from_name,
+                        to_name,
+                    });
                 }
             },
             None => match from_g.1.0 {

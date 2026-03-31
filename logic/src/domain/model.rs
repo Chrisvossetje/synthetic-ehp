@@ -74,7 +74,7 @@ impl SyntheticSS {
     pub fn add_diff(&mut self, from: usize, to: usize, proof: Option<String>, kind: Kind,) {
         let d_y = self.model.y(from) - self.model.y(to);
         
-        if !self.proven_from_to.contains_key(&(from, to)) || !self.disproven_from_to.contains_key(&(from, to)) {
+        if !self.proven_from_to.contains_key(&(from, to)) && !self.disproven_from_to.contains_key(&(from, to)) {
             match kind {
                 Kind::Real => {
                     self.diffs_page[d_y as usize].push(Diff { from, to });
@@ -91,7 +91,7 @@ impl SyntheticSS {
     }
 
     pub fn add_int_tau(&mut self, from: usize, to: usize, page: i32, proof: Option<String>, kind: Kind,) {
-        if !self.proven_from_to.contains_key(&(from, to)) || !self.disproven_from_to.contains_key(&(from, to)) {
+        if !self.proven_from_to.contains_key(&(from, to)) && !self.disproven_from_to.contains_key(&(from, to)) {
             match kind {
                 Kind::Real => {
                     self.internal_tau_page[page as usize].push(IntTauMult { from, to });
@@ -105,7 +105,7 @@ impl SyntheticSS {
     }
 
     pub fn add_ext_tau(&mut self, from: usize, to: usize, af: i32, proof: Option<String>, kind: Kind,) {
-        if !self.proven_from_to.contains_key(&(from, to)) || !self.disproven_from_to.contains_key(&(from, to)) {
+        if !self.proven_from_to.contains_key(&(from, to)) && !self.disproven_from_to.contains_key(&(from, to)) {
             match kind {
                 Kind::Real => {
                     let y_from = self.model.y(from);

@@ -72,7 +72,7 @@ pub fn process_input(ahss: bool) -> Result<Action, ()> {
                 print!("\nProof: ");
                 io::stdout().flush().unwrap();
                 let proof = read_line();
-                return Ok(Action::AddDiff { from, to, proof, kind: Kind::Real });
+                return Ok(Action::AddDiff { from, to, proof: Some(proof), kind: Kind::Real });
             }
 
             2 => {

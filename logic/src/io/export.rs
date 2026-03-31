@@ -169,11 +169,15 @@ pub fn write_typescript_file(
     for ((from, to), p) in &data.disproven_from_to {
         let d_y = data.model.y(*from) - data.model.y(*to);
         let d_stem = data.model.stem(*from) - data.model.stem(*to);
+        let kind = if p.is_some() { Kind::Fake } else { Kind::Unknown };
+        if kind == Kind::Fake {
+            continue; //TODO REMOVE
+        }
         if d_y == 0 {
             int_tau_mults.push(InternalTauMult {
                 from: data.model.name(*from).to_string(),
                 to: data.model.name(*to).to_string(),
-                kind: Kind::Fake,
+                kind,
                 proof: p.clone(),
                 page: 500,
             });
@@ -181,14 +185,14 @@ pub fn write_typescript_file(
             ext_tau_mults.push(ExternalTauMult {
                 from: data.model.name(*from).to_string(),
                 to: data.model.name(*to).to_string(),
-                kind: Kind::Fake,
+                kind,
                 proof: p.clone(),
             });
         } else {
             differentials.push(Differential {
                 from: data.model.name(*from).to_string(),
                 to: data.model.name(*to).to_string(),
-                kind: Kind::Fake,
+                kind,
                 proof: p.clone(),
             });
         }
@@ -254,7 +258,7 @@ pub fn get_log(ahss: bool) -> Result<Vec<Action>, ()> {
     };
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
-    serde_json::de::from_str(&s).map_err(|_| ())
+    serde_json::de::from_str(&s).map_err(|_| println!("{:?}", s))
 }
 
 pub fn write_all(data: &SyntheticSS, log: &Vec<Action>, ahss: bool) {
