@@ -2,7 +2,7 @@ use crate::domain::{model::{Diff, ExtTauMult, SyntheticSS}, process::compute_pag
 
 
 pub fn get_a_diff(data: &SyntheticSS, top_trunc: i32, target_y: i32, stem: i32) -> Option<Diff> {
-
+    
     // We can look at targets in RP1_256 as we have not added the adams diffs yet! 
     let (elements, _) = compute_pages(data, 0, 256, stem, stem + 1, false);
 
@@ -20,9 +20,18 @@ pub fn get_a_diff(data: &SyntheticSS, top_trunc: i32, target_y: i32, stem: i32) 
                         }
                         
                         // Would have been seen algebraicly
-                        if coeff == 0 && af == data.model.original_af(t_id) && s_af == data.model.original_af(s_id) {
-                            continue;
-                        }
+                        if coeff == 0 {
+                            if af == data.model.original_af(t_id) && s_af == data.model.original_af(s_id) {
+                                if let Some(died) = data.model.get(t_id).dies {
+                                    if died > data.model.y(s_id) {
+                                        continue;
+                                    }
+                                } else {
+                                    continue;
+                                }
+                            }
+                        } 
+
                         if !data.disproven_from_to.contains_key(&(s_id,t_id)) {
                             if torsion.can_map_with_coeff(&s_torsion, coeff) {
                                 return Some(Diff { from: s_id, to: t_id })
@@ -39,6 +48,10 @@ pub fn get_a_diff(data: &SyntheticSS, top_trunc: i32, target_y: i32, stem: i32) 
 
 pub fn get_a_tau(data: &SyntheticSS, top_trunc: i32, target_y: i32, stem: i32) -> Option<ExtTauMult> {
 
+    if top_trunc == 3 || top_trunc == 7 || top_trunc == 15 || top_trunc == 31 {
+        return None
+    }
+
     // We can look at targets in RP1_256 as we have not added the adams diffs yet! 
     let (elements, _) = compute_pages(data, target_y, top_trunc, stem, stem, false);
 
@@ -52,7 +65,7 @@ pub fn get_a_tau(data: &SyntheticSS, top_trunc: i32, target_y: i32, stem: i32) -
                             let d_y = data.model.y(s_id) - data.model.y(t_id);
                             if d_y > 0 {
                                 if s_af > t_af && s_af - s_torsion <= t_af {
-                                    return Some(ExtTauMult { from: s_id, to: t_id, af: s_af })
+                                    return Some(ExtTauMult { from: s_id, to: t_id, af: t_af + 1 })
                                 }
                             }
                         }

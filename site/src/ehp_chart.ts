@@ -125,7 +125,7 @@ export function handleLineClick(from: string, to: string) {
     const extraLines: string[] = [];
     if (rawDiff && "proof" in rawDiff) {
         extraLines.push(`Proof: ${rawDiff.proof ?? ""}`);
-    } else {
+    } else if (rawDiff?.kind != "Unknown") {
         extraLines.push("AEHP differential");
     }
 

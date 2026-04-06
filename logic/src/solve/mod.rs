@@ -6,3 +6,4 @@ pub mod generate;
 pub mod issues;
 pub mod solve;
 pub mod automated;
+pub mod ahss_e1;

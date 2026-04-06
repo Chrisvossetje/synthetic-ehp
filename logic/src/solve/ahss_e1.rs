@@ -1,17 +1,17 @@
 use std::{collections::HashMap, convert::identity};
 use itertools::{self, Itertools};
 
-use crate::{MAX_VERIFY_STEM, issues::Issue, model::SyntheticSS, naming::{generate_names_from_tag, name_get_tag}, static_compare_data::{synthetic_s0, synthetic_s0_keys}, types::Torsion};
+use crate::{data::naming::{generate_names_from_tag, generating_tag, name_get_tag}, domain::model::SyntheticSS, solve::{action::Action, issues::Issue}, types::Torsion};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct GeneratorChange {
+pub struct GeneratorChange {
     g: usize,
     torsion: Torsion,
 }
 
 
 // fn apply_e1_change(data: &mut SyntheticSS, g: usize, torsion: Torsion) -> Result<(),String> {
-//     if let Some(&source) = data.in_diffs.get(&g) {
+//     if let Some(&sources) = data.in_diffs.get(&g) {
 //         let t = data.model.original_torsion(source);
 
 //         // The only thing which is relevant to check here is if the source lives while the target is dead
@@ -43,6 +43,8 @@ struct GeneratorChange {
 
 //     Ok(idxs)
 // }
+
+
 
 // fn apply_option(data: &mut SyntheticSS, option: &Vec<GeneratorChange>) -> Result<Vec<Vec<usize>>, String> {
 //     let mut idxss = vec![]; 
@@ -90,20 +92,20 @@ struct GeneratorChange {
 //     }
 // }
 
-// fn get_all_elts_belonging_to_this_e1(data: &SyntheticSS, g: usize) -> Vec<usize> {
-//     let name = data.model.name(g);
-//     let tag = name_get_tag(&name);
+fn get_all_elts_belonging_to_this_e1(data: &SyntheticSS, g: usize) -> Vec<usize> {
+    let name = data.model.name(g);
+    let tag = name_get_tag(&name);
     
-//     let mut idxs = vec![];
-//     for n in generate_names_from_tag(tag) {
-//         if let Some(id) = data.model.try_index(&n) {
-//             idxs.push(id);
-//         } else {
-//             break; 
-//         };
-//     }
-//     idxs
-// }
+    let mut idxs = vec![];
+    for n in generate_names_from_tag(tag) {
+        if let Some(id) = data.model.try_index(&n) {
+            idxs.push(id);
+        } else {
+            break; 
+        };
+    }
+    idxs
+}
 
 // fn induct(data: &mut SyntheticSS, issues: &Vec<SyntheticE1PageIssue>, issue: usize, depth: usize, max_depth: usize, revert_on_return: bool) -> Result<(), String> {
 //     if issue >= issues.len() { return Ok(()) }
@@ -189,7 +191,7 @@ struct GeneratorChange {
 //     Ok(())
 // }
 
-// pub fn solve_e1_issues(data: &mut SyntheticSS, mut issues: Vec<SyntheticE1PageIssue>) {
+// pub fn solve_e1_issues(data: &mut SyntheticSS, mut issues: Vec<Issue>) {
 //     // It is important that this list is sorted
 //     // Because that way i can ALWAYS guarantee that i kill a source before i kill a potential target.
 //     issues.sort_by_key(|x| (x.stem, x.af));
@@ -201,33 +203,55 @@ struct GeneratorChange {
 //     println!("{:?}", res);
 // }
 
-// fn get_e1_solutions(data: &mut SyntheticSS, issue: &SyntheticE1PageIssue) -> Vec<Vec<GeneratorChange>> {
-//     // Give a list of options which one could / should change
-//     // This is the only time i (should) do this forward approach. Aka giving potential solutions.
-//     // In other cases i should just "go" and see if some option resolves some issue
+pub fn get_all_e1_solutions(
+    data: &SyntheticSS,
+    issues: &Vec<Issue>,
+) -> Vec<Vec<Action>> {
+    let sols: Vec<_> = issues
+        .iter()
+        .map(|i| get_e1_solutions(data, i))
+        .collect();
 
-//     // The solutions should be some combinatorial thing 
-//     // It should be "unique" permutations!
+    sols.iter()
+        .map(|s| 0..s.len())
+        .multi_cartesian_product()
+        .map(|idxs| {
+            sols.iter()
+                .zip(idxs)
+                .flat_map(|(sol, i)| sol[i].clone())
+                .collect()
+        })
+        .collect()
+}
 
-//     let stem = issue.stem + 1;
+fn get_e1_solutions(data: &SyntheticSS, issue: &Issue) -> Vec<Vec<Action>> {
+    // Give a list of options which one could / should change
+    // This is the only time i (should) do this forward approach. Aka giving potential solutions.
+    // In other cases i should just "go" and see if some option resolves some issue
 
-//     let stem_af_to_index = data.model.gens_id_in_stem_af(stem, issue.af);
+    // The solutions should be some combinatorial thing 
+    // It should be "unique" permutations!
 
-//     let mut changes = vec![];
-
-//     // TODO: This could be faster ?
-//     for p in issue.expected.iter().permutations(issue.expected.len()).unique() {
-//         let mut change = vec![];
-//         for (id, t) in p.into_iter().enumerate() {
-//             if *t != Torsion::default() {
-//                 let real_id = stem_af_to_index[id];
-//                 change.push(GeneratorChange {
-//                     g: real_id,
-//                     torsion: *t,
-//                 });
-//             }
-//         }
-//         changes.push(change);
-//     } 
-//     changes
-// }
+    if let Issue::SyntheticE1Page { stem, af, expected, observed } = issue {
+        let stem = stem + 1;
+    
+        let stem_af_to_index = data.model.gens_id_in_stem_af(stem, *af);
+    
+        let mut changes = vec![];
+    
+        for p in expected.iter().permutations(expected.len()).unique() {
+            let mut change = vec![];
+            for (id, &torsion) in p.into_iter().enumerate() {
+                if torsion != Torsion::default() {
+                    let real_id = stem_af_to_index[id];
+                    let tag = name_get_tag(data.model.name(real_id)).to_string();
+                    change.push(Action::SetE1 { tag, torsion, proof: "".to_string() });
+                }
+            }
+            changes.push(change);
+        } 
+        changes
+    } else {
+        panic!("Can only call this function on Synthetic E1 error")
+    }
+}

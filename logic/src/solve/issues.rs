@@ -309,7 +309,7 @@ pub fn synthetic_issue_is_tau_structure_issue(issues: &Vec<Issue>) -> bool {
                 }
             }
         } else {
-            return false;
+            return true;
         }
     }
     count.iter().all(|x| *x == 0)
