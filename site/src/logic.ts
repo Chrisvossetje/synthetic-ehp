@@ -92,6 +92,7 @@ type SyntheticCache = {
     truncation: number | undefined;
     bottomTruncation: number | undefined;
     limit_x: number | undefined;
+    showFakeData: boolean;
     pagesByGenerator: Record<string, GeneratorPageState[]>;
     generatorNames: string[];
     allDiffs: Differential[];
@@ -201,6 +202,10 @@ function buildYByName(data: SyntheticEHP): Record<string, number> {
     return yByName;
 }
 
+function shouldIncludeKind(kind: "Real" | "Fake" | "Unknown", data: SyntheticEHP): boolean {
+    return viewSettings.showFakeData || kind !== "Fake";
+}
+
 function getDiffPage(diff: Differential, yByName: Record<string, number>): number | undefined {
     if (Number.isFinite(diff.d)) {
         return diff.d;
@@ -254,6 +259,7 @@ function buildSyntheticCache(
 
     const diffsByPage: Differential[][] = Array.from({ length: MAX_STEM + 1 }, () => []);
     data.differentials.forEach((diff) => {
+        if (!shouldIncludeKind(diff.kind, data)) return;
         // if (diff.kind !== "Real") return;
         const diffPage = getDiffPage(diff, yByName);
         if (!Number.isFinite(diffPage)) return;
@@ -262,6 +268,7 @@ function buildSyntheticCache(
     });
     const internalTauByPage: InternalTauMult[][] = Array.from({ length: MAX_STEM + 1 }, () => []);
     data.internal_tau_mults.forEach((tm) => {
+        if (!shouldIncludeKind(tm.kind, data)) return;
         if (tm.kind !== "Real") return;
         if (!Number.isFinite(tm.page)) return;
         if (tm.page < 0 || tm.page > MAX_STEM) return;
@@ -270,6 +277,7 @@ function buildSyntheticCache(
 
     const externalTaus: ExternalTauMult[] = [];
     data.external_tau_mults.forEach((tm) => {
+        if (!shouldIncludeKind(tm.kind, data)) return;
         if (tm.kind !== "Real") return;
         externalTaus.push(tm);
     });
@@ -342,6 +350,7 @@ function buildSyntheticCache(
         truncation,
         bottomTruncation,
         limit_x,
+        showFakeData: viewSettings.showFakeData,
         pagesByGenerator,
         generatorNames,
         allDiffs,
@@ -360,7 +369,8 @@ function getSyntheticCache(
         syntheticCache.data === data &&
         syntheticCache.truncation === truncation &&
         syntheticCache.bottomTruncation === bottomTruncation &&
-        syntheticCache.limit_x === limit_x
+        syntheticCache.limit_x === limit_x &&
+        syntheticCache.showFakeData === viewSettings.showFakeData
     ) {
         return syntheticCache;
     }
@@ -398,7 +408,8 @@ export let viewSettings = {
     page: 1,
     category: Category.Synthetic, // 0: Synthetic, 1: Algebraic, 2: Geometric
     truncation: undefined as number | undefined,
-    bottomTruncation: undefined as number | undefined
+    bottomTruncation: undefined as number | undefined,
+    showFakeData: true
 };
 
 // Shared selection across all modes/data sources.
@@ -555,6 +566,9 @@ export function get_filtered_data(
 
     // Find all generators killed by differentials before this page
     for (const diff of data.differentials) {
+        if (!shouldIncludeKind(diff.kind, data)) {
+            continue;
+        }
         const diffPage = getDiffPage(diff, yByName);
         if (!Number.isFinite(diffPage)) {
             continue;

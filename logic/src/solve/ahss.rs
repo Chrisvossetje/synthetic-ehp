@@ -53,7 +53,7 @@ pub fn find_ahss_issues(data: &SyntheticSS, stem: i32) -> Result<(), Vec<Issue>>
             let pages = try_compute_pages(data, bot_trunc, top_trunc, stem, stem)?;
 
             verify_convergence(&data, &pages, bot_trunc, top_trunc, stem).map_err(|x| {
-                println!("Tau issues: {}", synthetic_issue_is_tau_structure_issue(&x));
+                println!("Tau issues: {}", synthetic_issue_is_tau_structure_issue(&x).0);
                 x
             })?;
         } else {

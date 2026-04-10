@@ -78,6 +78,8 @@ pub struct ExternalTauMult {
     pub from: String,
     pub to: String,
 
+    pub af: i32,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<String>,
 
@@ -159,6 +161,7 @@ pub fn write_typescript_file(
                 ext_tau_mults.push(ExternalTauMult {
                     from: from.to_string(),
                     to: to.to_string(),
+                    af: e_t.af,
                     proof,
                     kind: Kind::Real,
                 });
@@ -170,9 +173,6 @@ pub fn write_typescript_file(
         let d_y = data.model.y(*from) - data.model.y(*to);
         let d_stem = data.model.stem(*from) - data.model.stem(*to);
         let kind = if p.is_some() { Kind::Fake } else { Kind::Unknown };
-        if kind == Kind::Fake {
-            continue; //TODO REMOVE
-        }
         if d_y == 0 {
             int_tau_mults.push(InternalTauMult {
                 from: data.model.name(*from).to_string(),
@@ -185,6 +185,7 @@ pub fn write_typescript_file(
             ext_tau_mults.push(ExternalTauMult {
                 from: data.model.name(*from).to_string(),
                 to: data.model.name(*to).to_string(),
+                af: 0,
                 kind,
                 proof: p.clone(),
             });

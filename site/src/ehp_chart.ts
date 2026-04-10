@@ -33,6 +33,29 @@ function getAllTauMults(data: SyntheticEHP) {
     return [...data.internal_tau_mults, ...data.external_tau_mults];
 }
 
+function shouldDisplayKind(kind: "Real" | "Fake" | "Unknown"): boolean {
+    return viewSettings.showFakeData || kind !== "Fake";
+}
+
+function shouldDisplayTauMult(
+    kind: "Real" | "Fake" | "Unknown",
+    gens: Record<string, [number | undefined, number]>,
+    from: string,
+    to: string
+): boolean {
+    const fromEntry = gens[from];
+    const toEntry = gens[to];
+    if (!fromEntry || !toEntry) {
+        return false;
+    }
+
+    if (kind === "Real") {
+        return survivesFilteredGenerator(fromEntry) && survivesFilteredGenerator(toEntry);
+    }
+
+    return true;
+}
+
 export function getComputedDiff(from: string, to: string): Differential | undefined {
     return displayedDiffsByKey.get(`${from}->${to}`) ?? computedDiffsByKey.get(`${from}->${to}`);
 }
@@ -247,6 +270,9 @@ export function update_ehp_chart() {
     cacheComputedDiffs(diffs);
 
     const real_diffs = diffs.filter((d) => {
+        if (!shouldDisplayKind(d.kind)) {
+            return false;
+        }
         if (!gens[d.from] || !gens[d.to]) {
             return false;
         }
@@ -297,17 +323,23 @@ export function update_ehp_chart() {
     // Display tau multiplications only when both generators are alive
     if (viewSettings.category == Category.Synthetic) {
         activeData.internal_tau_mults.forEach((t) => {
+            if (!shouldDisplayKind(t.kind)) {
+                return;
+            }
             if (!viewSettings.allDiffs && t.page !== viewSettings.page) {
                 return;
             }
-            if (survivesFilteredGenerator(gens[t.from]) && survivesFilteredGenerator(gens[t.to])) {
+            if (shouldDisplayTauMult(t.kind, gens as Record<string, [number | undefined, number]>, t.from, t.to)) {
                 ehpChart.display_tau_mult(t.from, t.to, true);
             }
         });
 
         if (viewSettings.allDiffs || viewSettings.page > 999) {
             activeData.external_tau_mults.forEach((t) => {
-                if (survivesFilteredGenerator(gens[t.from]) && survivesFilteredGenerator(gens[t.to])) {
+                if (!shouldDisplayKind(t.kind)) {
+                    return;
+                }
+                if (shouldDisplayTauMult(t.kind, gens as Record<string, [number | undefined, number]>, t.from, t.to)) {
                     ehpChart.display_tau_mult(t.from, t.to, true);
                 }
             });

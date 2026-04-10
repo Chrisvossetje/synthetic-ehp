@@ -570,7 +570,8 @@ export class Chart {
                 return "";
             }
 
-            return this.generate_tau_mult(from_loc[0], from_loc[1], to_loc[0], to_loc[1], tauMult.from, tauMult.to, "");
+            const style = tauMult.kind !== "Real" && this.mode !== ChartMode.ASS ? "stroke-dasharray: 0.025,0.02;" : "";
+            return this.generate_tau_mult(from_loc[0], from_loc[1], to_loc[0], to_loc[1], tauMult.from, tauMult.to, style);
         }).join("\n");
     }
 

@@ -49,15 +49,16 @@ pub struct SyntheticSS {
     pub proven_from_to: HashMap<FromTo, Option<String>>,
     pub disproven_from_to: HashMap<FromTo, Option<String>>,
 
-    pub temp_fakes: HashSet<FromTo>,
-
     // Remember incoming/outgoing stuff
-    pub in_diffs: HashMap<usize, Vec<usize>>,
-    pub out_diffs: HashMap<usize, Vec<usize>>,
+    pub in_diffs: Vec<Vec<usize>>,
+    pub out_diffs: Vec<Vec<usize>>,
+
+    pub out_taus: Vec<Vec<usize>>,
 }
 
 impl SyntheticSS {
     pub fn empty(e1: E1) -> Self {
+        let len = e1.gens().len();
         Self {
             model: e1,
             diffs_page: vec![vec![]; (MAX_STEM + 1) as usize],
@@ -65,9 +66,9 @@ impl SyntheticSS {
             external_tau_page: vec![vec![vec![]; (MAX_STEM + 1) as usize]; (MAX_STEM + 1) as usize],
             proven_from_to: HashMap::default(),
             disproven_from_to: HashMap::default(),
-            temp_fakes: HashSet::default(),
-            in_diffs: HashMap::default(),
-            out_diffs: HashMap::default(),
+            in_diffs: vec![vec![]; len],
+            out_diffs: vec![vec![]; len],
+            out_taus: vec![vec![]; len],
         }
     }
 
@@ -78,13 +79,12 @@ impl SyntheticSS {
             match kind {
                 Kind::Real => {
                     self.diffs_page[d_y as usize].push(Diff { from, to });
-                    self.in_diffs.entry(to).or_insert(vec![]).push(from);
-                    self.out_diffs.entry(from).or_insert(vec![]).push(to);
+                    self.in_diffs[to].push(from);
+                    self.out_diffs[from].push(to);
                     self.proven_from_to.insert((from, to), proof);
                 },
                 _ => {
                     self.disproven_from_to.insert((from, to), proof);
-                    
                 },
             }
         }
@@ -111,6 +111,7 @@ impl SyntheticSS {
                     let y_from = self.model.y(from);
                     let y_diff = self.model.y(from) - self.model.y(to);
                     self.external_tau_page[y_from as usize][y_diff as usize].push(ExtTauMult { from, to, af });
+                    self.out_taus[from].push(to);
                     self.proven_from_to.insert((from, to), proof);
                 },
                 _ => {

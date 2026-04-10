@@ -30,22 +30,22 @@ pub enum Action {
     AddDiff {
         from: String,
         to: String,
-        proof: Option<String>,
         kind: Kind,
+        proof: Option<String>,
     },
     AddInt {
         from: String,
         to: String,
         page: i32,
-        proof: String,
         kind: Kind,
+        proof: String,
     },
     AddExt {
         from: String,
         to: String,
         af: i32,
-        proof: String,
         kind: Kind,
+        proof: String,
     },
     SetE1 {
         tag: String,

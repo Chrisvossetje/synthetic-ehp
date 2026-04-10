@@ -1,20 +1,414 @@
-AddDiff { from: "4 4 1 1 1[5]", to: "1 1 2 4 1 1 1[4]", proof: Some("Tau Issue: false | SyntheticConvergence { bot_trunc: 3, top_trunc: 5, stem: 15, af: 8, expected: [Torsion(None)], observed: [Torsion(Some(1))] }"), kind: Fake }
-AddDiff { from: "3 3 3[7]", to: "2 4 1 1 1[6]", proof: Some("Hopf Invariant One."), kind: Fake }
-AddDiff { from: "3 3 3[7]", to: "1 2 4 1 1 1[5]", proof: Some("Hopf Invariant One."), kind: Fake }
-AddDiff { from: "1 2 3 3[7]", to: "1 2 4 1 1 1[5]", proof: Some("Hopf Invariant One."), kind: Fake }
-AddDiff { from: "3 3 3[7]", to: "1 1 2 4 1 1 1[4]", proof: Some("Hopf Invariant One."), kind: Fake }
-AddDiff { from: "1 2 3 3[7]", to: "1 1 2 4 1 1 1[4]", proof: Some("Hopf Invariant One."), kind: Fake }
-AddDiff { from: "2 4 1 1 1[7]", to: "1 1 2 4 1 1 1[4]", proof: Some("Hopf Invariant One."), kind: Fake }
-AddDiff { from: "7[9]", to: "4 1 1 1[8]", proof: Some("Tau Issue: true | AlgebraicConvergence { bot_trunc: 5, top_trunc: 9, stem: 15, af: 3, expected: 0, observed: 1 }"), kind: Fake }
-AddDiff { from: "3 3[10]", to: "4 1 1 1[8]", proof: Some("Tau Issue: true | AlgebraicConvergence { bot_trunc: 6, top_trunc: 10, stem: 15, af: 4, expected: 0, observed: 1 }"), kind: Fake }
-AddDiff { from: "3[13]", to: "1 1 1[12]", proof: Some("Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 4, expected: [Torsion(None)], observed: [Torsion(Some(1))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 2, expected: [], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 3, expected: [Torsion(None)], observed: [Torsion(None), Torsion(None)] }"), kind: Fake }
-AddDiff { from: "3[13]", to: "4 1 1 1[8]", proof: Some("Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 2, expected: [], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 3, expected: [Torsion(None)], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 5, expected: [Torsion(None), Torsion(None)], observed: [Torsion(None), Torsion(Some(2))] }"), kind: Fake }
-AddDiff { from: "3[13]", to: "2 4 1 1 1[6]", proof: Some("Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 6, expected: [Torsion(None)], observed: [Torsion(Some(3))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 3, expected: [Torsion(None)], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 2, expected: [], observed: [Torsion(None)] }"), kind: Fake }
-AddDiff { from: "3[13]", to: "1 2 4 1 1 1[5]", proof: Some("Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 2, expected: [], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 3, expected: [Torsion(None)], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 7, expected: [Torsion(None)], observed: [Torsion(Some(4))] }"), kind: Fake }
-AddDiff { from: "3[13]", to: "1 1 2 4 1 1 1[4]", proof: Some("Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 8, expected: [Torsion(None)], observed: [Torsion(Some(5))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 3, expected: [Torsion(None)], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 2, expected: [], observed: [Torsion(None)] }"), kind: Fake }
-AddDiff { from: "3[13]", to: "6 2 3 3[1]", proof: Some("Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 2, expected: [], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 3, expected: [Torsion(None)], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 5, expected: [Torsion(None), Torsion(None)], observed: [Torsion(None), Torsion(Some(2))] }"), kind: Fake }
-AddDiff { from: "1 1[14]", to: "4 1 1 1[8]", proof: Some("Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 2, expected: [], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 3, expected: [Torsion(None)], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 5, expected: [Torsion(None), Torsion(None)], observed: [Torsion(None), Torsion(Some(1))] }"), kind: Fake }
-AddDiff { from: "1 1[14]", to: "2 4 1 1 1[6]", proof: Some("Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 2, expected: [], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 6, expected: [Torsion(None)], observed: [Torsion(Some(2))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 3, expected: [Torsion(None)], observed: [Torsion(None), Torsion(None)] }"), kind: Fake }
-AddDiff { from: "1 1[14]", to: "1 2 4 1 1 1[5]", proof: Some("Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 2, expected: [], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 3, expected: [Torsion(None)], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 7, expected: [Torsion(None)], observed: [Torsion(Some(3))] }"), kind: Fake }
-AddDiff { from: "1 1[14]", to: "1 1 2 4 1 1 1[4]", proof: Some("Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 8, expected: [Torsion(None)], observed: [Torsion(Some(4))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 3, expected: [Torsion(None)], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 2, expected: [], observed: [Torsion(None)] }"), kind: Fake }
-AddDiff { from: "1 1[14]", to: "6 2 3 3[1]", proof: Some("Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 5, expected: [Torsion(None), Torsion(None)], observed: [Torsion(None), Torsion(Some(1))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 2, expected: [], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 15, af: 3, expected: [Torsion(None)], observed: [Torsion(None), Torsion(None)] }"), kind: Fake }
+AddInt { from: "6 5 3[2]", to: "6 2 3 3[2]", page: 2, kind: Real, proof: "Unique solution to RP1_2" }
+AddDiff { from: "2 3 5 7 3 3[2]", to: "2 4 1 1 2 4 3 3 3[1]", kind: Real, proof: Some("Custom: By convergence on RP3_5 stem 26.") }
+AddDiff { from: "3 5 7 3 3[10]", to: "1 2 3 4 4 1 1 2 4 1 1 1[5]", kind: Fake, proof: Some("Program can't figure this out.") }
+AddDiff { from: "3[3]", to: "1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7[3]", to: "4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7[3]", to: "2 3 3[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 3[4]", to: "4 1 1 1[2]", kind: Fake, proof: Some("For RP2_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[7]", to: "4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3[7]", to: "2 3 3[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 3 3[2]", to: "2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 3[3]", to: "1 2 3 3[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "5 3[3]", to: "2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 3 3[3]", to: "2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 3[5]", to: "1 2 3 3[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 3[5]", to: "2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 3 3[3]", to: "2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 3 3[3]", to: "1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "1 2 3 3[3]", to: "1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 3[6]", to: "4 1 1 1[4]", kind: Unknown, proof: Some("We don't have enough Synthetic information to deduce this differential.") }
+AddDiff { from: "4 4 1 1 1[3]", to: "1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7[7]", to: "3 3 3[4]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "1 1 1[12]", to: "4 4 1 1 1[3]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 1[13]", to: "1 2 3 3[5]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 1[13]", to: "4 4 1 1 1[3]", kind: Real, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1[14]", to: "2 3 3[6]", kind: Fake, proof: Some("Issue at RP1_14: [SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 14, af: 5, expected: [Torsion(Some(2))], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 14, af: 4, expected: [Torsion(None)], observed: [Torsion(Some(1))] }]") }
+AddDiff { from: "1[14]", to: "1 2 3 3[5]", kind: Real, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "[15]", to: "5 3[6]", kind: Real, proof: Some("For RP5_15 the F_2 vector space generators don't add up.") }
+SetE1 { tag: "3 4 4 1 1 1", torsion: Torsion(Some(2)), proof: "Only one generator in stem 15, af 7. (auto)" }
+SetE1 { tag: "6 5 3", torsion: Torsion(Some(1)), proof: "Only one generator in stem 15, af 4. (auto)" }
+SetE1 { tag: "5 1 2 3 3", torsion: Torsion(Some(2)), proof: "Only one generator in stem 15, af 6. (auto)" }
+AddDiff { from: "3[13]", to: "4 1 1 1[8]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[13]", to: "2 4 1 1 1[6]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[13]", to: "1 2 4 1 1 1[5]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[13]", to: "1 1 2 4 1 1 1[4]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[13]", to: "6 2 3 3[1]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+SetE1 { tag: "15", torsion: Torsion(Some(0)), proof: "Only one generator in stem 16, af 2. (auto)" }
+SetE1 { tag: "14 1", torsion: Torsion(Some(0)), proof: "Only one generator in stem 16, af 3. (auto)" }
+SetE1 { tag: "13 1 1", torsion: Torsion(Some(0)), proof: "Only one generator in stem 16, af 4. (auto)" }
+AddExt { from: "3 4 4 1 1 1[2]", to: "12 1 1 1[1]", af: 6, kind: Real, proof: "Issue at RP1_2: [SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 16, af: 5, expected: [], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 16, af: 7, expected: [Torsion(None)], observed: [Torsion(Some(2))] }]" }
+AddDiff { from: "6 2 3 3[3]", to: "3 4 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7 7[3]", to: "12 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7 7[3]", to: "2 4 3 3 3[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 3 3[8]", to: "12 1 1 1[1]", kind: Fake, proof: Some("Issue at RP1_8: [SyntheticConvergence { bot_trunc: 1, top_trunc: 8, stem: 16, af: 7, expected: [Torsion(None)], observed: [Torsion(Some(2))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 8, stem: 16, af: 6, expected: [Torsion(None), Torsion(Some(1))], observed: [Torsion(None), Torsion(None)] }]") }
+AddDiff { from: "3 3 3[8]", to: "2 4 3 3 3[1]", kind: Real, proof: Some("For RP1_8 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 3[11]", to: "12 1 1 1[1]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+SetE1 { tag: "1 2 4 3 3 3", torsion: Torsion(Some(1)), proof: "Only one generator in stem 17, af 7. (auto)" }
+AddDiff { from: "13 3[2]", to: "2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddDiff { from: "12 1 1 1[3]", to: "4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 4 3 3 3[3]", to: "4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "12 1 1 1[3]", to: "2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 4 3 3 3[3]", to: "2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7 7[4]", to: "2 4 3 3 3[2]", kind: Fake, proof: Some("For RP2_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 5 3[4]", to: "2 4 3 3 3[2]", kind: Real, proof: Some("For RP2_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[4]", to: "4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP2_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[4]", to: "13 3[1]", kind: Fake, proof: Some("For RP1_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[4]", to: "2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "4 4 1 1 1[7]", to: "4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "4 4 1 1 1[7]", to: "2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 3 3[9]", to: "4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 3 3[9]", to: "2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 3[10]", to: "6 2 3 3[3]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 3[10]", to: "4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 3[10]", to: "2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7[11]", to: "6 2 3 3[3]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7[11]", to: "4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7[11]", to: "2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+SetE1 { tag: "2 2 4 3 3 3", torsion: Torsion(Some(1)), proof: "Only one generator in stem 18, af 7. (auto)" }
+SetE1 { tag: "1 1 2 4 3 3 3", torsion: Torsion(Some(1)), proof: "Only one generator in stem 18, af 8. (auto)" }
+SetE1 { tag: "8 3 3 3", torsion: Torsion(Some(0)), proof: "Only one generator in stem 18, af 5. (auto)" }
+AddDiff { from: "11 3 3[2]", to: "3 6 2 3 3[1]", kind: Fake, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 3 3[2]", to: "1 2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 3 3[2]", to: "2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddExt { from: "1 2 4 3 3 3[2]", to: "3 6 2 3 3[1]", af: 7, kind: Real, proof: "Issue at RP1_2: [SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 18, af: 7, expected: [Torsion(None)], observed: [Torsion(Some(1))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 18, af: 6, expected: [], observed: [Torsion(None)] }]" }
+AddDiff { from: "13 3[3]", to: "2 3 4 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "13 3[3]", to: "3 6 2 3 3[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "13 3[3]", to: "1 2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "13 3[3]", to: "2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 3 4 4 1 1 1[3]", to: "2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 4 3 3 3[4]", to: "3 6 2 3 3[1]", kind: Real, proof: Some("For RP1_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[5]", to: "12 1 1 1[3]", kind: Fake, proof: Some("For RP3_5 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[5]", to: "2 3 4 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[5]", to: "1 2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[5]", to: "2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "2 4 1 1 1[10]", to: "12 1 1 1[3]", kind: Real, proof: Some("Issue at RP3_10: [AlgebraicConvergence { bot_trunc: 3, top_trunc: 10, stem: 18, af: 5, expected: 1, observed: 2 }]") }
+SetE1 { tag: "4 5 3 3 3", torsion: Torsion(Some(0)), proof: "Only one generator in stem 19, af 6. (auto)" }
+SetE1 { tag: "5 7 3 3", torsion: Torsion(Some(0)), proof: "" }
+AddDiff { from: "9 3 3 3[2]", to: "1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 3 3[3]", to: "3 6 2 3 3[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "11 3 3[3]", to: "1 2 3 4 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 6 2 3 3[3]", to: "1 2 3 4 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "11 3 3[3]", to: "2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 6 2 3 3[3]", to: "2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "11 3 3[3]", to: "1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 6 2 3 3[3]", to: "1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "1 2 3 4 4 1 1 1[3]", to: "1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "12 1 1 1[5]", to: "2 3 4 4 1 1 1[3]", kind: Real, proof: Some("For RP3_5 the F_2 vector space generators don't add up.") }
+AddExt { from: "6 5 3[5]", to: "13 3[3]", af: 4, kind: Real, proof: "Issue at RP3_5: [SyntheticConvergence { bot_trunc: 3, top_trunc: 5, stem: 19, af: 3, expected: [Torsion(None)], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 3, top_trunc: 5, stem: 19, af: 4, expected: [Torsion(None)], observed: [Torsion(Some(1))] }]" }
+AddDiff { from: "2 4 3 3 3[5]", to: "2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "2 4 3 3 3[5]", to: "1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[6]", to: "4 1 1 2 4 1 1 1[4]", kind: Unknown, proof: None }
+AddDiff { from: "6 5 3[6]", to: "4 1 1 2 4 1 1 1[4]", kind: Fake, proof: Some("For RP3_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[6]", to: "13 3[3]", kind: Real, proof: Some("For RP3_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 5 3[6]", to: "3 6 2 3 3[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 5 3[6]", to: "2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 5 3[6]", to: "1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[2]", to: "4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 7[3]", to: "9 3 3 3[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "11 7[3]", to: "1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "11 7[3]", to: "4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7 7[7]", to: "3 6 2 3 3[3]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "6 2 3 3[7]", to: "3 6 2 3 3[3]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "5 7 7[3]", to: "1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "4 4 1 1 2 4 1 1 1[3]", to: "1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "13 3[6]", to: "3 6 2 3 3[4]", kind: Fake, proof: Some("For RP3_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "13 3[6]", to: "6 6 5 3[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[8]", to: "3 6 2 3 3[4]", kind: Fake, proof: Some("For RP1_8 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[8]", to: "11 7[3]", kind: Fake, proof: Some("For RP3_8 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "7 7[8]", to: "5 7 7[2]", kind: Fake, proof: Some("For RP1_8 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[8]", to: "6 6 5 3[1]", kind: Fake, proof: Some("For RP1_8 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 2 3 3[13]", to: "3 6 2 3 3[4]", kind: Fake, proof: Some("For RP3_13 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "1 2 3 3[13]", to: "6 6 5 3[1]", kind: Fake, proof: Some("For RP1_13 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "5 3[14]", to: "3 6 2 3 3[4]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 3[14]", to: "6 6 5 3[1]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7[15]", to: "3 6 2 3 3[4]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7[15]", to: "5 7 7[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7[15]", to: "6 6 5 3[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7 7 7[2]", to: "3 5 7 3 3[1]", kind: Fake, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 6 5 3[3]", to: "2 4 5 3 3 3[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "5 7 7[4]", to: "2 4 5 3 3 3[2]", kind: Fake, proof: Some("For RP2_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[4]", to: "3 5 7 3 3[1]", kind: Fake, proof: Some("For RP1_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 7[5]", to: "4 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("For RP3_5 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 7[5]", to: "2 4 5 3 3 3[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 7[5]", to: "3 5 7 3 3[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 6 2 3 3[6]", to: "4 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("For RP3_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 6 2 3 3[6]", to: "2 4 5 3 3 3[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 6 2 3 3[6]", to: "3 5 7 3 3[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[9]", to: "1 2 3 4 4 1 1 1[5]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[9]", to: "9 3 3 3[4]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[9]", to: "4 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[9]", to: "2 4 5 3 3 3[2]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[9]", to: "3 5 7 3 3[1]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 1 2 4 1 1 1[12]", to: "4 4 1 1 2 4 1 1 1[3]", kind: Real, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 2 4 1 1 1[13]", to: "1 2 3 4 4 1 1 1[5]", kind: Real, proof: Some("Issue at RP2_14: [AlgebraicConvergence { bot_trunc: 2, top_trunc: 14, stem: 22, af: 7, expected: 0, observed: 1 }]") }
+AddDiff { from: "2 4 1 1 1[14]", to: "2 3 4 4 1 1 1[6]", kind: Real, proof: Some("For RP5_23 the F_2 vector space generators don't add up.") }
+AddExt { from: "2 3 4 4 1 1 1[6]", to: "2 4 5 3 3 3[2]", af: 8, kind: Real, proof: "Issue at RP2_14: [AlgebraicConvergence { bot_trunc: 2, top_trunc: 14, stem: 22, af: 7, expected: 0, observed: 1 }]" }
+AddDiff { from: "4 1 1 1[16]", to: "3 4 4 1 1 1[8]", kind: Real, proof: Some("Issue at RP4_16: [AlgebraicConvergence { bot_trunc: 4, top_trunc: 16, stem: 22, af: 6, expected: 0, observed: 1 }]") }
+AddDiff { from: "4 1 1 1[16]", to: "12 1 1 1[7]", kind: Real, proof: Some("For RP7_16 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "1 1 1[20]", to: "4 4 1 1 1[11]", kind: Real, proof: Some("Issue at RP5_20: [AlgebraicConvergence { bot_trunc: 5, top_trunc: 20, stem: 22, af: 5, expected: 0, observed: 1 }]") }
+AddDiff { from: "1 1[21]", to: "1 2 3 3[13]", kind: Real, proof: Some("For RP6_21 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddExt { from: "1 2 3 3[13]", to: "6 5 3[8]", af: 5, kind: Real, proof: "Issue at RP8_21: [AlgebraicConvergence { bot_trunc: 8, top_trunc: 21, stem: 22, af: 4, expected: 1, observed: 2 }]" }
+SetE1 { tag: "3 4 4 1 1 2 4 1 1 1", torsion: Torsion(Some(1)), proof: "Only one generator in stem 23, af 11. (auto)" }
+SetE1 { tag: "5 1 2 3 4 4 1 1 1", torsion: Torsion(Some(1)), proof: "Only one generator in stem 23, af 10. (auto)" }
+AddDiff { from: "3 5 7 7[2]", to: "6 2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7 7[3]", to: "3 5 7 3 3[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7 7 7[3]", to: "6 2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 5 7 3 3[3]", to: "6 2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 4 5 3 3 3[4]", to: "6 2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[5]", to: "3 5 7 3 3[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[5]", to: "6 2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 6 2 3 3[7]", to: "1 1 2 4 1 1 2 4 1 1 1[4]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 6 2 3 3[7]", to: "6 2 3 4 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "6 5 3[10]", to: "3 6 2 3 3[6]", kind: Real, proof: Some("Issue at RP5_10: [AlgebraicConvergence { bot_trunc: 5, top_trunc: 10, stem: 23, af: 5, expected: 0, observed: 1 }]") }
+SetE1 { tag: "13 1 2 4 1 1 1", torsion: Torsion(Some(0)), proof: "Only one generator in stem 24, af 8. (auto)" }
+SetE1 { tag: "12 1 1 2 4 1 1 1", torsion: Torsion(Some(0)), proof: "Only one generator in stem 24, af 9. (auto)" }
+AddDiff { from: "4 5 7 7[2]", to: "8 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddExt { from: "3 4 4 1 1 2 4 1 1 1[2]", to: "2 4 1 1 2 4 3 3 3[1]", af: 11, kind: Fake, proof: "Issue at RP1_2: [SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 24, af: 11, expected: [Torsion(None)], observed: [Torsion(Some(3))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 24, af: 10, expected: [Torsion(Some(2))], observed: [Torsion(None)] }]" }
+AddExt { from: "3 4 4 1 1 2 4 1 1 1[2]", to: "8 4 1 1 2 4 1 1 1[1]", af: 11, kind: Real, proof: "Issue at RP1_2: [SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 24, af: 10, expected: [Torsion(Some(2))], observed: [Torsion(None), Torsion(Some(2))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 24, af: 11, expected: [Torsion(None)], observed: [Torsion(Some(1))] }]" }
+AddDiff { from: "3 5 7 7[3]", to: "6 2 3 4 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 5 7 7[3]", to: "8 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "6 2 3 4 4 1 1 1[3]", to: "8 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7 7 7[4]", to: "6 2 3 4 4 1 1 1[2]", kind: Fake, proof: Some("For RP2_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 3 3[4]", to: "6 2 3 4 4 1 1 1[2]", kind: Real, proof: Some("For RP2_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7 7[4]", to: "3 6 6 5 3[1]", kind: Fake, proof: Some("For RP1_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7 7[4]", to: "8 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[6]", to: "2 4 5 3 3 3[4]", kind: Fake, proof: Some("For RP3_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[6]", to: "3 6 6 5 3[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[6]", to: "8 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 7[7]", to: "2 4 5 3 3 3[4]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "11 7[7]", to: "3 5 7 7[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "11 7[7]", to: "4 5 7 7[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "11 7[7]", to: "3 6 6 5 3[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "11 7[7]", to: "8 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 6 2 3 3[8]", to: "2 4 5 3 3 3[4]", kind: Real, proof: Some("For RP1_8 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 1 2 4 3 3 3[8]", to: "2 4 1 1 2 4 3 3 3[1]", kind: Real, proof: Some("For RP1_8 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 2 4 3 3 3[9]", to: "6 2 3 4 4 1 1 1[2]", kind: Real, proof: Some("Issue at RP1_9: [AlgebraicConvergence { bot_trunc: 1, top_trunc: 9, stem: 24, af: 8, expected: 1, observed: 2 }]") }
+AddDiff { from: "7 7[11]", to: "3 6 2 3 3[7]", kind: Fake, proof: Some("Issue at RP6_11: [AlgebraicConvergence { bot_trunc: 6, top_trunc: 11, stem: 24, af: 6, expected: 0, observed: 1 }]") }
+AddDiff { from: "6 2 3 3[11]", to: "3 6 2 3 3[7]", kind: Real, proof: Some("Issue at RP6_11: [AlgebraicConvergence { bot_trunc: 6, top_trunc: 11, stem: 24, af: 6, expected: 0, observed: 1 }]") }
+AddDiff { from: "7 7[11]", to: "3 5 7 7[2]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[11]", to: "4 5 7 7[1]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[11]", to: "3 6 6 5 3[1]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7[11]", to: "8 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+SetE1 { tag: "1 2 4 1 1 2 4 3 3 3", torsion: Torsion(Some(1)), proof: "Only one generator in stem 25, af 11. (auto)" }
+AddDiff { from: "2 3 5 7 7[2]", to: "2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddDiff { from: "4 5 7 7[3]", to: "2 4 1 1 2 4 3 3 3[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 6 6 5 3[3]", to: "2 4 1 1 2 4 3 3 3[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "4 5 7 7[3]", to: "4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 6 6 5 3[3]", to: "4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "8 4 1 1 2 4 1 1 1[3]", to: "4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "4 5 7 7[3]", to: "2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 6 6 5 3[3]", to: "2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "8 4 1 1 2 4 1 1 1[3]", to: "2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 5 7 7[4]", to: "2 4 1 1 2 4 3 3 3[2]", kind: Fake, proof: Some("For RP2_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 2 3 4 4 1 1 1[4]", to: "2 4 1 1 2 4 3 3 3[2]", kind: Real, proof: Some("For RP2_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[4]", to: "4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP2_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[4]", to: "2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7 7[5]", to: "6 2 3 4 4 1 1 1[3]", kind: Fake, proof: Some("For RP3_5 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 3 3[5]", to: "6 2 3 4 4 1 1 1[3]", kind: Real, proof: Some("For RP3_5 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7 7[5]", to: "4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7 7[5]", to: "2 3 5 7 7[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7 7[5]", to: "2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "2 4 5 3 3 3[6]", to: "6 2 3 4 4 1 1 1[3]", kind: Real, proof: Some("For RP3_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "2 4 5 3 3 3[6]", to: "4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "2 4 5 3 3 3[6]", to: "2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[7]", to: "4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "4 4 1 1 2 4 1 1 1[7]", to: "4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "5 7 7[7]", to: "2 3 5 7 7[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "5 7 7[7]", to: "2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "4 4 1 1 2 4 1 1 1[7]", to: "2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "9 3 3 3[8]", to: "4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Unknown, proof: Some("We don't have enough Synthetic information to deduce this differential.") }
+AddExt { from: "1 1 2 4 3 3 3[8]", to: "2 3 5 7 3 3[2]", af: 8, kind: Real, proof: "Issue at RP2_8: [AlgebraicConvergence { bot_trunc: 2, top_trunc: 8, stem: 25, af: 7, expected: 0, observed: 1 }]" }
+AddExt { from: "1 2 4 3 3 3[9]", to: "3 5 7 3 3[4]", af: 7, kind: Real, proof: "Issue at RP4_9: [AlgebraicConvergence { bot_trunc: 4, top_trunc: 9, stem: 25, af: 6, expected: 0, observed: 1 }]" }
+AddExt { from: "6 5 3[11]", to: "11 7[7]", af: 4, kind: Real, proof: "Issue at RP7_11: [AlgebraicConvergence { bot_trunc: 7, top_trunc: 11, stem: 25, af: 3, expected: 1, observed: 2 }]" }
+AddDiff { from: "7 7[12]", to: "11 7[7]", kind: Real, proof: Some("Issue at RP7_12: [AlgebraicConvergence { bot_trunc: 7, top_trunc: 12, stem: 25, af: 3, expected: 1, observed: 2 }, AlgebraicConvergence { bot_trunc: 7, top_trunc: 12, stem: 25, af: 5, expected: 1, observed: 2 }]") }
+AddExt { from: "2 4 3 3 3[10]", to: "3 6 2 3 3[8]", af: 6, kind: Real, proof: "Issue at RP7_12: [AlgebraicConvergence { bot_trunc: 7, top_trunc: 12, stem: 25, af: 5, expected: 1, observed: 2 }]" }
+SetE1 { tag: "1 1 2 4 1 1 2 4 3 3 3", torsion: Torsion(Some(1)), proof: "Only one generator in stem 26, af 12. (auto)" }
+SetE1 { tag: "8 1 1 2 4 3 3 3", torsion: Torsion(Some(0)), proof: "Only one generator in stem 26, af 9. (auto)" }
+SetE1 { tag: "2 2 4 1 1 2 4 3 3 3", torsion: Torsion(Some(1)), proof: "Only one generator in stem 26, af 11. (auto)" }
+SetE1 { tag: "3 6 2 3 4 4 1 1 1", torsion: Torsion(Some(1)), proof: "Only one generator in stem 26, af 10. (auto)" }
+AddExt { from: "1 2 4 1 1 2 4 3 3 3[2]", to: "3 6 2 3 4 4 1 1 1[1]", af: 11, kind: Real, proof: "Issue at RP1_2: [SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 26, af: 10, expected: [], observed: [Torsion(Some(1))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 26, af: 11, expected: [Torsion(Some(2))], observed: [Torsion(Some(1))] }]" }
+AddDiff { from: "2 3 5 7 7[3]", to: "2 3 4 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 3 5 7 7[3]", to: "1 2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 3 5 7 7[3]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 3 4 4 1 1 2 4 1 1 1[3]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 4 1 1 2 4 3 3 3[4]", to: "3 6 2 3 4 4 1 1 1[1]", kind: Real, proof: Some("For RP1_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[5]", to: "8 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("For RP3_5 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[5]", to: "2 3 4 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 2 3 4 4 1 1 1[5]", to: "2 3 4 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[5]", to: "1 2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 2 3 4 4 1 1 1[5]", to: "1 2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[5]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 2 3 4 4 1 1 1[5]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 3 3[6]", to: "8 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("For RP3_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 3 3[6]", to: "2 3 4 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 3 3[6]", to: "1 2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 3 3[6]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 6 5 3[7]", to: "8 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "6 6 5 3[7]", to: "2 3 4 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "6 6 5 3[7]", to: "1 2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "6 6 5 3[7]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddExt { from: "2 2 4 3 3 3[9]", to: "3 5 7 3 3[5]", af: 7, kind: Real, proof: "Issue at RP5_9: [AlgebraicConvergence { bot_trunc: 5, top_trunc: 9, stem: 26, af: 6, expected: 2, observed: 3 }]" }
+AddExt { from: "2 2 4 3 3 3[9]", to: "3 6 6 5 3[3]", af: 7, kind: Unknown, proof: "" }
+AddExt { from: "2 2 4 3 3 3[9]", to: "2 4 5 3 3 3[6]", af: 7, kind: Real, proof: "Issue at RP3_9: [AlgebraicConvergence { bot_trunc: 3, top_trunc: 9, stem: 26, af: 6, expected: 3, observed: 4 }]" }
+AddDiff { from: "3 6 2 3 3[10]", to: "2 4 5 3 3 3[6]", kind: Real, proof: Some("Issue at RP5_10: [AlgebraicConvergence { bot_trunc: 5, top_trunc: 10, stem: 26, af: 6, expected: 1, observed: 2 }]") }
+AddExt { from: "2 4 5 3 3 3[6]", to: "3 5 7 3 3[5]", af: 7, kind: Real, proof: "Issue at RP5_10: [AlgebraicConvergence { bot_trunc: 5, top_trunc: 10, stem: 26, af: 6, expected: 1, observed: 2 }]" }
+AddDiff { from: "2 4 1 1 2 4 1 1 1[10]", to: "8 4 1 1 2 4 1 1 1[3]", kind: Real, proof: Some("Issue at RP3_10: [AlgebraicConvergence { bot_trunc: 3, top_trunc: 10, stem: 26, af: 10, expected: 1, observed: 2 }]") }
+SetE1 { tag: "2 2 2 2 4 5 3 3 3", torsion: Torsion(Some(0)), proof: "Only one generator in stem 27, af 10. (auto)" }
+SetE1 { tag: "6 2 4 5 3 3 3", torsion: Torsion(Some(0)), proof: "Only one generator in stem 27, af 8. (auto)" }
+SetE1 { tag: "4 2 2 4 5 3 3 3", torsion: Torsion(Some(0)), proof: "Only one generator in stem 27, af 9. (auto)" }
+AddDiff { from: "3 3 6 6 5 3[2]", to: "1 2 4 1 1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 2 3 4 4 1 1 2 4 1 1 1[3]", to: "1 2 4 1 1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 3 5 7 7[4]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Unknown, proof: Some("We don't have enough Synthetic information to deduce this differential.") }
+AddDiff { from: "3 6 6 5 3[5]", to: "2 3 4 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("For RP3_5 the F_2 vector space generators don't add up.") }
+AddDiff { from: "8 4 1 1 2 4 1 1 1[5]", to: "2 3 4 4 1 1 2 4 1 1 1[3]", kind: Real, proof: Some("For RP3_5 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 6 6 5 3[5]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 6 6 5 3[5]", to: "1 2 4 1 1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[6]", to: "2 4 1 1 2 4 3 3 3[4]", kind: Fake, proof: Some("For RP3_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[6]", to: "4 1 1 2 4 1 1 2 4 1 1 1[4]", kind: Fake, proof: Some("For RP3_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[6]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[6]", to: "1 2 4 1 1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7 7[7]", to: "2 4 1 1 2 4 3 3 3[4]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7 7 7[7]", to: "4 1 1 2 4 1 1 2 4 1 1 1[4]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7 7 7[7]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7 7 7[7]", to: "1 2 4 1 1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 4 5 3 3 3[8]", to: "2 4 1 1 2 4 3 3 3[4]", kind: Real, proof: Some("For RP1_8 the F_2 vector space generators don't add up.") }
+AddExt { from: "1 1 2 4 3 3 3[10]", to: "2 3 5 7 3 3[4]", af: 8, kind: Real, proof: "Issue at RP4_10: [AlgebraicConvergence { bot_trunc: 4, top_trunc: 10, stem: 27, af: 7, expected: 0, observed: 1 }]" }
+AddExt { from: "1 1 2 4 3 3 3[10]", to: "6 2 3 4 4 1 1 1[5]", af: 8, kind: Real, proof: "Issue at RP3_10: [AlgebraicConvergence { bot_trunc: 3, top_trunc: 10, stem: 27, af: 7, expected: 0, observed: 1 }]" }
+AddExt { from: "1 2 4 3 3 3[11]", to: "3 5 7 3 3[6]", af: 7, kind: Real, proof: "Issue at RP6_11: [AlgebraicConvergence { bot_trunc: 6, top_trunc: 11, stem: 27, af: 6, expected: 0, observed: 1 }]" }
+AddDiff { from: "3 6 2 3 3[11]", to: "6 2 3 4 4 1 1 1[5]", kind: Real, proof: Some("Issue at RP4_12: [AlgebraicConvergence { bot_trunc: 4, top_trunc: 12, stem: 27, af: 7, expected: 1, observed: 2 }]") }
+AddExt { from: "6 2 3 4 4 1 1 1[5]", to: "2 3 5 7 3 3[4]", af: 8, kind: Real, proof: "Issue at RP4_12: [AlgebraicConvergence { bot_trunc: 4, top_trunc: 12, stem: 27, af: 7, expected: 1, observed: 2 }]" }
+AddDiff { from: "2 4 3 3 3[13]", to: "3 5 7 3 3[6]", kind: Real, proof: Some("Issue at RP6_14: [AlgebraicConvergence { bot_trunc: 6, top_trunc: 14, stem: 27, af: 6, expected: 0, observed: 1 }]") }
+AddDiff { from: "3 3 6 6 5 3[3]", to: "1 2 4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 3 6 6 5 3[3]", to: "4 4 1 1 2 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 3 5 7 7[5]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[3]", kind: Unknown, proof: Some("We don't have enough Synthetic information to deduce this differential.") }
+AddDiff { from: "4 5 7 7[6]", to: "3 3 6 6 5 3[2]", kind: Fake, proof: Some("For RP1_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 2 3 4 4 1 1 1[7]", to: "3 6 2 3 4 4 1 1 1[3]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 5 7 7[7]", to: "3 3 6 6 5 3[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7 7 7[8]", to: "3 3 6 6 5 3[2]", kind: Unknown, proof: Some("As we are only interested in the module structure, we won't consider the case where two differentials target the same generator.") }
+AddExt { from: "6 2 3 4 4 1 1 1[6]", to: "3 3 6 6 5 3[2]", af: 8, kind: Real, proof: "Issue at RP2_8: [AlgebraicConvergence { bot_trunc: 2, top_trunc: 8, stem: 28, af: 7, expected: 1, observed: 2 }]" }
+AddExt { from: "2 2 4 3 3 3[11]", to: "3 6 6 5 3[5]", af: 7, kind: Real, proof: "Issue at RP5_11: [AlgebraicConvergence { bot_trunc: 5, top_trunc: 11, stem: 28, af: 6, expected: 2, observed: 3 }]" }
+AddDiff { from: "3 6 2 3 3[12]", to: "3 6 6 5 3[5]", kind: Real, proof: Some("Issue at RP5_12: [AlgebraicConvergence { bot_trunc: 5, top_trunc: 12, stem: 28, af: 6, expected: 1, observed: 2 }]") }
+AddDiff { from: "7 7[15]", to: "3 3 6 6 5 3[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+SetE1 { tag: "4 2 2 2 4 5 3 3 3", torsion: Torsion(Some(1)), proof: "Only one generator in stem 29, af 10. (auto)" }
+SetE1 { tag: "2 2 2 2 2 4 5 3 3 3", torsion: Torsion(Some(1)), proof: "Only one generator in stem 29, af 11. (auto)" }
+AddDiff { from: "4 4 1 1 2 4 1 1 2 4 1 1 1[3]", to: "1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[2]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 3 6 6 5 3[4]", to: "6 2 2 4 5 3 3 3[1]", kind: Fake, proof: Some("For RP1_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 6 6 5 3[7]", to: "6 2 2 4 5 3 3 3[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 5 7 7[8]", to: "3 3 6 6 5 3[3]", kind: Real, proof: Some("Issue at RP1_8: [SyntheticConvergence { bot_trunc: 1, top_trunc: 8, stem: 29, af: 9, expected: [Torsion(None), Torsion(None)], observed: [Torsion(None), Torsion(Some(3))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 8, stem: 29, af: 7, expected: [Torsion(Some(1))], observed: [Torsion(None)] }]") }
+AddDiff { from: "7 7 7[9]", to: "2 3 5 7 7[5]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddExt { from: "6 2 3 4 4 1 1 1[7]", to: "3 3 6 6 5 3[3]", af: 8, kind: Real, proof: "Issue at RP3_9: [AlgebraicConvergence { bot_trunc: 3, top_trunc: 9, stem: 29, af: 7, expected: 2, observed: 3 }]" }
+AddDiff { from: "7 7 7[9]", to: "6 2 2 4 5 3 3 3[1]", kind: Unknown, proof: None }
+AddDiff { from: "2 4 5 3 3 3[10]", to: "3 3 6 6 5 3[3]", kind: Real, proof: Some("For RP3_10 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "2 4 5 3 3 3[10]", to: "6 2 2 4 5 3 3 3[1]", kind: Real, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 3 3[13]", to: "2 3 5 7 7[5]", kind: Real, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddExt { from: "1 2 4 3 3 3[13]", to: "2 3 5 7 7[5]", af: 7, kind: Real, proof: "Issue at RP5_13: [AlgebraicConvergence { bot_trunc: 5, top_trunc: 13, stem: 29, af: 6, expected: 1, observed: 2 }]" }
+AddDiff { from: "1 2 3 4 4 1 1 1[13]", to: "6 2 2 4 5 3 3 3[1]", kind: Fake, proof: Some("For RP1_13 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "13 3[14]", to: "4 5 7 7[6]", kind: Real, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "2 3 4 4 1 1 1[14]", to: "6 2 2 4 5 3 3 3[1]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "12 1 1 1[15]", to: "2 3 5 7 7[5]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "7 7[16]", to: "7 7 7[8]", kind: Real, proof: Some("For RP1_16 the F_2 vector space generators don't add up.") }
+AddExt { from: "2 4 3 3 3[14]", to: "4 5 7 7[6]", af: 6, kind: Real, proof: "Issue at RP5_16: [AlgebraicConvergence { bot_trunc: 5, top_trunc: 16, stem: 29, af: 5, expected: 1, observed: 2 }]" }
+AddDiff { from: "3 4 4 1 1 1[16]", to: "6 2 2 4 5 3 3 3[1]", kind: Real, proof: Some("For RP1_16 the F_2 vector space generators don't add up.") }
+AddDiff { from: "4 4 1 1 1[19]", to: "2 3 5 7 7[5]", kind: Real, proof: Some("Issue at RP5_19: [AlgebraicConvergence { bot_trunc: 5, top_trunc: 19, stem: 29, af: 6, expected: 2, observed: 3 }]") }
+AddDiff { from: "1 2 3 3[21]", to: "4 5 7 7[6]", kind: Real, proof: Some("Issue at RP6_21: [AlgebraicConvergence { bot_trunc: 6, top_trunc: 21, stem: 29, af: 5, expected: 2, observed: 3 }]") }
+SetE1 { tag: "3 6 2 4 5 3 3 3", torsion: Torsion(Some(0)), proof: "Only one generator in stem 30, af 9. (auto)" }
+SetE1 { tag: "6 2 3 5 7 3 3", torsion: Torsion(Some(0)), proof: "Only one generator in stem 30, af 8. (auto)" }
+SetE1 { tag: "2 2 2 2 3 5 7 3 3", torsion: Torsion(Some(2)), proof: "Only one generator in stem 30, af 10. (auto)" }
+AddExt { from: "2 2 2 2 2 4 5 3 3 3[2]", to: "2 2 2 2 3 5 7 3 3[1]", af: 11, kind: Real, proof: "Issue at RP1_2: [SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 30, af: 10, expected: [], observed: [Torsion(Some(2))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 30, af: 11, expected: [Torsion(Some(3))], observed: [Torsion(Some(1))] }]" }
+AddDiff { from: "6 2 2 4 5 3 3 3[3]", to: "2 2 2 2 3 5 7 3 3[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "2 4 1 1 2 4 3 3 3[8]", to: "4 4 1 1 2 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("For RP1_8 the F_2 vector space generators don't add up.") }
+AddDiff { from: "2 4 1 1 2 4 3 3 3[8]", to: "2 2 2 2 3 5 7 3 3[1]", kind: Real, proof: Some("For RP1_8 the F_2 vector space generators don't add up.") }
+AddExt { from: "2 4 1 1 2 4 3 3 3[7]", to: "6 2 2 4 5 3 3 3[2]", af: 9, kind: Real, proof: "Issue at RP1_8: [SyntheticConvergence { bot_trunc: 1, top_trunc: 8, stem: 30, af: 10, expected: [Torsion(None), Torsion(None)], observed: [Torsion(None), Torsion(Some(2))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 8, stem: 30, af: 8, expected: [], observed: [Torsion(None)] }]" }
+AddDiff { from: "3 5 7 7[9]", to: "1 2 3 4 4 1 1 2 4 1 1 1[5]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 2 3 4 4 1 1 1[9]", to: "1 2 3 4 4 1 1 2 4 1 1 1[5]", kind: Fake, proof: Some("For RP1_16 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[9]", to: "3 3 6 6 5 3[4]", kind: Unknown, proof: Some("We don't have enough Synthetic information to deduce this differential.") }
+AddDiff { from: "3 5 7 7[9]", to: "4 4 1 1 2 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 2 3 4 4 1 1 1[9]", to: "4 4 1 1 2 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("For RP2_14 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "3 5 7 7[9]", to: "6 2 2 4 5 3 3 3[2]", kind: Fake, proof: Some("Issue at RP1_9: [AlgebraicConvergence { bot_trunc: 1, top_trunc: 9, stem: 30, af: 8, expected: 1, observed: 2 }]") }
+AddDiff { from: "6 2 3 4 4 1 1 1[9]", to: "6 2 2 4 5 3 3 3[2]", kind: Real, proof: Some("Issue at RP1_9: [AlgebraicConvergence { bot_trunc: 1, top_trunc: 9, stem: 30, af: 8, expected: 1, observed: 2 }]") }
+AddDiff { from: "3 5 7 3 3[10]", to: "2 3 4 4 1 1 2 4 1 1 1[6]", kind: Unknown, proof: None }
+AddDiff { from: "5 7 7[12]", to: "8 4 1 1 2 4 1 1 1[7]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[12]", to: "2 3 4 4 1 1 2 4 1 1 1[6]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[12]", to: "1 2 3 4 4 1 1 2 4 1 1 1[5]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[12]", to: "4 4 1 1 2 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 1 2 4 1 1 2 4 1 1 1[12]", to: "4 4 1 1 2 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 7[13]", to: "8 4 1 1 2 4 1 1 1[7]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 7[13]", to: "2 3 4 4 1 1 2 4 1 1 1[6]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 7[13]", to: "1 2 3 4 4 1 1 2 4 1 1 1[5]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 2 4 1 1 2 4 1 1 1[13]", to: "1 2 3 4 4 1 1 2 4 1 1 1[5]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "11 7[13]", to: "4 4 1 1 2 4 1 1 2 4 1 1 1[3]", kind: Unknown, proof: None }
+AddDiff { from: "1 2 4 1 1 2 4 1 1 1[13]", to: "4 4 1 1 2 4 1 1 2 4 1 1 1[3]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "2 4 1 1 2 4 1 1 1[14]", to: "2 3 4 4 1 1 2 4 1 1 1[6]", kind: Fake, proof: Some("Issue at RP1_14: [SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 30, af: 14, expected: [Torsion(Some(3))], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 30, af: 12, expected: [Torsion(None)], observed: [Torsion(Some(1))] }]") }
+AddDiff { from: "2 4 1 1 2 4 1 1 1[14]", to: "1 2 3 4 4 1 1 2 4 1 1 1[5]", kind: Fake, proof: Some("Issue at RP1_14: [SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 30, af: 13, expected: [Torsion(None)], observed: [Torsion(Some(2))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 14, stem: 30, af: 14, expected: [Torsion(Some(3))], observed: [Torsion(None)] }]") }
+AddDiff { from: "2 4 1 1 2 4 1 1 1[14]", to: "4 4 1 1 2 4 1 1 2 4 1 1 1[3]", kind: Real, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "4 1 1 2 4 1 1 1[16]", to: "8 4 1 1 2 4 1 1 1[7]", kind: Fake, proof: Some("For RP4_16 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "4 1 1 2 4 1 1 1[16]", to: "2 3 4 4 1 1 2 4 1 1 1[6]", kind: Fake, proof: Some("Issue at RP1_16: [SyntheticConvergence { bot_trunc: 1, top_trunc: 16, stem: 30, af: 12, expected: [Torsion(None)], observed: [Torsion(Some(2))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 16, stem: 30, af: 13, expected: [Torsion(Some(3))], observed: [Torsion(None)] }]") }
+AddDiff { from: "4 1 1 2 4 1 1 1[16]", to: "1 2 3 4 4 1 1 2 4 1 1 1[5]", kind: Real, proof: Some("For RP1_16 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 1 2 4 1 1 1[20]", to: "4 4 1 1 2 4 1 1 1[11]", kind: Fake, proof: Some("For RP5_20 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "1 1 2 4 1 1 1[20]", to: "8 4 1 1 2 4 1 1 1[7]", kind: Fake, proof: Some("Issue at RP1_20: [SyntheticConvergence { bot_trunc: 1, top_trunc: 20, stem: 30, af: 10, expected: [Torsion(None)], observed: [Torsion(Some(1))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 20, stem: 30, af: 12, expected: [Torsion(Some(3))], observed: [Torsion(None)] }]") }
+AddDiff { from: "1 1 2 4 1 1 1[20]", to: "2 3 4 4 1 1 2 4 1 1 1[6]", kind: Real, proof: Some("For RP1_20 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 2 4 1 1 1[21]", to: "1 2 3 4 4 1 1 1[13]", kind: Fake, proof: Some("For RP6_21 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "1 2 4 1 1 1[21]", to: "4 4 1 1 2 4 1 1 1[11]", kind: Fake, proof: Some("For RP1_22 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 2 4 1 1 1[21]", to: "8 4 1 1 2 4 1 1 1[7]", kind: Real, proof: Some("For RP1_22 the F_2 vector space generators don't add up.") }
+AddDiff { from: "2 4 1 1 1[22]", to: "2 3 4 4 1 1 1[14]", kind: Fake, proof: Some("For RP7_22 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "2 4 1 1 1[22]", to: "1 2 3 4 4 1 1 1[13]", kind: Fake, proof: Some("Issue at RP1_22: [SyntheticConvergence { bot_trunc: 1, top_trunc: 22, stem: 30, af: 8, expected: [Torsion(None)], observed: [Torsion(Some(1))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 22, stem: 30, af: 9, expected: [Torsion(Some(2))], observed: [Torsion(None)] }]") }
+AddDiff { from: "2 4 1 1 1[22]", to: "4 4 1 1 2 4 1 1 1[11]", kind: Real, proof: Some("For RP1_22 the F_2 vector space generators don't add up.") }
+AddDiff { from: "4 1 1 1[24]", to: "2 3 4 4 1 1 1[14]", kind: Fake, proof: Some("Issue at RP1_24: [SyntheticConvergence { bot_trunc: 1, top_trunc: 24, stem: 30, af: 7, expected: [Torsion(None)], observed: [Torsion(Some(1))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 24, stem: 30, af: 8, expected: [Torsion(Some(2))], observed: [Torsion(None)] }]") }
+AddDiff { from: "4 1 1 1[24]", to: "1 2 3 4 4 1 1 1[13]", kind: Real, proof: Some("For RP1_24 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 1 1[28]", to: "12 1 1 1[15]", kind: Fake, proof: Some("For RP1_28 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 1 1[28]", to: "2 3 4 4 1 1 1[14]", kind: Real, proof: Some("For RP1_28 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1 1[29]", to: "4 4 1 1 1[19]", kind: Fake, proof: Some("For RP5_29 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "1 1[29]", to: "12 1 1 1[15]", kind: Real, proof: Some("For RP15_31 the F_2 vector space generators don't add up.") }
+AddDiff { from: "1[30]", to: "1 2 3 3[21]", kind: Fake, proof: Some("For RP6_30 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "1[30]", to: "4 4 1 1 1[19]", kind: Real, proof: Some("Issue at RP1_30: [SyntheticConvergence { bot_trunc: 1, top_trunc: 30, stem: 30, af: 5, expected: [Torsion(None), Torsion(Some(1))], observed: [Torsion(Some(2)), Torsion(Some(1))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 30, stem: 30, af: 4, expected: [Torsion(Some(1))], observed: [Torsion(None)] }]") }
+AddDiff { from: "[31]", to: "5 3[22]", kind: Fake, proof: Some("Issue at RP21_31: [SyntheticConvergence { bot_trunc: 21, top_trunc: 31, stem: 30, af: 5, expected: [Torsion(Some(3))], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 21, top_trunc: 31, stem: 30, af: 3, expected: [Torsion(None), Torsion(None)], observed: [Torsion(None), Torsion(Some(1))] }]") }
+AddDiff { from: "[31]", to: "1 2 3 3[21]", kind: Real, proof: Some("For RP21_31 the F_2 vector space generators don't add up.") }
+AddExt { from: "1 2 3 3[21]", to: "6 5 3[16]", af: 5, kind: Real, proof: "Issue at RP15_31: [SyntheticConvergence { bot_trunc: 15, top_trunc: 31, stem: 30, af: 5, expected: [Torsion(None)], observed: [Torsion(Some(3))] }, SyntheticConvergence { bot_trunc: 15, top_trunc: 31, stem: 30, af: 4, expected: [Torsion(Some(2))], observed: [Torsion(None)] }]" }
+AddExt { from: "12 1 1 1[15]", to: "11 3 3[13]", af: 5, kind: Fake, proof: "For RP13_31 there is no way to fix the algebraic convergence issues with tau extensions" }
+AddExt { from: "4 4 1 1 1[19]", to: "11 3 3[13]", af: 5, kind: Real, proof: "Issue at RP13_31: [SyntheticConvergence { bot_trunc: 13, top_trunc: 31, stem: 30, af: 4, expected: [Torsion(None), Torsion(Some(1))], observed: [Torsion(None), Torsion(Some(2))] }, SyntheticConvergence { bot_trunc: 13, top_trunc: 31, stem: 30, af: 3, expected: [Torsion(None), Torsion(Some(1))], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 13, top_trunc: 31, stem: 30, af: 5, expected: [Torsion(None)], observed: [Torsion(Some(2))] }]" }
+AddExt { from: "1 2 3 3[21]", to: "13 3[14]", af: 4, kind: Real, proof: "Issue at RP13_31: [SyntheticConvergence { bot_trunc: 13, top_trunc: 31, stem: 30, af: 3, expected: [Torsion(None), Torsion(Some(1))], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 13, top_trunc: 31, stem: 30, af: 4, expected: [Torsion(None), Torsion(Some(1))], observed: [Torsion(Some(2)), Torsion(Some(1))] }]" }
+AddExt { from: "3 4 4 1 1 1[16]", to: "9 3 3 3[12]", af: 6, kind: Real, proof: "Issue at RP11_31: [SyntheticConvergence { bot_trunc: 11, top_trunc: 31, stem: 30, af: 5, expected: [Torsion(None), Torsion(Some(1))], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 11, top_trunc: 31, stem: 30, af: 6, expected: [Torsion(None)], observed: [Torsion(Some(2))] }]" }
+AddExt { from: "2 3 4 4 1 1 1[14]", to: "2 4 5 3 3 3[10]", af: 8, kind: Real, proof: "Issue at RP9_31: [SyntheticConvergence { bot_trunc: 9, top_trunc: 31, stem: 30, af: 7, expected: [Torsion(Some(2))], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 9, top_trunc: 31, stem: 30, af: 8, expected: [Torsion(None)], observed: [Torsion(Some(3))] }]" }
+AddExt { from: "1 2 3 4 4 1 1 1[13]", to: "6 2 3 4 4 1 1 1[8]", af: 9, kind: Real, proof: "Issue at RP7_31: [SyntheticConvergence { bot_trunc: 7, top_trunc: 31, stem: 30, af: 8, expected: [Torsion(Some(2))], observed: [Torsion(None)] }, SyntheticConvergence { bot_trunc: 7, top_trunc: 31, stem: 30, af: 9, expected: [Torsion(None)], observed: [Torsion(Some(3))] }]" }
+SetE1 { tag: "3 4 4 1 1 2 4 1 1 2 4 1 1 1", torsion: Torsion(Some(3)), proof: "Only one generator in stem 31, af 15. (auto)" }
+SetE1 { tag: "14 13 3", torsion: Torsion(Some(1)), proof: "Only one generator in stem 31, af 4. (auto)" }
+SetE1 { tag: "4 2 2 2 2 4 5 3 3 3", torsion: Torsion(Some(2)), proof: "Only one generator in stem 31, af 11. (auto)" }
+SetE1 { tag: "13 11 3 3", torsion: Torsion(Some(1)), proof: "Only one generator in stem 31, af 5. (auto)" }
+SetE1 { tag: "12 9 3 3 3", torsion: Torsion(Some(1)), proof: "Only one generator in stem 31, af 6. (auto)" }
+SetE1 { tag: "2 2 2 2 2 2 4 5 3 3 3", torsion: Torsion(Some(2)), proof: "Only one generator in stem 31, af 12. (auto)" }
+SetE1 { tag: "5 1 2 3 4 4 1 1 2 4 1 1 1", torsion: Torsion(Some(3)), proof: "Only one generator in stem 31, af 14. (auto)" }
+SetE1 { tag: "5 8 1 1 2 4 3 3 3", torsion: Torsion(Some(2)), proof: "Only one generator in stem 31, af 10. (auto)" }
+SetE1 { tag: "7 13 1 2 4 1 1 1", torsion: Torsion(Some(2)), proof: "Only one generator in stem 31, af 9. (auto)" }
+SetE1 { tag: "10 2 4 5 3 3 3", torsion: Torsion(Some(2)), proof: "Only one generator in stem 31, af 8. (auto)" }
+SetE1 { tag: "6 2 3 4 4 1 1 2 4 1 1 1", torsion: Torsion(Some(3)), proof: "Only one generator in stem 31, af 13. (auto)" }
+SetE1 { tag: "12 4 5 3 3 3", torsion: Torsion(Some(0)), proof: "Only one generator in stem 31, af 7. (auto)" }
+AddDiff { from: "12 9 3 3 3[2]", to: "10 2 4 5 3 3 3[1]", kind: Real, proof: Some("For RP1_2 the F_2 vector space generators don't add up.") }
+AddExt { from: "2 2 2 2 3 5 7 3 3[2]", to: "10 2 4 5 3 3 3[1]", af: 9, kind: Real, proof: "Issue at RP1_2: [SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 31, af: 8, expected: [], observed: [Torsion(Some(1))] }, SyntheticConvergence { bot_trunc: 1, top_trunc: 2, stem: 31, af: 10, expected: [Torsion(Some(3))], observed: [Torsion(Some(2))] }]" }
+AddDiff { from: "2 2 2 2 3 5 7 3 3[3]", to: "6 2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "6 2 2 4 5 3 3 3[4]", to: "2 2 2 2 3 5 7 3 3[2]", kind: Real, proof: Some("For RP2_4 the F_2 vector space generators don't add up.") }
+AddDiff { from: "6 2 2 4 5 3 3 3[4]", to: "10 2 4 5 3 3 3[1]", kind: Real, proof: Some("For RP1_4 there is no way to fix the algebraic convergence issues with tau extensions") }
+AddDiff { from: "3 3 6 6 5 3[6]", to: "1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[4]", kind: Unknown, proof: None }
+AddDiff { from: "3 3 6 6 5 3[6]", to: "6 2 2 4 5 3 3 3[3]", kind: Real, proof: Some("For RP3_6 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 6 2 3 4 4 1 1 1[7]", to: "6 2 3 4 4 1 1 2 4 1 1 1[1]", kind: Fake, proof: Some("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere") }
+AddDiff { from: "3 6 6 5 3[9]", to: "1 2 4 1 1 2 4 1 1 2 4 1 1 1[5]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 6 6 5 3[9]", to: "1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[4]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[10]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[6]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[10]", to: "1 2 4 1 1 2 4 1 1 2 4 1 1 1[5]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3 5 7 7[10]", to: "1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[4]", kind: Fake, proof: Some("For RP1_10 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7 7[11]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[6]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7 7[11]", to: "1 2 4 1 1 2 4 1 1 2 4 1 1 1[5]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "7 7 7[11]", to: "1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[4]", kind: Fake, proof: Some("For RP1_12 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[13]", to: "2 4 1 1 2 4 3 3 3[8]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[13]", to: "4 1 1 2 4 1 1 2 4 1 1 1[8]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[13]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[6]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[13]", to: "1 2 4 1 1 2 4 1 1 2 4 1 1 1[5]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "5 7 7[13]", to: "1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[4]", kind: Fake, proof: Some("For RP1_14 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[29]", to: "1 2 4 1 1 2 4 1 1 1[13]", kind: Fake, proof: Some("For RP1_30 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[29]", to: "5 7 7[12]", kind: Fake, proof: Some("For RP1_30 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[29]", to: "1 1 2 4 1 1 2 4 1 1 1[12]", kind: Fake, proof: Some("For RP1_30 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[29]", to: "3 5 7 7[9]", kind: Fake, proof: Some("For RP1_30 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[29]", to: "2 4 1 1 2 4 3 3 3[8]", kind: Fake, proof: Some("For RP1_30 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[29]", to: "4 1 1 2 4 1 1 2 4 1 1 1[8]", kind: Fake, proof: Some("For RP1_30 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[29]", to: "2 4 1 1 2 4 1 1 2 4 1 1 1[6]", kind: Fake, proof: Some("For RP1_30 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[29]", to: "1 2 4 1 1 2 4 1 1 2 4 1 1 1[5]", kind: Fake, proof: Some("For RP1_30 the F_2 vector space generators don't add up.") }
+AddDiff { from: "3[29]", to: "1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[4]", kind: Fake, proof: Some("For RP1_30 the F_2 vector space generators don't add up.") }

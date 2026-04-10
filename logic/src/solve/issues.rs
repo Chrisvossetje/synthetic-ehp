@@ -219,7 +219,7 @@ pub fn compare_algebraic_spectral_sequence(
     // TODO: This should be somewhat dependent on the top_truncation.
     // At least for EHP this is important
 
-    for (&from, tos) in &data.out_diffs {
+    for (from, tos) in data.out_diffs.iter().enumerate() {
         for &to in tos {
             if data.model.stem(to) == stem
                 && bot_trunc <= data.model.y(to)
@@ -283,8 +283,9 @@ pub fn compare_algebraic_spectral_sequence(
 /// This function checks if the synthetic convergence can be fixed by tau extensions
 /// Meaning do the amount of F2 generators (up until AF=0) coincide
 /// If so, we only need to fix the tau module structure, and not add differentials
-pub fn synthetic_issue_is_tau_structure_issue(issues: &Vec<Issue>) -> bool {
+pub fn synthetic_issue_is_tau_structure_issue(issues: &Vec<Issue>) -> (bool, bool) {
     let mut count: [i8; MAX_STEM as usize] = [0; MAX_STEM as usize];
+    let mut total_gens: i32 = 0;
 
     for i in issues {
         if let Issue::SyntheticConvergence {
@@ -296,6 +297,8 @@ pub fn synthetic_issue_is_tau_structure_issue(issues: &Vec<Issue>) -> bool {
             observed,
         } = i
         {
+            total_gens += expected.len() as i32;
+            total_gens -= observed.len() as i32;
             for i in expected {
                 let c = if let Some(t) = i.0 { af - t + 1 } else { 0 };
                 for j in c..=*af {
@@ -309,8 +312,41 @@ pub fn synthetic_issue_is_tau_structure_issue(issues: &Vec<Issue>) -> bool {
                 }
             }
         } else {
-            return true;
+            return (false, false);
         }
     }
-    count.iter().all(|x| *x == 0)
+    
+    if total_gens > 0 || count.iter().any(|x| *x != 0) {
+        (false, false)
+    } else {
+        if issues.len() == 1 {
+            panic!()
+        }
+        (true, total_gens < 0)
+    }
+}
+
+
+pub fn algebraic_issue_is_fixable_by_tau_extensions(issues: &Vec<Issue>) -> bool {
+    let mut count: [i8; MAX_STEM as usize] = [0; MAX_STEM as usize];
+
+    for i in issues {
+        if let Issue::AlgebraicConvergence {
+            bot_trunc,
+            top_trunc,
+            stem,
+            af,
+            expected,
+            observed,
+        } = i
+        {
+            count[*af as usize] += *expected as i8;
+            count[*af as usize] -= *observed as i8;
+        } else {
+            return false;
+        }
+    }
+
+    count.iter().all(|x| *x <= 0)
+
 }

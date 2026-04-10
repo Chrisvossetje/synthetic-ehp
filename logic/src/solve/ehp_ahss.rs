@@ -4,7 +4,7 @@ use crate::{domain::{model::SyntheticSS, process::compute_pages, ss::SSPages}, s
 // (EHP -> AHSS, Lifts from AHSS -> EHP)
 pub type SyntheticSSMap = (Vec<Option<usize>>, Vec<Option<usize>>);
 
-fn in_metastable_range(y: i32, stem: i32) -> bool {
+pub fn in_metastable_range(y: i32, stem: i32) -> bool {
     stem < (y * 3)
 }
 
@@ -24,11 +24,30 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
                     g_from.name.clone(),
                     g_to.name.clone(),
                     proof.clone().map(|x| format!("{x} (Metastable)")),
-                    Kind::Real // TODO! <<
+                    Kind::Real
                 )?;
             }
         }
     }
+
+    for (&(from, to), proof) in &ahss.disproven_from_to {
+        let g_from = ahss.model.get(from);
+        let g_to = ahss.model.get(to);
+        if in_metastable_range(g_to.y, g_to.stem) {
+            let (from_name, to_name) = ahss.get_names(from, to);
+
+            if ahss.model.stem(from) - ahss.model.stem(to) == 1 {
+                let kind = if proof.is_some() { Kind::Fake } else { Kind::Unknown };
+                ehp.add_diff_name(
+                    g_from.name.clone(),
+                    g_to.name.clone(),
+                    proof.clone().map(|x| format!("{x} (Metastable)")),
+                    kind
+                )?;
+            }
+        }
+    }
+
     for (page, ts) in ahss.internal_tau_page.iter().enumerate() {
         for t in ts {
             let g_from = ahss.model.get(t.from);

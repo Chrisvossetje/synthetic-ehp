@@ -55,11 +55,20 @@ function syncViewControlsForDataSource(updateChart = true) {
     const dataSourceSwitch = document.getElementById('data-source-switch') as HTMLInputElement | null;
     const truncationControls = document.getElementById('truncation-controls') as HTMLDivElement | null;
     const sphereControls = document.getElementById('sphere-controls') as HTMLDivElement | null;
+    const fakeControls = document.getElementById('fake-controls') as HTMLDivElement | null;
+    const fakeControlsSpacer = document.getElementById('fake-controls-spacer') as HTMLDivElement | null;
+    const showFakeCheckbox = document.getElementById('show-fake-checkbox') as HTMLInputElement | null;
     const controls = getTruncationControls();
 
-    if (!dataSourceSwitch || !truncationControls || !sphereControls || !controls) {
+    if (!dataSourceSwitch || !truncationControls || !sphereControls || !fakeControls || !fakeControlsSpacer || !showFakeCheckbox || !controls) {
         return;
     }
+
+    fakeControls.style.display = 'flex';
+    fakeControlsSpacer.style.display = 'block';
+    fakeControls.style.opacity = '1';
+    fakeControls.style.pointerEvents = 'auto';
+    showFakeCheckbox.disabled = false;
 
     if (dataSourceSwitch.checked) {
         truncationControls.style.display = 'flex';
@@ -101,6 +110,7 @@ function setupUIControls() {
             isEHPActive = true;
             window.chartInstance = ehpChart;
         }
+        syncViewControlsForDataSource(false);
         updateActiveChart();
     });
 
@@ -111,6 +121,12 @@ function setupUIControls() {
         if (isEHPActive) {
             update_ehp_chart();
         }
+    });
+
+    const showFakeCheckbox = document.getElementById('show-fake-checkbox') as HTMLInputElement | null;
+    showFakeCheckbox?.addEventListener('change', () => {
+        viewSettings.showFakeData = showFakeCheckbox.checked;
+        updateActiveChart();
     });
 
     // Page selector (only affects EHP chart)
@@ -295,6 +311,7 @@ function setupKeyboardControls() {
         } = truncationControls;
         const ehpAssSwitch = document.getElementById('ehp-ass-switch') as HTMLInputElement;
         const allDiffCheckbox = document.getElementById('all-diff-checkbox') as HTMLInputElement;
+        const showFakeCheckbox = document.getElementById('show-fake-checkbox') as HTMLInputElement | null;
         const dataSourceSwitch = document.getElementById('data-source-switch') as HTMLInputElement;
         const usingAhssViewSettings = () => !!dataSourceSwitch?.checked;
 
@@ -379,6 +396,16 @@ function setupKeyboardControls() {
                 if (isEHPActive) {
                     needsUpdate = true;
                 }
+                break;
+
+            case 'f':
+            case 'F':
+                if (!showFakeCheckbox) {
+                    break;
+                }
+                viewSettings.showFakeData = !viewSettings.showFakeData;
+                showFakeCheckbox.checked = viewSettings.showFakeData;
+                needsUpdate = true;
                 break;
 
             // Truncation controls
