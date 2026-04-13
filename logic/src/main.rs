@@ -21,7 +21,8 @@ mod types;
 const MAX_STEM: i32 = 48;
 // TODO: AHSS CURTIS DATA IS VALID UNTIL STEM 48
 // TODO: It seems EHP curtis data is also valid until +- STEM 48
-const MAX_VERIFY_STEM: i32 = 35;
+const MAX_VERIFY_STEM: i32 = 48;
+const MAX_AUTOMATED_TOP_TRUNC: i32 = 256;
 
 // const MAX_VERIFY_SPHERE: i32 = MAX_VERIFY_STEM + 2;
 // const MAX_UNEVEN_INPUT: i32 = (MAX_STEM + 1) * 2;
@@ -58,12 +59,7 @@ fn ahss() -> (SyntheticSS, Duration) {
     let mut log = match get_log(true) {
         Ok(log) => log,
         Err(_) => {
-            println!("Log importing was not succesful");
-            println!("Log importing was not succesful");
-            println!("Log importing was not succesful");
-            println!("Log importing was not succesful");
-            println!("Log importing was not succesful");
-            vec![]
+            panic!("Log importing was not succesful");
         }
     };
     let mut data = revert_log_and_remake(0, &mut log, &STABLE_DATA, true);
@@ -94,20 +90,24 @@ fn ahss() -> (SyntheticSS, Duration) {
             for issue in &issues {
                 // Automatic
                 match auto_deduce(&data, &issue) {
-                    Ok(action) => match process_action(&mut data, &action, true) {
-                        Ok(_) => {
-                            println!("\n{:?}\n", issue);
-                            println!(
-                                "\nAutomatically resolved the issue with the following action: {:?}\n",
-                                action
-                            );
-                            log.push(action);
-                            write_all(&data, &log, true);
-                            continue 'middle;
+                    Ok(actions) => {
+                        for action in actions {
+                            match process_action(&mut data, &action, false) {
+                                Ok(_) => {
+                                    println!("\n{:?}\n", issue);
+                                    println!(
+                                        "\nAutomatically resolved the issue with the following action: {:?}\n",
+                                        action
+                                    );
+                                    log.push(action);
+                                    write_all(&data, &log, false);
+                                }
+                                Err(_) => {
+                                    panic!("Automated action was invalid ?? {action:?}");
+                                }
+                            }
                         }
-                        Err(_) => {
-                            panic!("Automated action was invalid ?? {action:?}");
-                        }
+                        continue 'middle;
                     },
                     Err(_) => {}
                 }
@@ -210,20 +210,24 @@ fn ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
             for issue in &issues {
                 // Automatic
                 match auto_deduce(&data, &issue) {
-                    Ok(action) => match process_action(&mut data, &action, false) {
-                        Ok(_) => {
-                            println!("\n{:?}\n", issue);
-                            println!(
-                                "\nAutomatically resolved the issue with the following action: {:?}\n",
-                                action
-                            );
-                            log.push(action);
-                            write_all(&data, &log, false);
-                            continue 'middle;
+                    Ok(actions) => {
+                        for action in actions {
+                            match process_action(&mut data, &action, false) {
+                                Ok(_) => {
+                                    println!("\n{:?}\n", issue);
+                                    println!(
+                                        "\nAutomatically resolved the issue with the following action: {:?}\n",
+                                        action
+                                    );
+                                    log.push(action);
+                                    write_all(&data, &log, false);
+                                }
+                                Err(_) => {
+                                    panic!("Automated action was invalid ?? {action:?}");
+                                }
+                            }
                         }
-                        Err(_) => {
-                            panic!("Automated action was invalid ?? {action:?}");
-                        }
+                        continue 'middle;
                     },
                     Err(_) => {}
                 }
@@ -322,9 +326,18 @@ fn temp_lol(data: &SyntheticSS) {
 fn main() {
     let start = Instant::now();
 
-    let (ahss_log, ahss) = ahss_solver();
 
-    write_all(&ahss, &ahss_log, true);
+    let mut log = match get_log(true) {
+        Ok(log) => log,
+        Err(_) => {
+            panic!("Log importing was not succesful");
+        }
+    };
+
+    if let Ok((ahss_log, ahss)) = ahss_solver(Some(log)) {
+        write_all(&ahss, &ahss_log, true);
+    }
+
     
     
     // let (ahss, input_time_ahss) = ahss();

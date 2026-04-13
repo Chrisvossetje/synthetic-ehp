@@ -148,23 +148,25 @@ pub fn write_typescript_file(
     }
 
     let mut ext_tau_mults = vec![];
-    for e_tss in &data.external_tau_page {
-        for e_ts in e_tss {
-            for e_t in e_ts {
-                let from = data.model.name(e_t.from);
-                let to = data.model.name(e_t.to);
-                let proof = data
-                    .proven_from_to
-                    .get(&(e_t.from, e_t.to))
-                    .unwrap_or(&None)
-                    .clone();
-                ext_tau_mults.push(ExternalTauMult {
-                    from: from.to_string(),
-                    to: to.to_string(),
-                    af: e_t.af,
-                    proof,
-                    kind: Kind::Real,
-                });
+    for e_tsss in &data.external_tau_page {
+        for e_tss in e_tsss {
+            for e_ts in e_tss {
+                for e_t in e_ts {
+                    let from = data.model.name(e_t.from);
+                    let to = data.model.name(e_t.to);
+                    let proof = data
+                        .proven_from_to
+                        .get(&(e_t.from, e_t.to))
+                        .unwrap_or(&None)
+                        .clone();
+                    ext_tau_mults.push(ExternalTauMult {
+                        from: from.to_string(),
+                        to: to.to_string(),
+                        af: e_t.af,
+                        proof,
+                        kind: Kind::Real,
+                    });
+                }
             }
         }
     }

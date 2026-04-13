@@ -7,11 +7,11 @@ use crate::{
         process::compute_pages,
         ss::{PagesGeneratorState, SSPages},
     },
-    solve::{action::Action, generate::{get_a_tau_for_t_ids, get_a_tau_for_t_ids_s_ids}, issues::Issue},
+    solve::{action::Action, ahss_e1::{get_all_e1_solutions, get_e1_solutions}, generate::{get_a_tau_for_t_ids, get_a_tau_for_t_ids_s_ids}, issues::Issue},
     types::Torsion,
 };
 
-pub fn auto_deduce(data: &SyntheticSS, issue: &Issue) -> Result<Action, ()> {
+pub fn auto_deduce(data: &SyntheticSS, issue: &Issue) -> Result<Vec<Action>, ()> {
     match issue {
         Issue::SyntheticE1Page {
             stem,
@@ -19,18 +19,15 @@ pub fn auto_deduce(data: &SyntheticSS, issue: &Issue) -> Result<Action, ()> {
             expected,
             observed,
         } => {
-            if expected.len() == 1 {
-                assert_eq!(observed.len(), 1);
-                for id in data.model.gens_id_in_stem_af(*stem, *af) {
-                    if data.model.y(*id) == 1 {
-                        let name = data.model.name(*id);
-                        return Ok(Action::SetE1 {
-                            tag: name_get_tag(name).to_string(),
-                            torsion: expected[0],
-                            proof: format!("Only one generator in stem {stem}, af {af}. (auto)"),
-                        });
+            let mut sol = get_e1_solutions(data, issue);
+            if sol.len() == 1 && let Some(mut sol) = sol.pop() {
+                for s in &mut sol {
+                    match s {
+                        Action::SetE1 { tag, torsion, proof } => {*proof = format!("Unique solution in stem {stem} af {af}. (auto)")},
+                        _ => {unreachable!()}
                     }
-                }
+                } 
+                return Ok(sol);
             }
             Err(())
         }
@@ -69,12 +66,12 @@ pub fn auto_deduce(data: &SyntheticSS, issue: &Issue) -> Result<Action, ()> {
 
             if fil_syn.len() == 1 && fil_alg.len() == 1 {
                 let name = fil_alg[0];
-                return Ok(Action::SetInducedName {
+                return Ok(vec![Action::SetInducedName {
                     name: original_name.clone(),
                     new_name: name.to_string(),
                     sphere: *sphere,
                     proof: format!("Only one choice which could represent this recursion. (auto)"),
-                });
+                }]);
             }
             if fil_alg.len() == 0 {
                 println!(
@@ -88,8 +85,12 @@ pub fn auto_deduce(data: &SyntheticSS, issue: &Issue) -> Result<Action, ()> {
     }
 }
 
-pub fn suggest_tau_solution_algebraic(data: &SyntheticSS, issues: &Vec<Issue>, top_trunc: i32, bot_trunc: i32, stem: i32) -> Option<ExtTauMult> {
+pub fn suggest_tau_solution_algebraic(data: &SyntheticSS, issues: &mut Vec<Issue>, top_trunc: i32, bot_trunc: i32, stem: i32) -> Option<ExtTauMult> {
     let (elements, _) = compute_pages(data, bot_trunc, top_trunc, stem, stem, false);
+    
+    issues.sort_by_key(|i| if let Issue::AlgebraicConvergence { bot_trunc, top_trunc, stem, af, expected, observed } = i {*af} else {unreachable!()});
+
+    
     for i in issues {
         if let Issue::AlgebraicConvergence { bot_trunc, top_trunc, stem, af, expected, observed } = i {
             
@@ -105,9 +106,11 @@ pub fn suggest_tau_solution_algebraic(data: &SyntheticSS, issues: &Vec<Issue>, t
     None
 }
 
-pub fn suggest_tau_solution_generator_synthetic(data: &SyntheticSS, issues: &Vec<Issue>, top_trunc: i32, bot_trunc: i32, stem: i32) -> Option<ExtTauMult> {
+pub fn suggest_tau_solution_generator_synthetic(data: &SyntheticSS, issues: &mut Vec<Issue>, top_trunc: i32, bot_trunc: i32, stem: i32) -> Option<ExtTauMult> {
     let (elements, _) = compute_pages(data, bot_trunc, top_trunc, stem, stem, false);
     
+    issues.sort_by_key(|i| if let Issue::SyntheticConvergence { bot_trunc, top_trunc, stem, af, expected, observed } = i {*af} else {unreachable!()});
+
     let mut t_ids = vec![];
     // let mut s_ids = vec![];
     for i in issues {

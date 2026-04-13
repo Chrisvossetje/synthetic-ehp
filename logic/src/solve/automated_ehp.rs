@@ -1,69 +1,65 @@
-// use core::panic;
-// use std::sync::{Arc, LockResult, Mutex};
+use core::panic;
+use std::{fmt::format, sync::{Arc, LockResult, Mutex}};
 
-// use itertools::Itertools;
-// use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use itertools::Itertools;
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
-// use crate::{MAX_STEM, data::{compare::{algebraic_rp, rp_truncations, synthetic_rp}, curtis::{DATA, STABLE_DATA}}, domain::{model::{Diff, FromTo, SyntheticSS}, process::try_compute_pages}, solve::{action::{Action, D_R_REPEATS, revert_log_and_remake}, ahss::ahss_synthetic_e1_issue, ahss_e1::get_all_e1_solutions, ehp_ahss::set_metastable_range, generate::{get_a_diff, get_a_tau}, issues::{Issue, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic, synthetic_issue_is_tau_structure_issue}, solve::auto_deduce}, types::Kind};
+use crate::{MAX_STEM, data::{compare::{algebraic_rp, rp_truncations, synthetic_rp}, curtis::{DATA, STABLE_DATA}}, domain::{model::{Diff, FromTo, SyntheticSS}, process::try_compute_pages}, solve::{action::{Action, D_R_REPEATS, revert_log_and_remake}, ahss::ahss_synthetic_e1_issue, ahss_e1::get_all_e1_solutions, ehp_ahss::set_metastable_range, generate::{get_a_diff, get_a_tau}, issues::{Issue, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic, synthetic_issue_is_tau_structure_issue}, solve::auto_deduce}, types::Kind};
 
-// const PARALLEL_DEPTH: i32 = -1;
+const PARALLEL_DEPTH: i32 = -1;
 
-// fn check_issue(data: &SyntheticSS, stem: i32, bot_trunc: i32, top_trunc: i32) -> Result<(), Vec<Issue>> {
-//     for &(synthetic, bt, tt) in rp_truncations() {
-//         if (top_trunc == tt || (stem + 1 == top_trunc && tt == 256)) && bot_trunc == bt {
-//             if synthetic {
-//                 let pages = try_compute_pages(data, bt, tt, stem, stem)?;
+fn check_issue(data: &SyntheticSS, stem: i32, bot_trunc: i32, top_trunc: i32) -> Result<(), Vec<Issue>> {
+    for &(synthetic, bt, tt) in rp_truncations() {
+        if (top_trunc == tt || (stem + 1 == top_trunc && tt == 256)) && bot_trunc == bt {
+            if synthetic {
+                let pages = try_compute_pages(data, bt, tt, stem, stem)?;
                 
-//                 let observed = pages.convergence_at_stem(data, stem);
+                let observed = pages.convergence_at_stem(data, stem);
 
-//                 compare_synthetic(
-//                     &observed,
-//                     synthetic_rp(bt, tt),
-//                     bt,
-//                     top_trunc,
-//                     stem,
-//                 )?;
-//             } else {
-//                 let pages = try_compute_pages(data, bt, tt, stem - 1, stem)?;
+                compare_synthetic(
+                    &observed,
+                    synthetic_rp(bt, tt),
+                    bt,
+                    top_trunc,
+                    stem,
+                )?;
+            } else {
+                let pages = try_compute_pages(data, bt, tt, stem - 1, stem)?;
                 
-//                 let observed = pages.algebraic_convergence_at_stem(data, stem);
+                let observed = pages.algebraic_convergence_at_stem(data, stem);
 
-//                 compare_algebraic(
-//                     &observed,
-//                     algebraic_rp(bt, tt),
-//                     bt,
-//                     tt,
-//                     stem,
-//                 )?;
-//             }
-//             compare_algebraic_spectral_sequence(data, stem, bt, tt, true)?;
-//         }
-//     }
+                compare_algebraic(
+                    &observed,
+                    algebraic_rp(bt, tt),
+                    bt,
+                    tt,
+                    stem,
+                )?;
+            }
+            compare_algebraic_spectral_sequence(data, stem, bt, tt, true)?;
+        }
+    }
     
-//     Ok(())
-// }
+    Ok(())
+}
 
-// fn filter_diff(data: &SyntheticSS, alg_ahss: &SyntheticSS, bot_trunc: i32, top_trunc: i32, d: Diff) -> Option<(Kind, String)> {
-//     let stem = data.model.stem(d.to);
-//     let y = data.model.y(d.from);
+fn filter_diff(data: &SyntheticSS, alg_ahss: &SyntheticSS, bot_trunc: i32, top_trunc: i32, d: Diff) -> Option<(Kind, String)> {
+    let stem = data.model.stem(d.to);
+    let y = data.model.y(d.from);
 
-//     if y == 3 || y == 7 || (y == 15 && stem != 14) || (y == 31 && stem != 30) {
-//         Some((Kind::Fake, format!("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere")))
-//     } else if data.in_diffs[d.to].iter().any(|from| data.model.y(*from) == top_trunc && data.model.original_torsion(*from).alive()){
-//         Some((Kind::Unknown, format!("As we are only interested in the module structure, we won't consider the case where two differentials target the same generator.")))
-//     } else if bot_trunc & 1 == 0 && 
-//             let Some(alg_to) = alg_ahss.out_diffs[d.from].first() && 
-//             data.model.original_torsion(*alg_to).alive() && 
-//             data.model.y(*alg_to) + 1 == bot_trunc {
-//         Some((Kind::Unknown, format!("We don't have enough Synthetic information to deduce this differential.")))
-//     } else {
-//         None
-//     }
-// }
-
-// fn do_diff(data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<FromTo>>>>, mut getout: Option<Arc<Mutex<bool>>>, log: Arc<Mutex<Vec<Action>>>, stem: i32, top_trunc: i32, bot_trunc: i32, depth: i32, bounded: bool) {
-
-// }
+    if y == 3 || y == 7 || (y == 15 && stem != 14) || (y == 31 && stem != 30) {
+        Some((Kind::Fake, format!("By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere")))
+    } else if data.in_diffs[d.to].iter().any(|from| data.model.y(*from) == top_trunc && data.model.original_torsion(*from).alive()){
+        Some((Kind::Unknown, format!("As we are only interested in the module structure, we won't consider the case where two differentials target the same generator.")))
+    } else if bot_trunc & 1 == 0 && 
+            let Some(alg_to) = alg_ahss.out_diffs[d.from].first() && 
+            data.model.original_torsion(*alg_to).alive() && 
+            data.model.y(*alg_to) + 1 == bot_trunc {
+        Some((Kind::Unknown, format!("We don't have enough Synthetic information to deduce this differential.")))
+    } else {
+        None
+    }
+}
 
 // // TODO: Is a stem wise approach ENOUGH to conclude E1 stuff, lets hope E1 stuff can always be resolved on the current stem (sadly, i know this is not true :( )?
 // fn ahss_iterate(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<FromTo>>>>, mut getout: Option<Arc<Mutex<bool>>>, log: Arc<Mutex<Vec<Action>>>, stem: i32, top_trunc: i32, bot_trunc: i32, depth: i32, bounded: bool) -> Result<(), String> {
@@ -474,58 +470,113 @@
 //     }
 // }
 
-// pub fn ehp_solver(ahss: &SyntheticSS) -> (Vec<Action>, SyntheticSS) {
-//     let alg_ehp = DATA.clone();
-//     let mut partial_ahss = SyntheticSS::empty(alg_ehp.model.clone());
-//     // We should add all d1's from the algebraic data
+pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>, SyntheticSS) {
+    let alg_ehp = DATA.clone();
+    let mut partial_ehp = SyntheticSS::empty(alg_ehp.model.clone());
+    // We should add all d1's from the algebraic data
     
-//     set_metastable_range(&mut partial_ahss, ahss);
+    set_metastable_range(&mut partial_ehp, ahss);
 
-//     let mut alg_data = vec![vec![vec![vec![]; (MAX_STEM + 2) as usize]; (MAX_STEM + 1) as usize]; (MAX_STEM + 1) as usize];
+    let mut alg_and_ahss_diffs = vec![vec![vec![vec![]; (MAX_STEM + 2) as usize]; (MAX_STEM + 1) as usize]; (MAX_STEM + 1) as usize];
 
-//     for (&(from, to), _) in &alg_ehp.proven_from_to {
-//         let d_y = alg_ehp.model.y(from) - alg_ehp.model.y(to);
-//         if d_y == 1 {
-//             partial_ahss.add_diff(from, to, None, Kind::Real);
-//         } else {
-//             let stem = alg_ehp.model.stem(to);
-//             let top_trunc = alg_ehp.model.y(from);
-//             alg_data[stem as usize][d_y as usize][top_trunc as usize].push((from, to));
-//         }
-//     }
+    // Add EHP Algebraic Diffs
+    for (&(from, to), _) in &alg_ehp.proven_from_to {
+        let d_y = alg_ehp.model.y(from) - alg_ehp.model.y(to);
+        if d_y == 1 {
+            partial_ehp.add_diff(from, to, None, Kind::Real);
+        } else {
+            let stem = alg_ehp.model.stem(to);
+            let top_trunc = alg_ehp.model.y(from);
+            alg_and_ahss_diffs[stem as usize][d_y as usize][top_trunc as usize].push((from, to, Kind::Real, None));
+        }
+    }
 
+    // Add compatible AHSS diffs
+    for (&(from, to), proof) in &ahss.proven_from_to {
+        let d_y = ahss.model.y(from) - ahss.model.y(to);
 
+        if let Some(from_id) = alg_ehp.model.try_index(ahss.model.name(from)) {
+            if let Some(to_id) = alg_ehp.model.try_index(ahss.model.name(to)) {
+                // Differentials 
+                if ahss.model.stem(from) != ahss.model.stem(to) {
+                    // Don't include the Algebraic diffs of AHSS
+                    if let Some(p) = proof {
+                        if d_y == 1 {
+                            partial_ehp.add_diff(from_id, to_id, Some(format!("Lifted from Stable EHP")), Kind::Real);
+                        } else {
+                            let stem = alg_ehp.model.stem(to_id);
+                            let top_trunc = alg_ehp.model.y(from_id);
+                            alg_and_ahss_diffs[stem as usize][d_y as usize][top_trunc as usize].push((from, to, Kind::Real, Some(format!("Lifted from Stable EHP"))));
+                        }
+                    }
+                }
+            }
+        }
+    }
 
-//     let mut log = vec![
-//         Action::AddInt { 
-//             from: "6 5 3[2]".to_string(), 
-//             to: "6 2 3 3[2]".to_string(), 
-//             page: 2, 
-//             proof: "Unique solution to RP1_2".to_string(), 
-//             kind: Kind::Real 
-//         },
-//     ]; 
+    // Add disproven compatible AHSS diffs
+    for (&(from, to), proof) in &ahss.disproven_from_to {
+        let d_y = ahss.model.y(from) - ahss.model.y(to);
+
+        // Only add differentials here
+        if ahss.model.stem(from) != ahss.model.stem(to) {
+            if let Some(from_id) = alg_ehp.model.try_index(ahss.model.name(from)) {
+                if let Some(to_id) = alg_ehp.model.try_index(ahss.model.name(to)) {
+                    // Don't include the Unknown differentials
+                    if let Some(p) = proof {
+                        if d_y == 1 {
+                            partial_ehp.add_diff(from_id, to_id, Some(format!("Lifted from Stable EHP")), Kind::Real);
+                        } else {
+                            let stem = alg_ehp.model.stem(to_id);
+                            let top_trunc = alg_ehp.model.y(from_id);
+                            alg_and_ahss_diffs[stem as usize][d_y as usize][top_trunc as usize].push((from, to, Kind::Fake, Some(format!("Lifted from Stable EHP"))));
+                        }
+                    }
+                } 
+            }
+        }
+    }
+
+    // Add all external tau's 
+    // We won't worry about the fake ones
+    for esss in &ahss.external_tau_page {
+        for ess in esss {
+            for es in ess {
+                for e in es {
+                    if let Some(from_id) = alg_ehp.model.try_index(ahss.model.name(e.from)) {
+                        if let Some(to_id) = alg_ehp.model.try_index(ahss.model.name(e.to)) {
+                            partial_ehp.add_ext_tau(from_id, to_id, e.af, Some(format!("Lifted from Stable EHP")), Kind::Real);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let mut log = if let Some(log) = log {log} else { vec![
     
-//     for stem in 2..=35 {
-//         let ahss = revert_log_and_remake(0, &mut log, &partial_ahss, true);
-//         let (res, l) = e1_loop(ahss, &mut partial_ahss, &alg_ehp, &alg_data, log, stem);
-//         log = l;
-//         for dss in &alg_data[stem as usize] {
-//             for ds in dss {
-//                 for &(from, to) in ds {
-//                     partial_ahss.add_diff(from, to, None, Kind::Real);
-//                 }
-//             }
-//         }
-//         match res {
-//             Ok(_) => {},
-//             Err(e) => {
-//                 println!("Error on stem {stem}: {e}");
-//                 break;
-//             },
-//         }
-//     }
+    ]};
+    
+    // for stem in 2..=35 {
+    //     let ahss = revert_log_and_remake(0, &mut log, &partial_ehp, true);
+    //     let (res, l) = e1_loop(ahss, &mut partial_ehp, &alg_ehp, &alg_data, log, stem);
+    //     log = l;
+    //     for dss in &alg_data[stem as usize] {
+    //         for ds in dss {
+    //             for &(from, to) in ds {
+    //                 partial_ehp.add_diff(from, to, None, Kind::Real);
+    //             }
+    //         }
+    //     }
+    //     match res {
+    //         Ok(_) => {},
+    //         Err(e) => {
+    //             println!("Error on stem {stem}: {e}");
+    //             break;
+    //         },
+    //     }
+    // }
 
-//     let ahss = revert_log_and_remake(0, &mut log, &partial_ahss, true);
-//     (log, ahss)
-// }
+    let ehp = revert_log_and_remake(0, &mut log, &partial_ehp, true);
+    (log, ehp)
+}

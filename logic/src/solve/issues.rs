@@ -320,7 +320,7 @@ pub fn synthetic_issue_is_tau_structure_issue(issues: &Vec<Issue>) -> (bool, boo
         (false, false)
     } else {
         if issues.len() == 1 {
-            panic!()
+            panic!();
         }
         (true, total_gens < 0)
     }

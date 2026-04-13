@@ -4,21 +4,47 @@ use crate::domain::{model::{Diff, ExtTauMult, SyntheticSS}, process::compute_pag
 pub fn get_a_diff(data: &SyntheticSS, top_trunc: i32, target_y: i32, stem: i32) -> Option<Diff> {
     
     // We can look at targets in RP1_256 as we have not added the adams diffs yet! 
-    let (targets, _) = compute_pages(data, 0, top_trunc, stem, stem, false);
+    // let (targets, _) = compute_pages(data, 0, top_trunc, stem, stem, false);
     let (sources, _) = compute_pages(data, 0, 256, stem, stem + 1, false);
 
-    for &t_id in data.model.gens_id_in_stem_y(stem, target_y) {
-        if let Some((t_af, t_torsion)) = targets.try_element_final(t_id) && t_torsion.alive() {
-            for &s_id in data.model.gens_id_in_stem_y(stem + 1, top_trunc) {
-                if let Some((s_page, (s_af, s_torsion))) = sources.try_element_final_with_page(s_id) {
-                    let coeff = t_af - s_af - 1;
-                    if top_trunc - target_y >= s_page && s_torsion.alive() && coeff >= 0 {
+    // if top_trunc == 5 && target_y == 3 && stem == 39 {
+    //     println!("HOI!!OIH!OIHO!");
+    // }
 
+    let d_y = top_trunc - target_y;
+
+    for &t_id in data.model.gens_id_in_stem_y(stem, target_y) {
+        if let Some((t_af, t_torsion)) = sources.try_element_final(t_id) && t_torsion.alive() {
+            for &s_id in data.model.gens_id_in_stem_y(stem + 1, top_trunc) {
+                let (from_name, to_name) = data.get_names(s_id, t_id);
+                if from_name == "2 4 3 3 3 6 6 5 3[5]" && to_name == "6 2 2 2 2 2 2 4 5 3 3 3[3]" {
+                    println!("1 | {from_name} | {to_name}");
+                }
+                if let Some((_, s_torsion)) = sources.try_element_final(s_id) && s_torsion.alive() {
+                    let (s_af, _) = sources.element_at_page(d_y + 1, s_id);
+                    
+                    let coeff = t_af - s_af - 1;
+                    
+                    if from_name == "2 4 3 3 3 6 6 5 3[5]" && to_name == "6 2 2 2 2 2 2 4 5 3 3 3[3]" {
+                        println!("2 | {from_name} | {to_name} | {s_torsion:?} | {coeff}");
+                    }
+                    // TODO: top_trunc - target_y >= s_page
+                    // This should only hold whenever the s_page came from an actual 
+                    if coeff >= 0 {
+                        if from_name == "2 4 3 3 3 6 6 5 3[5]" && to_name == "6 2 2 2 2 2 2 4 5 3 3 3[3]" {
+                            println!("3 | {from_name} | {to_name}");
+                        }
+                        
+                        
+                        
                         // Would be useless diff
                         if let Some(t_torsion) = t_torsion.0 && t_torsion - coeff <= 0 {
                             continue;
                         }
                         
+                        if from_name == "2 4 3 3 3 6 6 5 3[5]" && to_name == "6 2 2 2 2 2 2 4 5 3 3 3[3]" {
+                            println!("4 | {from_name} | {to_name}");
+                        }
                         // Would have been seen algebraically
                         if coeff == 0 {
                             if t_af == data.model.original_af(t_id) && s_af == data.model.original_af(s_id) {
@@ -31,12 +57,21 @@ pub fn get_a_diff(data: &SyntheticSS, top_trunc: i32, target_y: i32, stem: i32) 
                                 }
                             }
                         } 
-
-                        if !data.disproven_from_to.contains_key(&(s_id,t_id)) {
+                        if from_name == "2 4 3 3 3 6 6 5 3[5]" && to_name == "6 2 2 2 2 2 2 4 5 3 3 3[3]" {
+                            println!("5 | {from_name} | {to_name}");
+                        }
+                        
+                        if !data.disproven_from_to.contains_key(&(s_id,t_id)) &&
+                            !data.proven_from_to.contains_key(&(s_id, t_id)) {
                             if t_torsion.can_map_with_coeff(&s_torsion, coeff) {
+                                if from_name == "2 4 3 3 3 6 6 5 3[5]" && to_name == "6 2 2 2 2 2 2 4 5 3 3 3[3]" {
+                                    println!("6 | {from_name} | {to_name}");
+                                }
+
                                 return Some(Diff { from: s_id, to: t_id })
                             }
                         }
+                    
                     }
                 }
             }            

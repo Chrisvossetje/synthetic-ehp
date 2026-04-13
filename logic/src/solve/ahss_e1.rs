@@ -224,7 +224,7 @@ pub fn get_all_e1_solutions(
         .collect()
 }
 
-fn get_e1_solutions(data: &SyntheticSS, issue: &Issue) -> Vec<Vec<Action>> {
+pub fn get_e1_solutions(data: &SyntheticSS, issue: &Issue) -> Vec<Vec<Action>> {
     // Give a list of options which one could / should change
     // This is the only time i (should) do this forward approach. Aka giving potential solutions.
     // In other cases i should just "go" and see if some option resolves some issue
@@ -233,10 +233,10 @@ fn get_e1_solutions(data: &SyntheticSS, issue: &Issue) -> Vec<Vec<Action>> {
     // It should be "unique" permutations!
 
     if let Issue::SyntheticE1Page { stem, af, expected, observed } = issue {
-        let stem = stem + 1;
-    
-        let stem_af_to_index = data.model.gens_id_in_stem_af(stem, *af);
-    
+        let stem_af_to_index = data.model.gens_id_in_stem_af(*stem, *af);
+        
+        // let stem = stem + 1;
+
         let mut changes = vec![];
     
         for p in expected.iter().permutations(expected.len()).unique() {
@@ -250,6 +250,7 @@ fn get_e1_solutions(data: &SyntheticSS, issue: &Issue) -> Vec<Vec<Action>> {
             }
             changes.push(change);
         } 
+
         changes
     } else {
         panic!("Can only call this function on Synthetic E1 error")

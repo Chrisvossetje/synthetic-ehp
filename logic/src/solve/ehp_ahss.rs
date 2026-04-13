@@ -65,20 +65,22 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
         }
     }
 
-    for ess in &ahss.external_tau_page {
-        for es in ess {
-            for e in es {
-                let g_from = ahss.model.get(e.from);
-                let g_to = ahss.model.get(e.to);
-                if in_metastable_range(g_to.y, g_to.stem) {
-                    let proof = ahss.proven_from_to.get(&(e.from, e.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting external tau's not done carefully enough.");
-                    ehp.add_ext_tau_name(
-                        g_from.name.clone(),
-                        g_to.name.clone(),
-                        e.af,
-                        proof.clone().map(|x| format!("{x} (Metastable)")),
-                        Kind::Real // TODO! <<
-                    )?;
+    for esss in &ahss.external_tau_page {
+        for ess in esss {
+            for es in ess {
+                for e in es {
+                    let g_from = ahss.model.get(e.from);
+                    let g_to = ahss.model.get(e.to);
+                    if in_metastable_range(g_to.y, g_to.stem) {
+                        let proof = ahss.proven_from_to.get(&(e.from, e.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting external tau's not done carefully enough.");
+                        ehp.add_ext_tau_name(
+                            g_from.name.clone(),
+                            g_to.name.clone(),
+                            e.af,
+                            proof.clone().map(|x| format!("{x} (Metastable)")),
+                            Kind::Real // TODO! <<
+                        )?;
+                    }
                 }
             }
         }

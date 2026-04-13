@@ -1,18 +1,19 @@
-use core::panic;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc,
+    Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 
-use itertools::Itertools;
+use crate::{MAX_AUTOMATED_TOP_TRUNC, MAX_STEM, MAX_VERIFY_STEM, data::{compare::{algebraic_rp, rp_truncations, synthetic_rp}, curtis::STABLE_DATA}, domain::{model::{Diff, ExtTauMult, FromTo, SyntheticSS}, process::{compute_pages, try_compute_pages}}, solve::{action::{Action, D_R_REPEATS, revert_log_and_remake}, ahss::ahss_synthetic_e1_issue, ahss_e1::get_all_e1_solutions, generate::{get_a_diff, get_a_tau}, issues::{Issue, algebraic_issue_is_fixable_by_tau_extensions, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic, synthetic_issue_is_tau_structure_issue}, solve::{auto_deduce, suggest_tau_solution_algebraic, suggest_tau_solution_generator_synthetic, suggest_tau_solution_module_synthetic}}, types::{Kind, Torsion}};
 
-use crate::{MAX_STEM, data::{self, compare::{algebraic_rp, rp_truncations, synthetic_rp}, curtis::STABLE_DATA}, domain::{model::{Diff, ExtTauMult, FromTo, SyntheticSS}, process::try_compute_pages}, solve::{action::{Action, D_R_REPEATS, revert_log_and_remake}, ahss::ahss_synthetic_e1_issue, ahss_e1::get_all_e1_solutions, generate::{get_a_diff, get_a_tau}, issues::{Issue, algebraic_issue_is_fixable_by_tau_extensions, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic, synthetic_issue_is_tau_structure_issue}, solve::{auto_deduce, suggest_tau_solution_algebraic, suggest_tau_solution_generator_synthetic, suggest_tau_solution_module_synthetic}}, types::Kind};
-
-const PARALLEL_DEPTH: i32 = 2;
+const PARALLEL_DEPTH: i32 = 3;
 const ALWAYS_PRINT: bool = false;
 
 fn check_issue(data: &SyntheticSS, stem: i32, bot_trunc: i32, top_trunc: i32) -> Result<(), Vec<Issue>> {
     for &(synthetic, bt, tt) in rp_truncations() {
         if (top_trunc == tt || (stem + 1 == top_trunc && tt == 256)) && bot_trunc == bt {
             if synthetic {
-                let pages = try_compute_pages(data, bt, tt, stem, stem)?;
+                let (pages, issues) = compute_pages(data, bt, tt, stem, stem, true);
                 
                 let observed = pages.convergence_at_stem(data, stem);
 
@@ -23,9 +24,14 @@ fn check_issue(data: &SyntheticSS, stem: i32, bot_trunc: i32, top_trunc: i32) ->
                     top_trunc,
                     stem,
                 )?;
+
+                if issues.len() != 0 {
+                    return Err(issues);
+                }   
+
             } else {
-                let pages = try_compute_pages(data, bt, tt, stem - 1, stem)?;
-                
+                let (pages, issues) = compute_pages(data, bt, tt, stem - 1, stem, true);
+
                 let observed = pages.algebraic_convergence_at_stem(data, stem);
 
                 compare_algebraic(
@@ -35,6 +41,11 @@ fn check_issue(data: &SyntheticSS, stem: i32, bot_trunc: i32, top_trunc: i32) ->
                     tt,
                     stem,
                 )?;
+
+                if issues.len() != 0 {
+                    return Err(issues);
+                }   
+
             }
             compare_algebraic_spectral_sequence(data, stem, bt, tt, true)?;
         }
@@ -55,7 +66,7 @@ fn filter_diff(data: &SyntheticSS, alg_ahss: &SyntheticSS, bot_trunc: i32, top_t
             data.model.original_torsion(*alg_to).alive() && 
             data.model.y(*alg_to) + 1 == bot_trunc {
         Some((Kind::Unknown, format!("We don't have enough Synthetic information to deduce this differential.")))
-    } else if top_trunc & 1 == 1 && 
+    } else if top_trunc & 1 == 1 && !(top_trunc == 5 && bot_trunc == 3) &&
             let Some(dies) = data.model.get(d.to).dies && 
             let Some(source) = alg_ahss.in_diffs[d.to].first() &&
             data.model.original_torsion(*source).free() &&
@@ -68,11 +79,11 @@ fn filter_diff(data: &SyntheticSS, alg_ahss: &SyntheticSS, bot_trunc: i32, top_t
 }
 
 // TODO: Is a stem wise approach ENOUGH to conclude E1 stuff, lets hope E1 stuff can always be resolved on the current stem (sadly, i know this is not true :( )?
-fn ahss_iterate(data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<FromTo>>>>, mut getout: [Option<Arc<Mutex<bool>>>; PARALLEL_DEPTH as usize], log: Arc<Mutex<Vec<Action>>>, stem: i32, top_trunc: i32, bot_trunc: i32, depth: i32, bounded: bool, tau_mode: bool) -> Result<(), String> {
+fn ahss_iterate(data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<FromTo>>>>, mut getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize], log: Arc<Mutex<Vec<Action>>>, stem: i32, top_trunc: i32, bot_trunc: i32, depth: i32, bounded: bool, tau_mode: bool) -> Result<bool, String> {
     for g in &getout {
         if let Some(g) = g {
-            if *g.lock().unwrap() {
-                return Ok(());
+            if g.load(Ordering::Relaxed) {
+                return Ok(false);
             }
         } 
     } 
@@ -94,19 +105,19 @@ fn ahss_iterate(data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Ve
         Ok(tau_issue) => tau_issue,
         Err(is) => {
             if depth <= PARALLEL_DEPTH && depth != 0 && let Some(getout) = &mut getout[(depth - 1) as usize] {
-                *getout.lock().unwrap() = true;
+                getout.store(true, Ordering::Relaxed);
             }
            return Err(is)
         },
     };
 
-    if let Some((synthetic, issues)) = potential_tau_thing {
+    if let Some((synthetic, mut issues)) = potential_tau_thing {
         let option = match synthetic {
-            TauIssue::AlgTauIssue => suggest_tau_solution_algebraic(&data, &issues, top_trunc, bot_trunc, stem),
-            TauIssue::SynTauGeneratorIssue => {suggest_tau_solution_generator_synthetic(&data, &issues, top_trunc, bot_trunc, stem)},
+            TauIssue::AlgTauIssue => suggest_tau_solution_algebraic(&data, &mut issues, top_trunc, bot_trunc, stem),
+            TauIssue::SynTauGeneratorIssue => {suggest_tau_solution_generator_synthetic(&data, &mut issues, top_trunc, bot_trunc, stem)},
             TauIssue::SynTauModuleIssue => {
                 // get_a_tau(&data, top_trunc, bot_trunc, stem)
-                suggest_tau_solution_generator_synthetic(&data, &issues, top_trunc, bot_trunc, stem)
+                suggest_tau_solution_generator_synthetic(&data, &mut issues, top_trunc, bot_trunc, stem)
                 }
             };
         
@@ -114,7 +125,7 @@ fn ahss_iterate(data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Ve
             return try_tau(data, alg_ahss, alg_data, getout, log, stem, top_trunc, bot_trunc, depth, bounded, d);
         } else {
             if depth <= PARALLEL_DEPTH && depth != 0 && let Some(getout) = &mut getout[(depth - 1) as usize] {
-                *getout.lock().unwrap() = true;
+                getout.store(true, Ordering::Relaxed);
             }
             return Err(format!("Issue at RP{bot_trunc}_{top_trunc}: {issues:?}"));
         }
@@ -122,24 +133,28 @@ fn ahss_iterate(data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Ve
 
     // TODO: 
     // if bounded {
-    //     return Ok(());
+    //     return Ok(true);
     // }
     
     if bot_trunc != 0 {
         return add_algebraic_diffs(data, alg_ahss, alg_data, getout, log, stem, top_trunc, bot_trunc, depth, bounded);
     }
 
-    if top_trunc == stem + 1 {
-        Ok(())
+    if top_trunc == stem + 1 || top_trunc >= MAX_AUTOMATED_TOP_TRUNC {
+        Ok(true)
     } else {
         ahss_iterate(data, alg_ahss, alg_data, getout, log, stem, top_trunc + 1, top_trunc, depth, bounded, tau_mode)
     }
 }
 
-fn try_diff(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>, mut getout: [Option<Arc<Mutex<bool>>>; PARALLEL_DEPTH as usize], log: &Arc<Mutex<Vec<Action>>>, stem: i32, top_trunc: i32, bot_trunc: i32, depth: i32, bounded: bool, d: Diff) -> Result<(), String> {
+fn try_diff(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>, mut getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize], log: &Arc<Mutex<Vec<Action>>>, stem: i32, top_trunc: i32, bot_trunc: i32, depth: i32, bounded: bool, d: Diff) -> Result<bool, String> {
     let (from_name, to_name) = data.get_names(d.from, d.to);
     
     let filter = filter_diff(&data, alg_ahss, bot_trunc, top_trunc, d);
+
+    if ALWAYS_PRINT || depth == 0 {
+        println!("Trying diff: {} | {}", from_name, to_name);
+    }    
     
     if let Some((kind, reason)) = filter {
         if depth == 0 {
@@ -150,14 +165,11 @@ fn try_diff(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Ve
         return ahss_iterate(data, alg_ahss, alg_data, getout.clone(), log.clone(), stem, top_trunc, bot_trunc, depth, bounded, false)
     }
 
-
-    if ALWAYS_PRINT || depth == 0 {
-        println!("Trying diff: {} | {}", from_name, to_name);
-    }    
+    
 
     
     if depth < PARALLEL_DEPTH { 
-        getout[depth as usize] = Some(Arc::new(Mutex::new(false)));
+        getout[depth as usize] = Some(Arc::new(AtomicBool::new(false)));
     }
 
     let with = || {
@@ -183,9 +195,11 @@ fn try_diff(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Ve
         
             // Proof: Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 30, stem: 30, af: 4, expected: [Torsion(Some(1))], observed: [Torsion(None)] }
 
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Disproven diff: {} | {} by {e}", from_name, to_name);            
+            }
             // Commit choice !
             if depth == 0 {
-                println!("Disproven diff: {} | {} by {e}", from_name, to_name);            
                 log.lock().unwrap().push(Action::AddDiff { from: from_name, to: to_name, proof: Some(e.clone()), kind: Kind::Fake });
             }
     
@@ -194,23 +208,44 @@ fn try_diff(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Ve
             // And iterate further
             getout[depth as usize] = None;
             return ahss_iterate(data, alg_ahss, alg_data, getout, log.clone(), stem, top_trunc, bot_trunc, depth, bounded, false)
+        } else if let Err(e) = without_res {
+            let (from_name, to_name) = data.get_names(d.from, d.to);
+    
+            data.add_diff(d.from, d.to, Some(e.clone()), Kind::Real);
+    
+            if depth == 0 {
+                println!("Proven diff: {} | {} | {:?}", from_name, to_name, Some(e.clone()));
+                log.lock().unwrap().push(Action::AddDiff { from: from_name, to: to_name, proof: Some(e), kind: Kind::Real });
+            }
+
+            getout[depth as usize] = None;
+            return ahss_iterate(data, alg_ahss, alg_data, getout, log.clone(), stem, top_trunc, bot_trunc, depth, bounded, false)
+        } else if !matches!(with_res, Ok(true)) || !matches!(without_res, Ok(true)) {
+            return Ok(false);
         } else {
             let without = without_res;
     
             let (from_name, to_name) = data.get_names(d.from, d.to);
     
-            if without.is_ok() && depth == 0 {
+            if matches!(without, Ok(true)) && depth == 0 {
                 println!("WITH OR WITHOUT ARE BOTH FINE FOR THE DIFFERENTIAL: {:?} | {:?}", d, data.get_names(d.from, d.to));
             }
     
             // If with and without are both Ok then we continue WITHOUT the differential
             // But we do remember that we don't know the result of this diff    
-            let kind = if without.is_err() { Kind::Real } else { Kind::Unknown };
-            let proof = if let Err(e) = without { Some(e) } else { None };
+            let kind = Kind::Unknown;
+            let proof = None;
         
             data.add_diff(d.from, d.to, proof.clone(), kind);
     
             // Commit choice !
+            if ALWAYS_PRINT || depth == 0 { 
+                if kind == Kind::Unknown {
+                    println!("Unknown diff: {} | {}", from_name, to_name);
+                } else {
+                    println!("Proven diff: {} | {} | {proof:?}", from_name, to_name);
+                }
+            }
             if depth == 0 { 
                 if kind == Kind::Unknown {
                     println!("Unknown diff: {} | {}", from_name, to_name);
@@ -225,7 +260,8 @@ fn try_diff(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Ve
         }
 
     } else {
-        if let Err(e) = with() {
+        let with_res = with();
+        if let Err(e) = with_res {
             // DISPROOF !
             let (from_name, to_name) = data.get_names(d.from, d.to);
         
@@ -242,19 +278,24 @@ fn try_diff(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Ve
         
             // And iterate further
             return ahss_iterate(data, alg_ahss, alg_data, getout.clone(), log.clone(), stem, top_trunc, bot_trunc, depth, bounded, false)
+        } else if !matches!(with_res, Ok(true)) {
+            return Ok(false);
         } else {
             let without = without();
     
             let (from_name, to_name) = data.get_names(d.from, d.to);
     
-            if without.is_ok() && depth == 0 {
+            if matches!(without, Ok(true)) && depth == 0 {
                 println!("WITH OR WITHOUT ARE BOTH FINE FOR THE DIFFERENTIAL: {:?} | {:?}", d, data.get_names(d.from, d.to));
             }
     
             // If with and without are both Ok then we continue WITHOUT the differential
             // But we do remember that we don't know the result of this diff    
-            let kind = if without.is_err() { Kind::Real } else { Kind::Unknown };
-            let proof = if let Err(e) = without { Some(e) } else { None };
+            let (kind, proof) = match without {
+                Err(e) => (Kind::Real, Some(e)),
+                Ok(true) => (Kind::Unknown, None),
+                Ok(false) => return Ok(false),
+            };
         
             data.add_diff(d.from, d.to, proof.clone(), kind);
     
@@ -301,20 +342,20 @@ fn is_tau_issue(data: &SyntheticSS, stem: i32, top_trunc: i32, bot_trunc: i32, d
                         Ok(Some((TauIssue::SynTauModuleIssue, is)))
                     }
                 } else {
-                    Err(format!("For RP{bot_trunc}_{top_trunc} the F_2 vector space generators don't add up."))
+                    Err(format!("For RP{bot_trunc}_{top_trunc} the F_2 vector space generators don't add up. {is:?}"))
                 }
             } else {
                 if algebraic_issue_is_fixable_by_tau_extensions(&is) {
                     Ok(Some((TauIssue::AlgTauIssue, is)))
                 } else {
-                    Err(format!("For RP{bot_trunc}_{top_trunc} there is no way to fix the algebraic convergence issues with tau extensions"))
+                    Err(format!("For RP{bot_trunc}_{top_trunc} there is no way to fix the algebraic convergence issues with tau extensions. {is:?}"))
                 }
             }
         },
     }
 }
 
-fn try_tau(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>, mut getout: [Option<Arc<Mutex<bool>>>; PARALLEL_DEPTH as usize], log: Arc<Mutex<Vec<Action>>>, stem: i32, top_trunc: i32, bot_trunc: i32, depth: i32, bounded: bool, d: ExtTauMult) -> Result<(), String> {
+fn try_tau(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>, mut getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize], log: Arc<Mutex<Vec<Action>>>, stem: i32, top_trunc: i32, bot_trunc: i32, depth: i32, bounded: bool, d: ExtTauMult) -> Result<bool, String> {
     let (from_name, to_name) = data.get_names(d.from, d.to);
     
     if ALWAYS_PRINT || depth == 0 {
@@ -323,7 +364,7 @@ fn try_tau(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec
 
     
     if depth < PARALLEL_DEPTH { 
-        getout[depth as usize] = Some(Arc::new(Mutex::new(false)));
+        getout[depth as usize] = Some(Arc::new(AtomicBool::new(false)));
     }
 
     let with = || {
@@ -350,8 +391,10 @@ fn try_tau(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec
             let (from_name, to_name) = data.get_names(d.from, d.to);
         
             // Commit choice !
-            if depth == 0 {
+            if ALWAYS_PRINT || depth == 0 {
                 println!("Disproven tau: {} | {} by {e}", from_name, to_name);
+            }
+            if depth == 0 {
                 log.lock().unwrap().push(Action::AddExt { from: from_name, to: to_name, af: d.af, proof: e.clone(), kind: Kind::Fake });
             }
         
@@ -360,25 +403,44 @@ fn try_tau(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec
             // And iterate further
             getout[depth as usize] = None;
             return ahss_iterate(data, alg_ahss, alg_data, getout, log, stem, top_trunc, bot_trunc, depth, bounded, true)
+        } else if let Err(e) = without_res {
+            let (from_name, to_name) = data.get_names(d.from, d.to);
+            let proof = e.clone();
+        
+            data.add_ext_tau(d.from, d.to, d.af, Some(proof.clone()), Kind::Real);
+        
+            if ALWAYS_PRINT || depth == 0 { 
+                println!("Proven tau: {} | {} by {proof}", from_name, to_name);
+            }
+            if depth == 0 { 
+                log.lock().unwrap().push(Action::AddExt { from: from_name, to: to_name, af: d.af, proof, kind: Kind::Real });
+            }
+
+            getout[depth as usize] = None;
+            return ahss_iterate(data, alg_ahss, alg_data, getout, log, stem, top_trunc, bot_trunc, depth, bounded, true)
+        } else if !matches!(with_res, Ok(true)) || !matches!(without_res, Ok(true)) {
+            return Ok(false);
         } else {
             let without = without_res;
         
             let (from_name, to_name) = data.get_names(d.from, d.to);
     
-            if without.is_ok() && depth == 0 {
+            if matches!(without, Ok(true)) && depth == 0 {
                 println!("WITH OR WITHOUT ARE BOTH FINE FOR THE TAU: {:?} | {:?}", d, data.get_names(d.from, d.to));
             }
         
             // If with and without are both Ok then we continue WITHOUT the differential
             // But we do remember that we don't know the result of this diff    
-            let kind = if without.is_err() { Kind::Real } else { Kind::Unknown };
-            let proof = if let Err(e) = without { e } else { "".to_string() };
+            let kind = Kind::Unknown;
+            let proof = "".to_string();
         
             data.add_ext_tau(d.from, d.to, d.af, Some(proof.clone()), kind);
         
             // Commit choice !
-            if depth == 0 { 
+            if ALWAYS_PRINT || depth == 0 { 
                 println!("Proven tau: {} | {} by {proof}", from_name, to_name);
+            }
+            if depth == 0 { 
                 log.lock().unwrap().push(Action::AddExt { from: from_name, to: to_name, af: d.af, proof, kind });
             }
 
@@ -387,13 +449,16 @@ fn try_tau(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec
         }
     
     } else {
-        if let Err(e) = with() {
+        let with_res = with();
+        if let Err(e) = with_res {
             // DISPROOF !
             let (from_name, to_name) = data.get_names(d.from, d.to);
         
             // Commit choice !
-            if depth == 0 {
+            if ALWAYS_PRINT || depth == 0 {
                 println!("Disproven tau: {} | {} by {e}", from_name, to_name);
+            }
+            if depth == 0 {
                 log.lock().unwrap().push(Action::AddExt { from: from_name, to: to_name, af: d.af, proof: e.clone(), kind: Kind::Fake });
                 getout = [const { None }; PARALLEL_DEPTH as usize];
             }
@@ -402,25 +467,32 @@ fn try_tau(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec
         
             // And iterate further
             return ahss_iterate(data, alg_ahss, alg_data, getout, log, stem, top_trunc, bot_trunc, depth, bounded, true)
+        } else if !matches!(with_res, Ok(true)) {
+            return Ok(false);
         } else {
             let without = without();
         
             let (from_name, to_name) = data.get_names(d.from, d.to);
     
-            if without.is_ok() && depth == 0 {
+            if matches!(without, Ok(true)) && depth == 0 {
                 println!("WITH OR WITHOUT ARE BOTH FINE FOR THE TAU: {:?} | {:?}", d, data.get_names(d.from, d.to));
             }
         
             // If with and without are both Ok then we continue WITHOUT the differential
             // But we do remember that we don't know the result of this diff    
-            let kind = if without.is_err() { Kind::Real } else { Kind::Unknown };
-            let proof = if let Err(e) = without { e } else { "".to_string() };
+            let (kind, proof) = match without {
+                Err(e) => (Kind::Real, e),
+                Ok(true) => (Kind::Unknown, "".to_string()),
+                Ok(false) => return Ok(false),
+            };
         
             data.add_ext_tau(d.from, d.to, d.af, Some(proof.clone()), kind);
 
             // Commit choice !
-            if depth == 0 { 
+            if ALWAYS_PRINT || depth == 0 { 
                 println!("Proven tau: {} | {} by {proof}", from_name, to_name);
+            }
+            if depth == 0 { 
                 log.lock().unwrap().push(Action::AddExt { from: from_name, to: to_name, af: d.af, proof, kind });
                 getout = [const { None }; PARALLEL_DEPTH as usize];
             }
@@ -430,7 +502,7 @@ fn try_tau(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec
     }
 }
 
-fn add_algebraic_diffs(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>, getout: [Option<Arc<Mutex<bool>>>; PARALLEL_DEPTH as usize], log: Arc<Mutex<Vec<Action>>>, stem: i32, top_trunc: i32, bot_trunc: i32, depth: i32, bounded: bool) -> Result<(), String> {
+fn add_algebraic_diffs(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>, getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize], log: Arc<Mutex<Vec<Action>>>, stem: i32, top_trunc: i32, bot_trunc: i32, depth: i32, bounded: bool) -> Result<bool, String> {
     // As we are moving up a page for possible diffs,
     // we should add all adams differentials which could arise from here
 
@@ -446,7 +518,7 @@ fn add_algebraic_diffs(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: 
 }
 
 
-fn e1_to_ahss_loop(partial_ahss: &SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<FromTo>>>>, mut log: Vec<Action>, stem: i32) -> (Result<(), String>, Vec<Action>) {
+fn e1_to_ahss_loop(partial_ahss: &SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<FromTo>>>>, mut log: Vec<Action>, stem: i32) -> (Result<bool, String>, Vec<Action>) {
     let ahss = revert_log_and_remake(0, &mut log, &partial_ahss, true);
     let log = Arc::new(Mutex::new(log));
     let res = ahss_iterate(ahss, alg_ahss, &alg_data, [const { None }; PARALLEL_DEPTH as usize], log.clone(), stem, 2, 1, 0, false, false);
@@ -454,7 +526,7 @@ fn e1_to_ahss_loop(partial_ahss: &SyntheticSS, alg_ahss: &SyntheticSS, alg_data:
     (res, Arc::try_unwrap(log).unwrap().into_inner().unwrap())
 }
 
-fn e1_loop(ahss: SyntheticSS, partial_ahss: &SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<FromTo>>>>, mut log: Vec<Action>, stem: i32) -> (Result<(), String>, Vec<Action>) {
+fn e1_loop(ahss: SyntheticSS, partial_ahss: &SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<FromTo>>>>, mut log: Vec<Action>, stem: i32) -> (Result<bool, String>, Vec<Action>) {
     
     println!("\nStarted stem {stem}\n");
     
@@ -465,7 +537,7 @@ fn e1_loop(ahss: SyntheticSS, partial_ahss: &SyntheticSS, alg_ahss: &SyntheticSS
             for i in issues {
                 // First we solve all the e1 issues we can resolve 
                 match auto_deduce(&ahss, &i){
-                    Ok(a) => log.push(a),
+                    Ok(mut a) => log.append(&mut a),
                     Err(_) => proper_issues.push(i),
                 }
             }
@@ -474,7 +546,7 @@ fn e1_loop(ahss: SyntheticSS, partial_ahss: &SyntheticSS, alg_ahss: &SyntheticSS
 
     if proper_issues.len() != 0 {
         println!("We need to try multiple E1 options");
-
+        println!("{proper_issues:?}");
 
         // TODO: Par iter
         let res: Vec<_> = get_all_e1_solutions(&ahss, &proper_issues).into_iter().map(|options| {
@@ -488,13 +560,13 @@ fn e1_loop(ahss: SyntheticSS, partial_ahss: &SyntheticSS, alg_ahss: &SyntheticSS
             res
         }).collect();
 
-        let positives = res.iter().fold(0, |acc, r| if r.0.is_ok() {acc + 1} else {acc});
+        let positives = res.iter().fold(0, |acc, r| if matches!(r.0, Ok(true)) {acc + 1} else {acc});
         if positives != 1 {
             let first = res[0].1.clone();
             return (Err(format!("We have {positives} positives. Which means we can't decide on E1 stuff sadge :(")), first)
         } else {
             for r in res {
-                if r.0.is_ok() {
+                if matches!(r.0, Ok(true)) {
                     return r
                 }
             }
@@ -505,7 +577,7 @@ fn e1_loop(ahss: SyntheticSS, partial_ahss: &SyntheticSS, alg_ahss: &SyntheticSS
     }
 }
 
-pub fn ahss_solver() -> (Vec<Action>, SyntheticSS) {
+pub fn ahss_solver(log: Option<Vec<Action>>) -> Result<(Vec<Action>, SyntheticSS), ()> {
     let alg_ahss = STABLE_DATA.clone();
     let mut partial_ahss = SyntheticSS::empty(alg_ahss.model.clone());
     // We should add all d1's from the algebraic data
@@ -524,7 +596,7 @@ pub fn ahss_solver() -> (Vec<Action>, SyntheticSS) {
         }
     }
 
-    let mut log = vec![
+    let mut log = if let Some(log) = log {log} else { vec![
         Action::AddInt { 
             from: "6 5 3[2]".to_string(), 
             to: "6 2 3 3[2]".to_string(), 
@@ -532,31 +604,42 @@ pub fn ahss_solver() -> (Vec<Action>, SyntheticSS) {
             proof: "Unique solution to RP1_2".to_string(), 
             kind: Kind::Real 
         },
-        Action::AddDiff { from: "2 3 5 7 3 3[2]".to_string(), to: "2 4 1 1 2 4 3 3 3[1]".to_string(), proof: Some("Custom: By convergence on RP3_5 stem 26.".to_string()), kind: Kind::Real },
+        Action::AddDiff { from: "2 3 5 7 3 3[2]".to_string(), to: "2 4 1 1 2 4 3 3 3[1]".to_string(), proof: Some("This differential cannot be deduced by just looking at the current stem. It must be deduced by convergence on RP1_4 stem 26.".to_string()), kind: Kind::Real },
 
-
-        Action::AddDiff { from: "3 5 7 3 3[10]".to_string(), to: "1 2 3 4 4 1 1 2 4 1 1 1[5]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Fake },
-        // Action::AddDiff { from: "3 5 7 3 3[10]".to_string(), to: "2 3 4 4 1 1 2 4 1 1 1[6]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Fake },
-        // Action::AddDiff { from: "[31]".to_string(), to: "1 2 3 3[21]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
-        // Action::AddDiff { from: "1[30]".to_string(), to: "4 4 1 1 1[19]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
-        // Action::AddDiff { from: "1 1[29]".to_string(), to: "12 1 1 1[15]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
-        // Action::AddDiff { from: "1 1 1[28]".to_string(), to: "2 3 4 4 1 1 1[14]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
-        
-        // Action::AddDiff { from: "4 1 1 1[24]".to_string(), to: "1 2 3 4 4 1 1 1[13]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
-        // Action::AddDiff { from: "2 4 1 1 1[22]".to_string(), to: "4 4 1 1 2 4 1 1 1[11]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
-        // Action::AddDiff { from: "1 2 4 1 1 1[21]".to_string(), to: "8 4 1 1 2 4 1 1 1[7]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
-        // Action::AddDiff { from: "1 1 2 4 1 1 1[20]".to_string(), to: "2 3 4 4 1 1 2 4 1 1 1[6]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
-        // Action::AddDiff { from: "6 2 3 4 4 1 1 1[9]".to_string(), to: "6 2 2 4 5 3 3 3[2]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
-        
-        // Action::AddExt { from: "1 2 3 3[21]".to_string(), to: "6 5 3[16]".to_string(), af: 5, proof: "Program can't figure this out.".to_string(), kind: Kind::Real },
-        // Action::AddExt { from: "1 2 3 3[21]".to_string(), to: "13 3[14]".to_string(), af: 4, proof: "Program can't figure this out.".to_string(), kind: Kind::Real },
-        // Action::AddExt { from: "4 4 1 1 1[19]".to_string(), to: "11 3 3[13]".to_string(), af: 5, proof: "Program can't figure this out.".to_string(), kind: Kind::Real },
-        // Action::AddExt { from: "3 4 4 1 1 1[16]".to_string(), to: "9 3 3 3[12]".to_string(), af: 6, proof: "Program can't figure this out.".to_string(), kind: Kind::Real },
-        // Action::AddExt { from: "2 3 4 4 1 1 1[14]".to_string(), to: "2 4 5 3 3 3[10]".to_string(), af: 8, proof: "Program can't figure this out.".to_string(), kind: Kind::Real },
-        // Action::AddExt { from: "1 2 3 4 4 1 1 1[13]".to_string(), to: "6 2 3 4 4 1 1 1[8]".to_string(), af: 9, proof: "Program can't figure this out.".to_string(), kind: Kind::Real },
-    ]; 
+        Action::SetE1 { tag: "17 7 7 7".to_string(), torsion: Torsion(Some(0)), proof: "This E1 generator cannot be deduced by looking at the stem in which it occurs. It can only be concluded by looking further + James periodicity.".to_string() },
+        Action::AddDiff { from: "3 5 7 3 3[10]".to_string(), to: "1 2 3 4 4 1 1 2 4 1 1 1[5]".to_string(), proof: Some("Program takes a long time to deduce this differential + results in Unknown. We just say its fake.".to_string()), kind: Kind::Fake },
+        Action::AddDiff { from: "3 5 7 3 3[10]".to_string(), to: "2 3 4 4 1 1 2 4 1 1 1[6]".to_string(), proof: Some("Program takes a long time to deduce this differential + results in Unknown. We just say its fake.".to_string()), kind: Kind::Fake },
+        Action::AddDiff { from: "15 15[6]".to_string(), to: "9 3 5 7 7[4]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Fake },
+        Action::AddDiff { from: "12 1 1 1[5]".to_string(), to: "2 3 4 4 1 1 1[3]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
+        Action::AddDiff { from: "14 4 5 7 7[8]".to_string(), to: "19 7 7 7[4]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
+        Action::AddDiff {
+            from: "14 5 7 7[8]".to_string(),
+            to: "14 4 5 7 7[3]".to_string(),
+            kind: Kind::Real,
+            proof: Some("If we don't have this differential we have a problem at RP3_47. (This could not have been deduced by just looking at RP1_8 at most)".to_string()),
+        },
+        // "AddExt": {
+        //     "from": "6 2 3 4 4 1 1 2 4 1 1 2 4 1 1 1[5]",
+        //     "to": "2 2 2 2 2 2 2 2 2 3 5 7 3 3[4]",
+        //     "af": 16,
+        //     "kind": "Real",
+        //     "proof": "Without this extension the problems in AF 5 at RP4_12 stem 43 cannot be resolved."
+        // }
+        //  "AddDiff": {
+        //     "from": "11 15 7 7[5]",
+        //     "to": "9 11 7 7 7[3]",d
+        //     "kind": "Real",
+        //     "proof": "The source of this must also be this one, not the other AF5 element in this grid point. For RP3_5 the F_2 vector space generators don't add up. [SyntheticConvergence { bot_trunc: 3, top_trunc: 5, stem: 44, af: 7, expected: [Torsion(None), Torsion(Some(1))], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 3, top_trunc: 5, stem: 44, af: 11, expected: [Torsion(None), Torsion(Some(1))], observed: [Torsion(None), Torsion(None)] }]"
+        // }
+        //         "AddDiff": {
+        //     "from": "27 3 3[13]",
+        //     "to": "21 11 3 3[7]",
+        //     "kind": "Unknown",
+        //     "proof": "(Custom) This differential must be here to support resolve the Synthetic convergence for RP7_256, stem 45, af 7. "
+        // }
+    ]}; 
     
-    for stem in 2..=31 {
+    for stem in 2..MAX_VERIFY_STEM {
         let ahss = revert_log_and_remake(0, &mut log, &partial_ahss, true);
         let (res, l) = e1_loop(ahss, &mut partial_ahss, &alg_ahss, &alg_data, log, stem);
         log = l;
@@ -568,9 +651,13 @@ pub fn ahss_solver() -> (Vec<Action>, SyntheticSS) {
             }
         }
         match res {
-            Ok(_) => {
+            Ok(true) => {
                 println!("\n\nNEXT\n\n");
                 
+            },
+            Ok(false) => {
+                println!("\n\nCancelled on stem {stem}\n\n");
+                break;
             },
             Err(e) => {
                 println!("\n\nError on stem {stem}: {e}\n\n");
@@ -580,5 +667,5 @@ pub fn ahss_solver() -> (Vec<Action>, SyntheticSS) {
     }
 
     let ahss = revert_log_and_remake(0, &mut log, &partial_ahss, true);
-    (log, ahss)
+    Ok((log, ahss))
 }

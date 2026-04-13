@@ -54,15 +54,19 @@ fn apply_diff(
 
     let (new_from_g, new_to_g) = if from_g.1.alive() {
         if !to_g.1.alive() {
-            let (from_name, to_name) = data.get_names(from, to);
-            return Err(Issue::UselessDifferential {
-                from,
-                to,
-                bot_trunc: pages.bot_trunc,
-                top_trunc: pages.top_trunc,
-                from_name,
-                to_name,
-            });
+            if data.proven_from_to[&(from, to)].is_some() {
+                let (from_name, to_name) = data.get_names(from, to);
+                return Err(Issue::UselessDifferential {
+                    from,
+                    to,
+                    bot_trunc: pages.bot_trunc,
+                    top_trunc: pages.top_trunc,
+                    from_name,
+                    to_name,
+                });
+            } else {
+                return Ok(())
+            }
         }
 
         let coeff = to_g.0 - from_g.0 - 1;
@@ -113,16 +117,20 @@ fn apply_diff(
                         }   
                     }
                 } else {
-                    // Useless
-                    let (from_name, to_name) = data.get_names(from, to);
-                    return Err(Issue::UselessDifferential {
-                        from,
-                        to,
-                        bot_trunc: pages.bot_trunc,
-                        top_trunc: pages.top_trunc,
-                        from_name,
-                        to_name,
-                    });
+                    if data.proven_from_to[&(from, to)].is_some() {
+                        // Useless
+                        let (from_name, to_name) = data.get_names(from, to);
+                        return Err(Issue::UselessDifferential {
+                            from,
+                            to,
+                            bot_trunc: pages.bot_trunc,
+                            top_trunc: pages.top_trunc,
+                            from_name,
+                            to_name,
+                        });
+                    } else {
+                        return Ok(())
+                    }
                 }
             },
             None => match from_g.1.0 {
@@ -252,25 +260,19 @@ pub fn compute_pages(
     }
 
     if include_tau {
-        // let mut retry_taus = vec![];
-        for ess in &data.external_tau_page {
-            for es in ess {
-                for e in es {
-                    if pages.element_in_pages(e.from) && pages.element_in_pages(e.to) {
-                        if let Err(i) = apply_tau(data, &mut pages, 500, e.af, e.from, e.to) {
-                            issues.push(i);
+        for esss in &data.external_tau_page {
+            for ess in esss {
+                for es in ess {
+                    for e in es {
+                        if pages.element_in_pages(e.from) && pages.element_in_pages(e.to) && from_stem <= data.model.stem(e.from) && data.model.stem(e.from) <= to_stem {
+                            if let Err(i) = apply_tau(data, &mut pages, 500, e.af, e.from, e.to) {
+                                issues.push(i);
+                            }
                         }
                     }
                 }
             }
         }
-        // for e in retry_taus {
-        //     if pages.element_in_pages(e.from) && pages.element_in_pages(e.to) {
-        //         if let Err(i) = apply_tau(data, &mut pages, 500, e.af, e.from, e.to) {
-        //             issues.push(i);
-        //         }
-        //     }
-        // }
     }
 
     (pages, issues)

@@ -42,8 +42,9 @@ pub struct SyntheticSS {
 
     // This happens at the "final" page
     // Indexed by the y coordinate of "from"
-    // 2nd index is by difference in y coordinates
-    pub external_tau_page: Vec<Vec<Vec<ExtTauMult>>>,
+    // 2nd index is by the AF thing (Meaning, the "better" the element fits onto the other the earlier it should be applied)
+    // Third index is for the y difference
+    pub external_tau_page: Vec<Vec<Vec<Vec<ExtTauMult>>>>,
 
     // Index on the two generors, then a potential proof / disproof ?
     pub proven_from_to: HashMap<FromTo, Option<String>>,
@@ -63,7 +64,7 @@ impl SyntheticSS {
             model: e1,
             diffs_page: vec![vec![]; (MAX_STEM + 1) as usize],
             internal_tau_page: vec![vec![]; (MAX_STEM + 1) as usize],
-            external_tau_page: vec![vec![vec![]; (MAX_STEM + 1) as usize]; (MAX_STEM + 1) as usize],
+            external_tau_page: vec![vec![vec![vec![]; (MAX_STEM + 1) as usize]; (MAX_STEM + 1) as usize]; (MAX_STEM + 1) as usize],
             proven_from_to: HashMap::default(),
             disproven_from_to: HashMap::default(),
             in_diffs: vec![vec![]; len],
@@ -109,8 +110,8 @@ impl SyntheticSS {
             match kind {
                 Kind::Real => {
                     let y_from = self.model.y(from);
-                    let y_diff = self.model.y(from) - self.model.y(to);
-                    self.external_tau_page[y_from as usize][y_diff as usize].push(ExtTauMult { from, to, af });
+                    let y_to = self.model.y(to);
+                    self.external_tau_page[y_from as usize][af as usize][(y_from - y_to) as usize].push(ExtTauMult { from, to, af });
                     self.out_taus[from].push(to);
                     self.proven_from_to.insert((from, to), proof);
                 },
