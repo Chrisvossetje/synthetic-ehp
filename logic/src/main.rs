@@ -8,7 +8,7 @@ use crate::{
         export::{get_log, write_all},
     },
     solve::{
-        action::{Action, process_action, revert_log_and_remake}, ahss::find_ahss_issues, automated::ahss_solver, ehp::{apply_ehp_recursively, find_ehp_issues, verify_geometric}, ehp_ahss::{ehp_to_ahss_map, set_metastable_range}, solve::auto_deduce
+        action::{Action, process_action, revert_log_and_remake}, ahss::find_ahss_issues, automated::ahss_solver, automated_ehp::ehp_solver, ehp::{apply_ehp_recursively, find_ehp_issues, verify_geometric}, ehp_ahss::{ehp_to_ahss_map, set_metastable_range}, solve::auto_deduce
     },
 };
 
@@ -334,10 +334,16 @@ fn main() {
         }
     };
 
-    if let Ok((ahss_log, ahss)) = ahss_solver(Some(log)) {
-        write_all(&ahss, &ahss_log, true);
-    }
+    let ahss = revert_log_and_remake(0, &mut log, &STABLE_DATA, true);
 
+    // if let Ok((ahss_log, ahss)) = ahss_solver(Some(log)) {
+    //     write_all(&ahss, &ahss_log, true);   
+    
+
+    // }
+
+    let (ehp_log, ehp) = ehp_solver(&ahss, None);
+    write_all(&ehp, &ehp_log, false);   
     
     
     // let (ahss, input_time_ahss) = ahss();

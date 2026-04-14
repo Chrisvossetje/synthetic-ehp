@@ -6,8 +6,8 @@ use std::sync::{
 
 use crate::{MAX_AUTOMATED_TOP_TRUNC, MAX_STEM, MAX_VERIFY_STEM, data::{compare::{algebraic_rp, rp_truncations, synthetic_rp}, curtis::STABLE_DATA}, domain::{model::{Diff, ExtTauMult, FromTo, SyntheticSS}, process::{compute_pages, try_compute_pages}}, solve::{action::{Action, D_R_REPEATS, revert_log_and_remake}, ahss::ahss_synthetic_e1_issue, ahss_e1::get_all_e1_solutions, generate::{get_a_diff, get_a_tau}, issues::{Issue, algebraic_issue_is_fixable_by_tau_extensions, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic, synthetic_issue_is_tau_structure_issue}, solve::{auto_deduce, suggest_tau_solution_algebraic, suggest_tau_solution_generator_synthetic, suggest_tau_solution_module_synthetic}}, types::{Kind, Torsion}};
 
-const PARALLEL_DEPTH: i32 = 3;
-const ALWAYS_PRINT: bool = false;
+pub const PARALLEL_DEPTH: i32 = 3;
+pub const ALWAYS_PRINT: bool = false;
 
 fn check_issue(data: &SyntheticSS, stem: i32, bot_trunc: i32, top_trunc: i32) -> Result<(), Vec<Issue>> {
     for &(synthetic, bt, tt) in rp_truncations() {
@@ -78,7 +78,6 @@ fn filter_diff(data: &SyntheticSS, alg_ahss: &SyntheticSS, bot_trunc: i32, top_t
     }
 }
 
-// TODO: Is a stem wise approach ENOUGH to conclude E1 stuff, lets hope E1 stuff can always be resolved on the current stem (sadly, i know this is not true :( )?
 fn ahss_iterate(data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Vec<Vec<FromTo>>>>, mut getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize], log: Arc<Mutex<Vec<Action>>>, stem: i32, top_trunc: i32, bot_trunc: i32, depth: i32, bounded: bool, tau_mode: bool) -> Result<bool, String> {
     for g in &getout {
         if let Some(g) = g {
@@ -202,19 +201,21 @@ fn try_diff(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Ve
             if depth == 0 {
                 log.lock().unwrap().push(Action::AddDiff { from: from_name, to: to_name, proof: Some(e.clone()), kind: Kind::Fake });
             }
-    
+            
             data.add_diff(d.from, d.to, Some(e), Kind::Fake);
-        
+            
             // And iterate further
             getout[depth as usize] = None;
             return ahss_iterate(data, alg_ahss, alg_data, getout, log.clone(), stem, top_trunc, bot_trunc, depth, bounded, false)
         } else if let Err(e) = without_res {
             let (from_name, to_name) = data.get_names(d.from, d.to);
-    
+            
             data.add_diff(d.from, d.to, Some(e.clone()), Kind::Real);
-    
-            if depth == 0 {
+            
+            if ALWAYS_PRINT || depth == 0 {
                 println!("Proven diff: {} | {} | {:?}", from_name, to_name, Some(e.clone()));
+            }
+            if depth == 0 {
                 log.lock().unwrap().push(Action::AddDiff { from: from_name, to: to_name, proof: Some(e), kind: Kind::Real });
             }
 
@@ -247,11 +248,6 @@ fn try_diff(mut data: SyntheticSS, alg_ahss: &SyntheticSS, alg_data: &Vec<Vec<Ve
                 }
             }
             if depth == 0 { 
-                if kind == Kind::Unknown {
-                    println!("Unknown diff: {} | {}", from_name, to_name);
-                } else {
-                    println!("Proven diff: {} | {} | {proof:?}", from_name, to_name);
-                }
                 log.lock().unwrap().push(Action::AddDiff { from: from_name, to: to_name, proof, kind });
             }
     
