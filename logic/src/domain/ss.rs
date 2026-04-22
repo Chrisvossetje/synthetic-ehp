@@ -60,7 +60,6 @@ impl SSPages {
         Some(b.last().unwrap().clone())
     }
 
-    
     pub fn push(&mut self, elt: usize, page: i32, g: GeneratorState) {
         self.generators[elt].as_mut().unwrap().push((page, g));
     }

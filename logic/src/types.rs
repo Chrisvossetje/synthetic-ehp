@@ -26,6 +26,7 @@ impl Torsion {
         self.0.is_none()
     }
 
+    // if from + coeff <= self
     pub fn can_map_with_coeff(&self, from: &Self, coeff: i32) -> bool {
         if let Some(from_torsion) = from.0 {
             if let Some(to_torsion) = self.0 {

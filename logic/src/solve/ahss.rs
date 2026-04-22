@@ -49,19 +49,24 @@ pub fn find_ahss_issues(data: &SyntheticSS, stem: i32) -> Result<(), Vec<Issue>>
     ahss_synthetic_e1_issue(data, stem)?;
 
     for &(synthetic, bot_trunc, top_trunc) in rp_truncations() {
-        if synthetic {
-            let pages = try_compute_pages(data, bot_trunc, top_trunc, stem, stem)?;
+        let pages = if synthetic {
+            let pages = try_compute_pages(data, bot_trunc, top_trunc, stem, stem, true)?;
 
             verify_convergence(&data, &pages, bot_trunc, top_trunc, stem).map_err(|x| {
-                println!("Tau issues: {}", synthetic_issue_is_tau_structure_issue(&x).0);
+                println!(
+                    "Tau issues: {}",
+                    synthetic_issue_is_tau_structure_issue(&x).0
+                );
                 x
             })?;
+            pages
         } else {
-            let pages = try_compute_pages(data, bot_trunc, top_trunc, stem - 1, stem)?;
+            let pages = try_compute_pages(data, bot_trunc, top_trunc, stem - 1, stem, true)?;
 
             verify_algebraic_convergence(&data, &pages, bot_trunc, top_trunc, stem)?;
-        }
-        compare_algebraic_spectral_sequence(data, stem, bot_trunc, top_trunc, true)?;
+            pages
+        };
+        compare_algebraic_spectral_sequence(data, &pages, stem, bot_trunc, top_trunc, true)?;
     }
 
     Ok(())

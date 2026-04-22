@@ -1,5 +1,8 @@
-use crate::{domain::{model::SyntheticSS, process::compute_pages, ss::SSPages}, solve::issues::Issue, types::{Kind, Torsion}};
-
+use crate::{
+    domain::{model::SyntheticSS, process::compute_pages, ss::SSPages},
+    solve::issues::Issue,
+    types::Kind,
+};
 
 // (EHP -> AHSS, Lifts from AHSS -> EHP)
 pub type SyntheticSSMap = (Vec<Option<usize>>, Vec<Option<usize>>);
@@ -23,8 +26,8 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
                 ehp.add_diff_name(
                     g_from.name.clone(),
                     g_to.name.clone(),
-                    proof.clone().map(|x| format!("{x} (Metastable)")),
-                    Kind::Real
+                    proof.clone().map(|x| format!("(Metastable) - {x} ")),
+                    Kind::Real,
                 )?;
             }
         }
@@ -37,12 +40,16 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
             let (from_name, to_name) = ahss.get_names(from, to);
 
             if ahss.model.stem(from) - ahss.model.stem(to) == 1 {
-                let kind = if proof.is_some() { Kind::Fake } else { Kind::Unknown };
+                let kind = if proof.is_some() {
+                    Kind::Fake
+                } else {
+                    Kind::Unknown
+                };
                 ehp.add_diff_name(
                     g_from.name.clone(),
                     g_to.name.clone(),
-                    proof.clone().map(|x| format!("{x} (Metastable)")),
-                    kind
+                    proof.clone().map(|x| format!("(Metastable) - {x}")),
+                    kind,
                 )?;
             }
         }
@@ -58,8 +65,8 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
                     g_from.name.clone(),
                     g_to.name.clone(),
                     page as i32,
-                    proof.clone().map(|x| format!("{x} (Metastable)")),
-                    Kind::Real // TODO! <<
+                    proof.clone().map(|x| format!("(Metastable) - {x}")),
+                    Kind::Real, // TODO! <<
                 )?;
             }
         }
@@ -78,7 +85,7 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
                             g_to.name.clone(),
                             e.af,
                             proof.clone().map(|x| format!("{x} (Metastable)")),
-                            Kind::Real // TODO! <<
+                            Kind::Real, // TODO! <<
                         )?;
                     }
                 }
@@ -90,17 +97,33 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
 }
 
 pub fn ehp_to_ahss_map(ehp: &SyntheticSS, ahss: &SyntheticSS) -> SyntheticSSMap {
-    let ehp_ahss: Vec<_> = ehp.model.gens().iter().map(|g| ahss.model.try_index(&g.name)).collect();
-    let ahss_ehp: Vec<_> = ahss.model.gens().iter().map(|g| ehp.model.try_index(&g.name)).collect();
+    let ehp_ahss: Vec<_> = ehp
+        .model
+        .gens()
+        .iter()
+        .map(|g| ahss.model.try_index(&g.name))
+        .collect();
+    let ahss_ehp: Vec<_> = ahss
+        .model
+        .gens()
+        .iter()
+        .map(|g| ehp.model.try_index(&g.name))
+        .collect();
 
     (ehp_ahss, ahss_ehp)
-} 
+}
 
-
-
-fn check(a: &SyntheticSS, b: &SyntheticSS, a_p: &SSPages, b_p: &SSPages, a_b: &Vec<Option<usize>>, stem: i32, sphere: i32) -> Vec<Issue> {
+fn check(
+    a: &SyntheticSS,
+    b: &SyntheticSS,
+    a_p: &SSPages,
+    b_p: &SSPages,
+    a_b: &Vec<Option<usize>>,
+    stem: i32,
+    sphere: i32,
+) -> Vec<Issue> {
     let mut issues = vec![];
-    
+
     // We check if every AHSS diff between known generators also exists on EHP
     for (&(from, to), p) in &a.proven_from_to {
         // Skip Algebraic things
@@ -111,7 +134,7 @@ fn check(a: &SyntheticSS, b: &SyntheticSS, a_p: &SSPages, b_p: &SSPages, a_b: &V
         }
 
         // If it is in the ehp pages then (if it maps to something)
-        // it must also be in ahss 
+        // it must also be in ahss
         if !a_p.element_in_pages(from) || !a_p.element_in_pages(to) {
             continue;
         }
@@ -125,13 +148,13 @@ fn check(a: &SyntheticSS, b: &SyntheticSS, a_p: &SSPages, b_p: &SSPages, a_b: &V
                 if b_p.element_in_pages(b_from) && b_p.element_in_pages(b_to) {
                     // let from_g = ahss_p.element_at_page(d_y, from);
                     // let to_g = ahss_p.element_at_page(d_y, to);
-    
+
                     let d_y = a.model.y(from) - a.model.y(to);
-    
+
                     // We only check differentials.
                     // Tau extensions are usually clear to resolve
                     let d_stem = a.model.stem(from) - a.model.stem(to);
-                    
+
                     if d_y > 0 && d_stem == 1 {
                         let (from_name, to_name) = a.get_names(from, to);
 
@@ -139,18 +162,18 @@ fn check(a: &SyntheticSS, b: &SyntheticSS, a_p: &SSPages, b_p: &SSPages, a_b: &V
                         // We check if they are non zero 1 page later
                         // We only want to check a "non"-existence of a diff
                         // Not the specific configuration at a page
-                        let from_g_b = b_p.element_at_page(d_y+1, b_from);
-                        let to_g_b = b_p.element_at_page(d_y+1, b_to);
-        
+                        let from_g_b = b_p.element_at_page(d_y + 1, b_from);
+                        let to_g_b = b_p.element_at_page(d_y + 1, b_to);
+
                         if from_g_b.1.alive() && to_g_b.1.alive() {
                             if !b.proven_from_to.contains_key(&(b_from, b_to)) {
-        
-                                
-                                issues.push(Issue::InvalidEHPAHSSMap { 
-                                    from: from_name, 
-                                    to: to_name, 
-                                    stem, 
-                                    sphere });
+                                issues.push(Issue::InvalidEHPAHSSMap {
+                                    name: from_name,
+                                    from_torsion: from_g_b.1,
+                                    to_torsion: from_g_b.1,
+                                    stem,
+                                    sphere,
+                                });
                             }
                         }
                     }
@@ -162,35 +185,50 @@ fn check(a: &SyntheticSS, b: &SyntheticSS, a_p: &SSPages, b_p: &SSPages, a_b: &V
     issues
 }
 
-
 // This is a reduced version
 // Below is the "official" version
-pub fn compare_ehp_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS, (ehp_ahss, ahss_ehp): &SyntheticSSMap, stem: i32, sphere: i32) -> Result<(), Vec<Issue>> {
+pub fn compare_ehp_ahss(
+    ehp: &SyntheticSS,
+    ahss: &SyntheticSS,
+    (ehp_ahss, ahss_ehp): &SyntheticSSMap,
+    stem: i32,
+    sphere: i32,
+) -> Result<(), Vec<Issue>> {
     let (ehp_p, _) = compute_pages(ehp, 0, sphere - 1, stem, stem + 1, false);
     let (ahss_p, _) = compute_pages(ahss, 0, sphere - 1, stem, stem + 1, false);
 
     let mut issues = vec![];
 
     // First we check if the torsion on E1 is mapped correctly
-    for y in 0..=(sphere-1) {
+    for y in 0..=(sphere - 1) {
         for &ehp_id in ehp.model.gens_id_in_stem_y(stem, y) {
             if let Some(ahss_id) = ehp_ahss[ehp_id] {
                 if ehp.model.original_torsion(ehp_id).alive() {
                     if ehp.model.original_torsion(ehp_id) > ahss.model.original_torsion(ahss_id) {
-                        issues.push(Issue::InvalidEHPAHSSGen { name: ehp.model.name(ehp_id).to_string(), stem });
+                        issues.push(Issue::InvalidEHPAHSSGen {
+                            name: ehp.model.name(ehp_id).to_string(),
+                            stem,
+                        });
                     }
                 }
                 if ehp_p.element_in_pages(ehp_id) {
                     if ehp_p.element_final(ehp_id).1 > ahss_p.element_final(ehp_id).1 {
-                        issues.push(Issue::InvalidEHPAHSSGen { name: ehp.model.name(ehp_id).to_string(), stem });
+                        issues.push(Issue::InvalidEHPAHSSGen {
+                            name: ehp.model.name(ehp_id).to_string(),
+                            stem,
+                        });
                     }
                 }
             }
         }
     }
 
-    issues.append(&mut check(ahss, ehp, &ahss_p, &ehp_p, ahss_ehp, stem, sphere));
-    issues.append(&mut check(ehp, ahss, &ehp_p, &ahss_p, ehp_ahss, stem, sphere));
+    issues.append(&mut check(
+        ahss, ehp, &ahss_p, &ehp_p, ahss_ehp, stem, sphere,
+    ));
+    issues.append(&mut check(
+        ehp, ahss, &ehp_p, &ahss_p, ehp_ahss, stem, sphere,
+    ));
 
     if issues.len() == 0 {
         Ok(())
@@ -198,7 +236,6 @@ pub fn compare_ehp_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS, (ehp_ahss, ahss_e
         Err(issues)
     }
 }
-
 
 // // This is the original complete version
 // // Here one can also start to understand the non trivial map from S^n -> QS
@@ -223,7 +260,6 @@ pub fn compare_ehp_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS, (ehp_ahss, ahss_e
 //         }
 //     }
 
-
 //     for (&(from, to), p) in &ehp.proven_from_to {
 //         // Skip Algebraic things
 //         // This must already have been commutative
@@ -233,7 +269,7 @@ pub fn compare_ehp_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS, (ehp_ahss, ahss_e
 //         }
 
 //         // If it is in the ehp pages then (if it maps to something)
-//         // it must also be in ahss 
+//         // it must also be in ahss
 //         if !ehp_p.element_in_pages(from) || !ehp_p.element_in_pages(to) {
 //             continue;
 //         }
@@ -269,19 +305,19 @@ pub fn compare_ehp_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS, (ehp_ahss, ahss_e
 //                             if !ahss.proven_from_to.contains_key(&(a_from, a_to)) {
 //                                 // ISSUE
 //                                 let (from_name, to_name) = ehp.get_names(from, to);
-//                                 issues.push(Issue::InvalidEHPAHSSMap { 
-//                                     from: from_name, 
-//                                     to: to_name, 
-//                                     stem, 
+//                                 issues.push(Issue::InvalidEHPAHSSMap {
+//                                     from: from_name,
+//                                     to: to_name,
+//                                     stem,
 //                                     sphere: top_trunc + 1 });
 //                             }
 //                         } else {
 //                             // ISSUE
 //                             let (from_name, to_name) = ehp.get_names(from, to);
-//                             issues.push(Issue::InvalidEHPAHSSMap { 
-//                                 from: from_name, 
-//                                 to: to_name, 
-//                                 stem, 
+//                             issues.push(Issue::InvalidEHPAHSSMap {
+//                                 from: from_name,
+//                                 to: to_name,
+//                                 stem,
 //                                 sphere: top_trunc + 1 });
 //                         }
 //                     }
@@ -289,7 +325,6 @@ pub fn compare_ehp_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS, (ehp_ahss, ahss_e
 //             }
 //         }
 //     }
-
 
 //     for (&(from, to), p) in &ahss.proven_from_to {
 //         // Skip Algebraic things
@@ -300,7 +335,7 @@ pub fn compare_ehp_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS, (ehp_ahss, ahss_e
 //         }
 
 //         // If it is in the ehp pages then (if it maps to something)
-//         // it must also be in ahss 
+//         // it must also be in ahss
 //         if !ahss_p.element_in_pages(from) || !ahss_p.element_in_pages(to) {
 //             continue;
 //         }
@@ -326,7 +361,7 @@ pub fn compare_ehp_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS, (ehp_ahss, ahss_e
 //                 // Differentials !
 //                 let from_g = ahss_p.element_at_page(d_y, from);
 //                 let to_g = ahss_p.element_at_page(d_y, to);
-                
+
 //                 if from_g.1.alive() && to_g.1.alive() {
 //                     let from_g_ehp = ehp_p.element_at_page(d_y, e_from);
 
@@ -335,19 +370,19 @@ pub fn compare_ehp_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS, (ehp_ahss, ahss_e
 //                             if !ehp.proven_from_to.contains_key(&(e_from, e_to)) {
 //                                 // ISSUE
 //                                 let (from_name, to_name) = ahss.get_names(from, to);
-//                                 issues.push(Issue::InvalidEHPAHSSMap { 
-//                                     from: from_name, 
-//                                     to: to_name, 
-//                                     stem, 
+//                                 issues.push(Issue::InvalidEHPAHSSMap {
+//                                     from: from_name,
+//                                     to: to_name,
+//                                     stem,
 //                                     sphere: top_trunc + 1 });
 //                             }
 //                         } else {
 //                             // ISSUE
 //                             let (from_name, to_name) = ahss.get_names(from, to);
-//                             issues.push(Issue::InvalidEHPAHSSMap { 
-//                                 from: from_name, 
-//                                 to: to_name, 
-//                                 stem, 
+//                             issues.push(Issue::InvalidEHPAHSSMap {
+//                                 from: from_name,
+//                                 to: to_name,
+//                                 stem,
 //                                 sphere: top_trunc + 1 });
 //                         }
 //                     }
@@ -355,7 +390,6 @@ pub fn compare_ehp_ahss(ehp: &SyntheticSS, ahss: &SyntheticSS, (ehp_ahss, ahss_e
 //             }
 //         }
 //     }
-
 
 //     if issues.len() == 0 {
 //         Ok(())

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     MAX_STEM,
     data::naming::{generate_names_from_tag_special, name_to_sphere},
-    domain::model::SyntheticSS,
+    domain::{model::SyntheticSS, process::ehp_recursion},
     types::{Kind, Torsion},
 };
 
@@ -65,7 +65,12 @@ pub enum Action {
 
 pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Result<i32, ()> {
     match action {
-        Action::AddDiff { from, to, proof, kind } => {
+        Action::AddDiff {
+            from,
+            to,
+            proof,
+            kind,
+        } => {
             let from_tag = data.try_name_tag(&from)?;
             let to_tag = data.try_name_tag(&to)?;
 
@@ -174,8 +179,9 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
             from,
             to,
             af,
-            proof, 
-            kind } => {
+            proof,
+            kind,
+        } => {
             let from_tag = data.try_name_tag(&from)?;
             let to_tag = data.try_name_tag(&to)?;
 
@@ -290,5 +296,15 @@ pub fn revert_log_and_remake(
             .expect("There was an invalid action in the log. That should not be possible :(");
     }
 
+    if !ahss {
+        for stem in 3..MAX_STEM {
+            for uneven_sphere in (3..MAX_STEM).step_by(2) {
+                if uneven_sphere > stem + 1 {
+                    break;
+                }
+                let _ = ehp_recursion(&mut data, uneven_sphere, stem);
+            }
+        }
+    }
     data
 }

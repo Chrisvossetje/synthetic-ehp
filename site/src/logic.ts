@@ -409,7 +409,7 @@ export let viewSettings = {
     category: Category.Synthetic, // 0: Synthetic, 1: Algebraic, 2: Geometric
     truncation: undefined as number | undefined,
     bottomTruncation: undefined as number | undefined,
-    showFakeData: true
+    showFakeData: false,
 };
 
 // Shared selection across all modes/data sources.

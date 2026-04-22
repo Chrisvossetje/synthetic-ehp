@@ -1,10 +1,10 @@
 pub mod action;
 pub mod ahss;
+pub mod ahss_e1;
+pub mod automated;
+pub mod automated_ehp;
 pub mod ehp;
 pub mod ehp_ahss;
 pub mod generate;
 pub mod issues;
 pub mod solve;
-pub mod automated;
-pub mod automated_ehp;
-pub mod ahss_e1;

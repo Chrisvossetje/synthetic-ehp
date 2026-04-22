@@ -68,7 +68,7 @@ impl E1 {
         &mut self.generators[id]
     }
 
-    pub fn get_index(&self, name: &String) -> usize {
+    pub fn get_index(&self, name: &str) -> usize {
         *self.index.get(name).unwrap()
     }
 
@@ -76,7 +76,7 @@ impl E1 {
         self.index.get(name).map(|x| *x)
     }
 
-    pub fn get_name(&self, name: &String) -> &Generator {
+    pub fn get_name(&self, name: &str) -> &Generator {
         self.get(self.get_index(name))
     }
 

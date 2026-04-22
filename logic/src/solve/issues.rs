@@ -8,7 +8,7 @@ use crate::{
         compare::EMPTY_LIST_TORSION,
         curtis::{DATA_PAGES, STABLE_DATA_PAGES},
     },
-    domain::{model::SyntheticSS, process::try_compute_pages},
+    domain::{model::SyntheticSS, process::try_compute_pages, ss::SSPages},
     types::Torsion,
 };
 
@@ -84,6 +84,7 @@ pub enum Issue {
     UselessDifferential {
         from: usize,
         to: usize,
+        stem: i32,
         bot_trunc: i32,
         top_trunc: i32,
         from_name: String,
@@ -104,11 +105,12 @@ pub enum Issue {
     },
 
     InvalidEHPAHSSMap {
-        from: String,
-        to: String,
+        name: String,
+        from_torsion: Torsion,
+        to_torsion: Torsion,
         stem: i32,
         sphere: i32,
-    }
+    },
 }
 
 pub fn compare_synthetic(
@@ -199,6 +201,7 @@ pub fn compare_algebraic(
 
 pub fn compare_algebraic_spectral_sequence(
     data: &SyntheticSS,
+    pages: &SSPages,
     stem: i32,
     bot_trunc: i32,
     top_trunc: i32,
@@ -206,24 +209,25 @@ pub fn compare_algebraic_spectral_sequence(
 ) -> Result<(), Vec<Issue>> {
     // We just check the algebraic diffs, and then if their sources are correct ?
     // Most notably differerntials OUT of a stem
-    let pages = try_compute_pages(data, bot_trunc, top_trunc, stem, stem)?;
 
     let alg_pages = if ahss {
         &STABLE_DATA_PAGES
     } else {
         &DATA_PAGES
     };
-
+    
     let mut issues = vec![];
-
+    
     // TODO: This should be somewhat dependent on the top_truncation.
     // At least for EHP this is important
 
+    
+    
     for (from, tos) in data.out_diffs.iter().enumerate() {
         for &to in tos {
             if data.model.stem(to) == stem
-                && bot_trunc <= data.model.y(to)
-                && data.model.y(from) <= top_trunc
+            && bot_trunc <= data.model.y(to)
+            && data.model.y(from) <= top_trunc
             {
                 let alg = data.proven_from_to.get(&(from, to)).unwrap().is_none();
                 if alg {
@@ -315,7 +319,7 @@ pub fn synthetic_issue_is_tau_structure_issue(issues: &Vec<Issue>) -> (bool, boo
             return (false, false);
         }
     }
-    
+
     if total_gens > 0 || count.iter().any(|x| *x != 0) {
         (false, false)
     } else {
@@ -325,7 +329,6 @@ pub fn synthetic_issue_is_tau_structure_issue(issues: &Vec<Issue>) -> (bool, boo
         (true, total_gens < 0)
     }
 }
-
 
 pub fn algebraic_issue_is_fixable_by_tau_extensions(issues: &Vec<Issue>) -> bool {
     let mut count: [i8; MAX_STEM as usize] = [0; MAX_STEM as usize];
@@ -348,5 +351,4 @@ pub fn algebraic_issue_is_fixable_by_tau_extensions(issues: &Vec<Issue>) -> bool
     }
 
     count.iter().all(|x| *x <= 0)
-
 }

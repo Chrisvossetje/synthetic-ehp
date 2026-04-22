@@ -1,14 +1,19 @@
-use std::time::{Duration, Instant};
+use std::{cell::{LazyCell, OnceCell}, sync::OnceLock, time::{Duration, Instant}};
 
 use crate::{
     data::curtis::{DATA, STABLE_DATA},
-    domain::{model::SyntheticSS, process::compute_pages},
+    domain::{model::SyntheticSS, process::compute_pages, ss::SSPages},
     io::{
         cli::process_input,
         export::{get_log, write_all},
     },
     solve::{
-        action::{Action, process_action, revert_log_and_remake}, ahss::find_ahss_issues, automated::ahss_solver, automated_ehp::ehp_solver, ehp::{apply_ehp_recursively, find_ehp_issues, verify_geometric}, ehp_ahss::{ehp_to_ahss_map, set_metastable_range}, solve::auto_deduce
+        action::{Action, process_action, revert_log_and_remake},
+        ahss::find_ahss_issues,
+        automated_ehp::ehp_solver,
+        ehp::{apply_ehp_recursively, find_ehp_issues, verify_geometric},
+        ehp_ahss::{ehp_to_ahss_map, set_metastable_range},
+        solve::auto_deduce,
     },
 };
 
@@ -108,7 +113,7 @@ fn ahss() -> (SyntheticSS, Duration) {
                             }
                         }
                         continue 'middle;
-                    },
+                    }
                     Err(_) => {}
                 }
             }
@@ -228,7 +233,7 @@ fn ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
                             }
                         }
                         continue 'middle;
-                    },
+                    }
                     Err(_) => {}
                 }
             }
@@ -307,7 +312,7 @@ fn temp_lol(data: &SyntheticSS) {
                 if page.element_at_page(d_y, from).0 != from_af
                     || page.element_at_page(d_y, to).0 != to_af
                     || !page.element_at_page(d_y, to).1.alive()
-                    // || !page.element_at_page(d_y, from).1.alive()
+                // || !page.element_at_page(d_y, from).1.alive()
                 {
                     if data.model.stem(from) <= MAX_VERIFY_STEM {
                         println!(
@@ -323,9 +328,10 @@ fn temp_lol(data: &SyntheticSS) {
     }
 }
 
+pub static STABLE_SYNTHETIC_PAGES: OnceLock<[SSPages; (MAX_STEM + 1) as usize]> = OnceLock::new();
+
 fn main() {
     let start = Instant::now();
-
 
     let mut log = match get_log(true) {
         Ok(log) => log,
@@ -333,19 +339,29 @@ fn main() {
             panic!("Log importing was not succesful");
         }
     };
-
-    let ahss = revert_log_and_remake(0, &mut log, &STABLE_DATA, true);
-
-    // if let Ok((ahss_log, ahss)) = ahss_solver(Some(log)) {
-    //     write_all(&ahss, &ahss_log, true);   
     
-
+    let ahss = revert_log_and_remake(0, &mut log, &STABLE_DATA, true);
+    
+    let ahss_pages = std::array::from_fn(|x| compute_pages(&ahss, 0, x as i32, 0, 150, false).0);
+    STABLE_SYNTHETIC_PAGES.set(ahss_pages).unwrap();
+    
+    // if let Ok((ahss_log, ahss)) = ahss_solver(Some(log)) {
+    //     write_all(&ahss, &ahss_log, true);
+    
     // }
 
-    let (ehp_log, ehp) = ehp_solver(&ahss, None);
-    write_all(&ehp, &ehp_log, false);   
-    
-    
+    let mut ehp_log = match get_log(false) {
+        Ok(log) => log,
+        Err(_) => {
+            panic!("Log importing was not succesful");
+        }
+    };
+        
+    let (ehp_log, ehp) = ehp_solver(&ahss, Some(ehp_log));
+    write_all(&ehp, &ehp_log, false);
+
+    verify_geometric(&ehp);
+
     // let (ahss, input_time_ahss) = ahss();
     // let start_ehp = Instant::now();
     // let (ehp, input_time_ehp) = ehp(&ahss);

@@ -1,6 +1,7 @@
 use std::{
     fs::File,
     io::{self, Read, Write},
+    path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
@@ -20,6 +21,12 @@ pub fn write_vec_to_file<T: std::fmt::Debug>(vec: &[T], path: &str) -> io::Resul
     }
 
     Ok(())
+}
+
+fn repo_root_path(file_name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join(file_name)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -174,7 +181,11 @@ pub fn write_typescript_file(
     for ((from, to), p) in &data.disproven_from_to {
         let d_y = data.model.y(*from) - data.model.y(*to);
         let d_stem = data.model.stem(*from) - data.model.stem(*to);
-        let kind = if p.is_some() { Kind::Fake } else { Kind::Unknown };
+        let kind = if p.is_some() {
+            Kind::Fake
+        } else {
+            Kind::Unknown
+        };
         if d_y == 0 {
             int_tau_mults.push(InternalTauMult {
                 from: data.model.name(*from).to_string(),
@@ -254,11 +265,12 @@ pub fn write_typescript_file(
 }
 
 pub fn get_log(ahss: bool) -> Result<Vec<Action>, ()> {
-    let mut f = if ahss {
-        File::open("../log_stable.json").map_err(|_| ())?
+    let log_path = if ahss {
+        repo_root_path("log_stable.json")
     } else {
-        File::open("../log.json").map_err(|_| ())?
+        repo_root_path("log.json")
     };
+    let mut f = File::open(&log_path).map_err(|_| ())?;
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
     serde_json::de::from_str(&s).map_err(|_| println!("{:?}", s))

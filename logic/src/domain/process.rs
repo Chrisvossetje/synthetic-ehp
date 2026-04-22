@@ -47,13 +47,13 @@ fn apply_diff(
 ) -> Result<(), Issue> {
     let from_g = pages.element_final(from);
     let to_g = pages.element_final(to);
-    
+
     let (from_name, to_name) = data.get_names(from, to);
 
     let stem = data.model.stem(from);
 
     let (new_from_g, new_to_g) = if from_g.1.alive() {
-        if !to_g.1.alive() {
+            if !to_g.1.alive() {
             if data.proven_from_to[&(from, to)].is_some() {
                 let (from_name, to_name) = data.get_names(from, to);
                 return Err(Issue::UselessDifferential {
@@ -63,9 +63,10 @@ fn apply_diff(
                     top_trunc: pages.top_trunc,
                     from_name,
                     to_name,
+                    stem,
                 });
             } else {
-                return Ok(())
+                return Ok(());
             }
         }
 
@@ -109,12 +110,12 @@ fn apply_diff(
                                 let to = (to_g.0, Torsion::new(coeff));
                                 (from, to)
                             }
-                        },
+                        }
                         None => {
                             let from = (from_g.0 - delta, Torsion::default());
                             let to = (to_g.0, Torsion::new(coeff));
                             (from, to)
-                        }   
+                        }
                     }
                 } else {
                     if data.proven_from_to[&(from, to)].is_some() {
@@ -127,12 +128,13 @@ fn apply_diff(
                             top_trunc: pages.top_trunc,
                             from_name,
                             to_name,
+                            stem,
                         });
                     } else {
-                        return Ok(())
+                        return Ok(());
                     }
                 }
-            },
+            }
             None => match from_g.1.0 {
                 Some(t) => {
                     let (from_name, to_name) = data.get_names(from, to);
@@ -153,7 +155,20 @@ fn apply_diff(
             },
         }
     } else {
-        (from_g, to_g)
+        if to_g.1.alive() && data.proven_from_to[&(from, to)].is_some() {
+                let (from_name, to_name) = data.get_names(from, to);
+                return Err(Issue::UselessDifferential {
+                    from,
+                    to,
+                    bot_trunc: pages.bot_trunc,
+                    top_trunc: pages.top_trunc,
+                    from_name,
+                    to_name,
+                    stem,
+                });
+        } else {
+            (from_g, to_g)
+        }
     };
 
     pages.push(from, page + 1, new_from_g);
@@ -172,6 +187,8 @@ fn apply_tau(
 ) -> Result<(), Issue> {
     let from_g = pages.element_final(from);
     let to_g = pages.element_final(to);
+
+
 
     if from_g.1.alive() && to_g.1.alive() && from_g.0 >= af {
         if let Some(from_torsion) = from_g.1.0 {
@@ -192,8 +209,8 @@ fn apply_tau(
                 }
                 None => (Torsion::default(), Torsion::new(from_torsion - af_diff)),
             };
-
-            if from_g.0 - from_torsion <= to_g.0 && af_diff > 0 {
+            
+            if from_g.0 - from_torsion <= to_g.0 && af_diff >= 0 {
                 pages.push(from, page, (from_g.0, new_from_torsion));
                 pages.push(to, page, (to_g.0, new_to_torsion));
             } else if from_g.0 - from_torsion > to_g.0 {
@@ -219,8 +236,9 @@ pub fn try_compute_pages(
     top_trunc: i32,
     from_stem: i32,
     to_stem: i32,
+    include_tau: bool,
 ) -> Result<SSPages, Vec<Issue>> {
-    let (pages, issues) = compute_pages(data, bot_trunc, top_trunc, from_stem, to_stem, true);
+    let (pages, issues) = compute_pages(data, bot_trunc, top_trunc, from_stem, to_stem, include_tau);
 
     if issues.len() != 0 {
         return Err(issues);
@@ -264,7 +282,11 @@ pub fn compute_pages(
             for ess in esss {
                 for es in ess {
                     for e in es {
-                        if pages.element_in_pages(e.from) && pages.element_in_pages(e.to) && from_stem <= data.model.stem(e.from) && data.model.stem(e.from) <= to_stem {
+                        if pages.element_in_pages(e.from)
+                            && pages.element_in_pages(e.to)
+                            && from_stem <= data.model.stem(e.from)
+                            && data.model.stem(e.from) <= to_stem
+                        {
                             if let Err(i) = apply_tau(data, &mut pages, 500, e.af, e.from, e.to) {
                                 issues.push(i);
                             }
@@ -283,7 +305,7 @@ pub fn ehp_recursion(ehp: &mut SyntheticSS, sphere: i32, stem: i32) -> Result<()
         panic!("Can't call this on even spheres");
     }
 
-    let pages = try_compute_pages(ehp, 0, sphere - 1, stem, stem)?;
+    let pages = try_compute_pages(ehp, 0, sphere - 1, stem, stem, true)?;
 
     // Set everything to zero
     for id in ehp
@@ -298,39 +320,39 @@ pub fn ehp_recursion(ehp: &mut SyntheticSS, sphere: i32, stem: i32) -> Result<()
 
     // Set everything to what we expect
     for id in ehp.model.gens_id_in_stem(stem).clone() {
-        if pages.element_in_pages(id) {
-            let g = pages.element_final(id);
-
+        if let Some(g) = pages.try_element_final(id) && g.1.alive() {
             let name = ehp.get_name_at_sphere(id, sphere).to_string();
             let gen_tag = generating_tag(&name);
 
             let target_name = add_sphere_to_tag(gen_tag, sphere);
-            if g.1.alive() {
-                match ehp.model.try_index(&target_name) {
-                    Some(target_id) => {
-                        let t_g = ehp.model.get_mut(target_id);
-                        if g.0 + 1 != t_g.af {
-                            issues.push(Issue::InvalidAFRecursion {
-                                from: id,
-                                to: target_id,
-                                from_name: name,
-                                to_name: target_name,
-                            });
-                        } else {
-                            t_g.torsion = g.1;
-                        }
-                    }
-                    None => {
-                        issues.push(Issue::InvalidName {
-                            original_name: name.to_string(),
-                            unexpected_name: target_name,
-                            stem,
-                            sphere,
-                            af: g.0,
+
+            match ehp.model.try_index(&target_name) {
+                Some(target_id) => {
+                    let t_g = ehp.model.get_mut(target_id);
+                    if g.0 + 1 != t_g.af {
+                        issues.push(Issue::InvalidAFRecursion {
+                            from: id,
+                            to: target_id,
+                            from_name: name,
+                            to_name: target_name,
                         });
+                        
+                        
+                    } else {
+                        t_g.torsion = g.1;
                     }
                 }
+                None => {
+                    issues.push(Issue::InvalidName {
+                        original_name: name.to_string(),
+                        unexpected_name: target_name,
+                        stem,
+                        sphere,
+                        af: g.0,
+                    });
+                }
             }
+            
         }
     }
 

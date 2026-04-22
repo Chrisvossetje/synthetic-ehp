@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
+    path::{Path, PathBuf},
     sync::LazyLock,
 };
 
@@ -55,20 +56,41 @@ pub static TRUNCS: LazyLock<Vec<(bool, i32, i32)>> = LazyLock::new(|| {
             (true, 3, 6)
         ],
         [(false, 1, 3), (false, 4, 6), (false, 2, 5), (false, 4, 7)],
-        (4..=MAX_STEM).flat_map(|l| {
-            (0..(D_R_REPEATS[(l - 1) as usize] as i32).min(50 - l + 1)).map(move |i| {
-                (
-                    synthetic_rp_truncations().contains(&(1 + i, l + i)),
-                    1 + i,
-                    l + i,
-                )
+        (4..=MAX_STEM)
+            .flat_map(|l| {
+                (0..(D_R_REPEATS[(l - 1) as usize] as i32).min(50 - l + 1)).map(move |i| {
+                    (
+                        synthetic_rp_truncations().contains(&(1 + i, l + i)),
+                        1 + i,
+                        l + i,
+                    )
+                })
             })
-        }).sorted_by_key(|x| (!x.0, x.2 - x.1)),
-        (3..=MAX_STEM).rev()
+            .sorted_by_key(|x| (!x.0, x.2 - x.1)),
+        (3..=MAX_STEM)
+            .rev()
             .filter(|x| x % 2 == 1)
             .map(|x| (true, x, 256)),
-        ]
+    ]
     .collect()
+});
+
+pub static EHP_TO_AHSS: LazyLock<Vec<Option<usize>>> = LazyLock::new(|| {
+    DATA
+            .model
+            .gens()
+            .iter()
+            .map(|g| STABLE_DATA.model.try_index(&g.name))
+            .collect()
+});
+
+pub static AHSS_TO_EHP: LazyLock<Vec<Option<usize>>> = LazyLock::new(|| {
+    STABLE_DATA
+            .model
+            .gens()
+            .iter()
+            .map(|g| DATA.model.try_index(&g.name))
+            .collect()
 });
 
 pub fn synthetic_rp_truncations() -> &'static [(i32, i32)] {
@@ -87,12 +109,12 @@ pub static EMPTY_LIST_TORSION: LazyLock<Vec<Torsion>> = LazyLock::new(|| vec![])
 pub static EMPTY_LIST_USIZE: LazyLock<Vec<usize>> = LazyLock::new(|| vec![]);
 
 pub static S0_ZEROES: LazyLock<SYNTHETIC_COMPARE_DATA> = LazyLock::new(|| {
-    let file_name = format!("../AHSS_DATA/S0_AdamsE2_ss.csv",);
+    let file_name = ahss_data_path("S0_AdamsE2_ss.csv");
     read_csv(1, 256, &file_name, false, true)
 });
 
 pub static S0: LazyLock<SYNTHETIC_COMPARE_DATA> = LazyLock::new(|| {
-    let file_name = format!("../AHSS_DATA/S0_AdamsE2_ss.csv",);
+    let file_name = ahss_data_path("S0_AdamsE2_ss.csv");
     read_csv(1, 256, &file_name, false, false)
 });
 
@@ -162,10 +184,17 @@ pub fn algebraic_spheres(sphere: i32) -> &'static HashMap<(i32, i32), usize> {
 
 // This bot / top trunc is for compatibility with C2, which is shifted 1 down wrt. RP1_2
 // So for S0, we just dont do anything with bot trunc and toptrunc
+fn ahss_data_path(file_name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("AHSS_DATA")
+        .join(file_name)
+}
+
 fn read_csv(
     bot_trunc: i32,
     top_trunc: i32,
-    file_name: &str,
+    file_name: &Path,
     add_one_af: bool,
     include_zero: bool,
 ) -> HashMap<(i32, i32), Vec<Torsion>> {
@@ -212,7 +241,7 @@ fn read_csv(
             }
         }
     } else {
-        panic!()
+        panic!("Failed to open AHSS data file: {}", file_name.display())
     }
     if bot_trunc % 2 == 0 {
         for i in 0..200 {
@@ -245,7 +274,7 @@ pub fn read_rp_csv(
     top_trunc: i32,
     include_zero: bool,
 ) -> HashMap<(i32, i32), Vec<Torsion>> {
-    let file_name = format!("../AHSS_DATA/RP{bot_trunc}_{top_trunc}_AdamsE2_ss.csv",);
+    let file_name = ahss_data_path(&format!("RP{bot_trunc}_{top_trunc}_AdamsE2_ss.csv"));
     read_csv(bot_trunc, top_trunc, &file_name, true, include_zero)
 }
 
