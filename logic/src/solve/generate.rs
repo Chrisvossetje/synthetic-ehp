@@ -11,6 +11,7 @@ pub fn get_a_diff(data: &SyntheticSS, top_trunc: i32, bot_trunc: i32, stem: i32)
 
     let d_y = top_trunc - bot_trunc;
 
+    
     for &t_id in data.model.gens_id_in_stem_y(stem, bot_trunc) {
         if let Some((t_af, t_torsion)) = sources.try_element_final(t_id)
             && t_torsion.alive()
@@ -134,7 +135,7 @@ pub fn get_a_tau_for_t_ids(
                             && !data.disproven_from_to.contains_key(&(s_id, t_id))
                         {
                             let y = data.model.y(t_id);
-                            if !data.out_taus[s_id].iter().any(|to| data.model.y(*to) == y) {
+                            if !data.out_taus[s_id].iter().any(|to| data.model.y(*to) == y && data.model.original_torsion(*to).alive()) {
                                 let d_y = data.model.y(s_id) - data.model.y(t_id);
                                 if d_y > 0 {
                                     if s_af > t_af && s_af - s_torsion <= t_af {

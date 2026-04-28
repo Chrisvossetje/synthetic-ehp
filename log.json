@@ -27,17 +27,15 @@
         }
     },
 
-
     {
         "AddExt": {
             "from": "1 2 4 1 1 2 4 1 1 2 4 3 3 3[6]",
             "to": "2 2 2 2 2 2 2 2 2 4 5 3 3 3[2]",
-            "af": 13,
+            "af": 15,
             "kind": "Real",
             "proof": "TODO: This tau extension should be lifted of off the AHSS, but that is only visible synthetically. It can be seen that on stem 28, 3 3 6 6 5 3[2] will tau extend with 6 2 3 4 4 1 1 1[6]. What this means is that 2 3 3 6 6 5 3[2] on S^5 will hit tau * 6 2 2 4 5 3 3 3[2] on the sphere spectrum."
         }
     },
-
 
     {
         "AddInt": {
@@ -57,25 +55,8 @@
             "proof": "TODO: "
         }
     },
-    {
-        "AddExt": {
-            "from": "2 2 2 2 3 5 7 3 3[6]",
-            "to": "7 3 6 6 5 3[5]",
-            "af": 8,
-            "kind": "Real",
-            "proof": "TODO: "
-        }
-    },
-    {
-        "AddExt": {
-            "from": "8 7 7 7[9]",
-            "to": "13 11 7[7]",
-            "af": 5,
-            "kind": "Real",
-            "proof": "TODO: "
-        }
-    },
 
+    
     {
         "SetInducedName": {
             "name": "6 2 3 4 4 1 1 1[13]",
@@ -118,14 +99,6 @@
     },
     {
         "SetInducedName": {
-            "name": "4 4 1 1 2 4 1 1 1[19]",
-            "new_name": "3 5 5 3 6 6 5 3[2]",
-            "sphere": 11,
-            "proof": "The proof of this is proper weird"
-        }
-    },
-    {
-        "SetInducedName": {
             "name": "4 2 2 2 2 3 3 6 6 5 3[2]",
             "new_name": "2 4 7 3 3 6 6 5 3[1]",
             "sphere": 3,
@@ -154,6 +127,46 @@
             "new_name": "13 1 2 4 1 1 1[9]",
             "sphere": 11,
             "proof": "With the other choice we are unable to fix a torsion issue on stem 36"
+        }
+    },
+    {
+        "AddDiff": {
+            "from": "7 7 7 7[5]",
+            "to": "2 3 5 7 7 7[1]",
+            "kind": "Unknown",
+            "proof": "If we assume this we have one generator less in stem 32/33 sphere 6/7/8. It's shadow also reduces one generator on the 35/36 stem only for the 4 sphere, and has no further effects."
+        }
+    },
+    {
+        "AddDiff": {
+            "from": "9 7 7 7[6]",
+            "to": "7 3 6 6 5 3[5]",
+            "kind": "Unknown",
+            "proof": "If we assume this we have one less generator on the 35/36 stem for the spheres 7/8. It's shadow also reduces one generator on the 38/39 stem for the 4 sphere only and has no further effects."
+        }
+    },
+    {
+        "AddDiff": {
+            "from": "3 3 5 9 3 5 7 7[2]",
+            "to": "1 2 2 4 7 3 3 6 6 5 3[1]",
+            "kind": "Unknown",
+            "proof": "This differential does not have enough shadows to be fully deducable. The computation of the UASS for S3 by Curtis and Mahowald show that it should not exist. It reduces one generator on stem 43/44 for the 3/4 sphere. Interestingly, it has no shadow at all!"
+        }
+    },
+    {
+        "SetInducedName": {
+            "name": "5 5 3 6 6 5 3[5]",
+            "new_name": "6 5 2 3 5 7 7[3]",
+            "sphere": 7,
+            "proof": "With the normal choice we get that on stem 41 the synthetic lifts do not line up as naturally as we want to. Also without this, the induced element on stem 41 will become the other on the 5-sphere already!"
+        }
+    },
+    {
+        "SetInducedName": {
+            "name": "5 5 3 6 6 5 3[5]",
+            "new_name": "5 5 3 6 6 5 3[5]",
+            "sphere": 9,
+            "proof": "With the normal choice we get that on stem 41 the synthetic lifts do not line up as naturally as we want to. Also without this, the induced element on stem 41 will become the other on the 5-sphere already!"
         }
     }
 ]

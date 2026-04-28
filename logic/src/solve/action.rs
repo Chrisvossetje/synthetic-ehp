@@ -293,7 +293,7 @@ pub fn revert_log_and_remake(
     let mut data = original_data.clone();
     for action in log {
         process_action(&mut data, action, ahss)
-            .expect("There was an invalid action in the log. That should not be possible :(");
+            .expect(&format!("There was an invalid action in the log. That should not be possible :( {action:?}"));
     }
 
     if !ahss {

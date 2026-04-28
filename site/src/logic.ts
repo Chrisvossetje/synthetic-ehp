@@ -566,7 +566,7 @@ export function get_filtered_data(
 
     // Find all generators killed by differentials before this page
     for (const diff of data.differentials) {
-        if (!shouldIncludeKind(diff.kind, data)) {
+        if (diff.kind !== "Real") {
             continue;
         }
         const diffPage = getDiffPage(diff, yByName);

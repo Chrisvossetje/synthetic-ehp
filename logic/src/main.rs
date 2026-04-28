@@ -83,9 +83,6 @@ fn ahss() -> (SyntheticSS, Duration) {
     println!("----------------------------------------");
     println!("");
 
-    // get_all_diffs(&mut data, 7, 13);
-    // write_all(&data, &log, true);
-    // todo!();
 
     'outer: while stem <= MAX_VERIFY_STEM {
         print!("{stem}-");
@@ -329,6 +326,7 @@ fn temp_lol(data: &SyntheticSS) {
 }
 
 pub static STABLE_SYNTHETIC_PAGES: OnceLock<[SSPages; (MAX_STEM + 1) as usize]> = OnceLock::new();
+pub static ALGEBRAIC_SPHERE_PAGES: OnceLock<[SSPages; (MAX_STEM + 1) as usize]> = OnceLock::new();
 
 fn main() {
     let start = Instant::now();
@@ -344,6 +342,9 @@ fn main() {
     
     let ahss_pages = std::array::from_fn(|x| compute_pages(&ahss, 0, x as i32, 0, 150, false).0);
     STABLE_SYNTHETIC_PAGES.set(ahss_pages).unwrap();
+    
+    let alg_ehp_pages = std::array::from_fn(|x| compute_pages(&DATA, 0, x as i32 - 1, 0, MAX_STEM + 5, false).0);
+    ALGEBRAIC_SPHERE_PAGES.set(alg_ehp_pages).unwrap();
     
     // if let Ok((ahss_log, ahss)) = ahss_solver(Some(log)) {
     //     write_all(&ahss, &ahss_log, true);

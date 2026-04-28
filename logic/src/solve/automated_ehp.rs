@@ -1,66 +1,169 @@
 use core::panic;
 use std::sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::AtomicBool
     };
 
-use itertools::Itertools;
-use rayon::iter::ParallelIterator;
 
 use crate::{
-    MAX_STEM, STABLE_SYNTHETIC_PAGES, data::{
+    ALGEBRAIC_SPHERE_PAGES, MAX_STEM, STABLE_SYNTHETIC_PAGES, data::{
         compare::{EHP_TO_AHSS, S0, algebraic_spheres},
-        curtis::{DATA, STABLE_DATA},
+        curtis::DATA,
     }, domain::{
         model::{Diff, ExtTauMult, SyntheticSS},
         process::{compute_pages, ehp_recursion, try_compute_pages},
     }, solve::{
-        action::{Action, process_action, revert_log_and_remake},
-        automated::{ALWAYS_PRINT, PARALLEL_DEPTH, TauIssue},
-        ehp_ahss::{compare_ehp_ahss, in_metastable_range, set_metastable_range},
-        generate::get_a_diff,
-        issues::{
-            Issue, algebraic_issue_is_fixable_by_tau_extensions, compare_algebraic,
-            compare_algebraic_spectral_sequence, compare_synthetic,
-            synthetic_issue_is_tau_structure_issue,
-        },
-        solve::{
+        action::{Action, process_action, revert_log_and_remake}, automated::{ALWAYS_PRINT, PARALLEL_DEPTH, TauIssue}, ehp_ahss::{in_metastable_range, set_metastable_range}, generate::get_a_diff, issues::{
+            Issue, algebraic_issue_is_fixable_by_tau_extensions, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic, synthetic_issue_is_tau_structure_issue
+        }, search::{BranchResult, ChoiceResult, SpeculativeBranchOutcome, branch_on_speculative_worlds, check_getout, create_getout, signal_parent_getout}, solve::{
             suggest_tau_solution_algebraic, suggest_tau_solution_generator_synthetic,
-        },
+        }
     }, types::Kind
 };
 
-pub const MAX_DEPTH: i32 = 6;
+pub const MAX_DEPTH: i32 = 14;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BranchResult {
-    Viable,
+enum Commitment {
+    Real(String),
+    Fake(String),
+    Unknown,
+}
+
+enum FixNamesResult {
+    Applied(Vec<Action>),
+    Open,
     Cancelled,
 }
 
-fn signal_parent_getout(
-    getout: &mut [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+fn commit_diff_choice(
+    data: &mut SyntheticSS,
+    log: &Arc<Mutex<Vec<Action>>>,
     depth: i32,
+    d: Diff,
+    commitment: Commitment,
 ) {
-    if depth <= PARALLEL_DEPTH
-        && depth != 0
-        && let Some(flag) = &mut getout[(depth - 1) as usize]
-    {
-        flag.store(true, Ordering::Relaxed);
+    let (from_name, to_name) = data.get_names(d.from, d.to);
+
+    match commitment {
+        Commitment::Fake(proof) => {
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Disproven diff: {} | {} by {proof}", from_name, to_name);
+            }
+            if depth == 0 {
+                log.lock().unwrap().push(Action::AddDiff {
+                    from: from_name,
+                    to: to_name,
+                    proof: Some(proof.clone()),
+                    kind: Kind::Fake,
+                });
+            }
+            data.add_diff(d.from, d.to, Some(proof), Kind::Fake);
+        }
+        Commitment::Real(proof) => {
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Proven diff: {} | {} | {:?}", from_name, to_name, proof);
+            }
+            if depth == 0 {
+                log.lock().unwrap().push(Action::AddDiff {
+                    from: from_name,
+                    to: to_name,
+                    proof: Some(proof.clone()),
+                    kind: Kind::Real,
+                });
+            }
+            data.add_diff(d.from, d.to, Some(proof), Kind::Real);
+        }
+        Commitment::Unknown => {
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Unknown diff: {} | {}", from_name, to_name);
+            }
+            if depth == 0 {
+                log.lock().unwrap().push(Action::AddDiff {
+                    from: from_name,
+                    to: to_name,
+                    proof: None,
+                    kind: Kind::Unknown,
+                });
+            }
+            data.add_diff(d.from, d.to, None, Kind::Unknown);
+        }
     }
 }
 
-fn check_getout(
-    getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
-) -> bool {
-    for g in getout {
-        if let Some(g) = g {
-            if g.load(Ordering::Relaxed) {
-                return true;
+fn commit_tau_choice(
+    data: &mut SyntheticSS,
+    log: &Arc<Mutex<Vec<Action>>>,
+    depth: i32,
+    d: ExtTauMult,
+    commitment: Commitment,
+) {
+    let (from_name, to_name) = data.get_names(d.from, d.to);
+
+    match commitment {
+        Commitment::Fake(proof) => {
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Disproven tau: {} | {} by {proof}", from_name, to_name);
             }
+            if depth == 0 {
+                log.lock().unwrap().push(Action::AddExt {
+                    from: from_name,
+                    to: to_name,
+                    af: d.af,
+                    proof: proof.clone(),
+                    kind: Kind::Fake,
+                });
+            }
+            data.add_ext_tau(d.from, d.to, d.af, Some(proof), Kind::Fake);
+        }
+        Commitment::Real(proof) => {
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Proven tau: {} | {} by {proof}", from_name, to_name);
+            }
+            if depth == 0 {
+                log.lock().unwrap().push(Action::AddExt {
+                    from: from_name,
+                    to: to_name,
+                    af: d.af,
+                    proof: proof.clone(),
+                    kind: Kind::Real,
+                });
+            }
+            data.add_ext_tau(d.from, d.to, d.af, Some(proof), Kind::Real);
+        }
+        Commitment::Unknown => {
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Unknown tau: {} | {} by ", from_name, to_name);
+            }
+            if depth == 0 {
+                log.lock().unwrap().push(Action::AddExt {
+                    from: from_name,
+                    to: to_name,
+                    af: d.af,
+                    proof: "".to_string(),
+                    kind: Kind::Unknown,
+                });
+            }
+            data.add_ext_tau(d.from, d.to, d.af, Some("".to_string()), Kind::Unknown);
         }
     }
-    return false;
+}
+
+fn commit_induced_name_choice(
+    data: &mut SyntheticSS,
+    depth: i32,
+    action: &mut Action,
+    proof: String,
+) -> Action {
+    if let Action::SetInducedName { proof: action_proof, .. } = action {
+        *action_proof = proof.clone();
+    }
+
+    if ALWAYS_PRINT || depth == 0 {
+        println!("Choosing induced name: {:?} | because {proof}", action);
+    }
+
+    process_action(data, action, false).unwrap();
+    action.clone()
 }
 
 fn check_issue(data: &SyntheticSS, stem: i32, sphere: i32) -> Result<(), Vec<Issue>> {
@@ -71,6 +174,7 @@ fn check_issue(data: &SyntheticSS, stem: i32, sphere: i32) -> Result<(), Vec<Iss
 
         compare_synthetic(&observed, &S0, 0, sphere - 1, stem)?;
         
+        
         pages
     } else {
         let pages = try_compute_pages(data, 0, sphere - 1, stem - 1, stem, true)?;
@@ -80,11 +184,10 @@ fn check_issue(data: &SyntheticSS, stem: i32, sphere: i32) -> Result<(), Vec<Iss
         compare_algebraic(&observed, algebraic_spheres(sphere), 0, sphere - 1, stem)?;
         pages
     };
-
-    // compare_algebraic_spectral_sequence(data, &pages, stem, 0, sphere - 1, false)?;
+    
+    compare_algebraic_spectral_sequence(data, &pages, stem, 0, sphere - 1, false)?;
     
     for &f_id in data.model.gens_id_in_stem(stem) {
-    // for f_id in 0..data.model.gens().len() {
         if let Some(t_id) = EHP_TO_AHSS[f_id] && STABLE_SYNTHETIC_PAGES.get().unwrap()[(sphere - 1) as usize].element_in_pages(t_id) {
             if let Some(ps) = &pages.generators[f_id] {
                 for (f_page, (f_af, f_torsion)) in ps {
@@ -102,44 +205,12 @@ fn check_issue(data: &SyntheticSS, stem: i32, sphere: i32) -> Result<(), Vec<Iss
                                 }
                             ]);
                         }
-
-                        // if f_torsion > &t_torsion {
-                        //     return Err(vec![
-                        //         Issue::InvalidEHPAHSSMap { 
-                        //             name: data.model.name(f_id).to_string(), 
-                        //             from_torsion: *f_torsion,
-                        //             to_torsion: t_torsion,
-                        //             stem, 
-                        //             sphere 
-                        //         }
-                        //     ]);
-                        // }
                     }
                 }
             }
         }
     }
-    
-    // for (f_id, t_id) in EHP_TO_AHSS.iter().enumerate() {
-    //     if let Some(t_id) = t_id {
-    //         if let Some((_, f_torsion)) = pages.try_element_final(f_id) && f_torsion.alive() {
-    //             if let Some((_, t_torsion)) = STABLE_SYNTHETIC_PAGES.get().unwrap().try_element_final(*t_id) {
-    //                 if f_torsion > t_torsion {
-    //                     // println!("HOI1!!ZIES");
-    //                     // for d in &data.in_diffs[data.model.get_index("2 4 5 3 3 3[2]")] {
-    //                     //     println!("{} | {:?}", data.model.name(*d), pages.generators[*d]);
-    //                     // }
-    //                     // println!("1. {:?}", pages.generators[f_id]);
-    //                     // println!("2. {:?}", STABLE_SYNTHETIC_PAGES.get().unwrap().generators[*t_id]);
-    //                     // panic!();
-    //                     return Err(vec![
-    //                         Issue::InvalidEHPAHSSMap { from: data.model.name(f_id).to_string(), to: data.model.name(f_id).to_string(), stem, sphere }
-    //                     ]);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+
     Ok(())
 }
 
@@ -189,6 +260,11 @@ fn filter_diff(
             Kind::Unknown,
             format!("We don't have enough Synthetic information to deduce this differential."),
         ))
+    } else if data.out_diffs[d.from].last().map(|x| if let Some(target) = data.out_taus[*x].last() { *target != d.to } else {false}).unwrap_or(false) {
+        Some((
+            Kind::Unknown,
+            format!("Can't have a differential which earlier hits some tau multiple and then later does not."),
+        ))
     } else {
         None
     }
@@ -235,25 +311,23 @@ fn ehp_iterate(
     mut stem: i32,
     mut top_trunc: i32,
     mut bot_trunc: i32,
-    depth: i32,
-) -> Result<BranchResult, String> {
+    mut depth: i32,
+) -> BranchResult {
     loop {
-        if depth == 0 && stem >= 40 {
-            return Ok(BranchResult::Viable);
+        if depth == 0 && stem >= 47 {
+            return BranchResult::Open;
         }
 
-        if depth >= MAX_DEPTH || stem >= 37 {
-            return Ok(BranchResult::Viable);
+        if depth > MAX_DEPTH || stem >= 48 {
+            return BranchResult::Open;
         }
 
         if check_getout(&getout) {
-            return Ok(BranchResult::Cancelled);
+            return BranchResult::Cancelled;
         }
 
         if bot_trunc != 0 {
             let option = get_a_diff(&data, top_trunc, bot_trunc, stem);
-
-            
 
             // Should only need first option here
             if let Some(d) = option {
@@ -268,9 +342,16 @@ fn ehp_iterate(
                     bot_trunc,
                     depth,
                     d,
-                )? {
-                    BranchResult::Viable => continue,
-                    BranchResult::Cancelled => return Ok(BranchResult::Cancelled),
+                ) {
+                    ChoiceResult::Chosen => {
+                        continue;
+                    },
+                    ChoiceResult::Open => {
+                        return BranchResult::Open;
+                    },
+                    ChoiceResult::Cancelled => {
+                        return BranchResult::Cancelled;
+                    },
                 }
             }
         } else {
@@ -278,7 +359,7 @@ fn ehp_iterate(
                 Ok(tau_issue) => tau_issue,
                 Err(is) => {
                     signal_parent_getout(&mut getout, depth);
-                    return Err(is);
+                    return BranchResult::Contradiction(is);
                 }
             };
 
@@ -320,14 +401,21 @@ fn ehp_iterate(
                         bot_trunc,
                         depth,
                         d,
-                    )? {
-                        BranchResult::Viable => continue,
-                        BranchResult::Cancelled => return Ok(BranchResult::Cancelled),
+                    ) {
+                        ChoiceResult::Chosen => {
+                            continue;
+                        },
+                        ChoiceResult::Open => {
+                            return BranchResult::Open;
+                        },
+                        ChoiceResult::Cancelled => {
+                            return BranchResult::Cancelled;
+                        },
                     }
                 } else {
                     signal_parent_getout(&mut getout, depth);
 
-                    return Err(format!(
+                    return BranchResult::Contradiction(format!(
                         "Issue at S^{} | stem {}: {issues:?}",
                         top_trunc + 1,
                         stem
@@ -338,6 +426,7 @@ fn ehp_iterate(
 
         
         if bot_trunc != 0 {
+            // TODO: Do something wth this result ?
             let _ = add_diffs(
                 &mut data,
                 ahss_and_alg_data,
@@ -346,28 +435,39 @@ fn ehp_iterate(
                 top_trunc,
                 bot_trunc,
                 depth,
-            )?;
+            );
             bot_trunc -= 1;
             continue;
         } else {
             if top_trunc & 1 == 0 && (top_trunc/2) + stem < MAX_STEM {
-                let mut actions = fix_names(&mut data,
-                alg_ehp,
-                ahss_and_alg_data,
-                &getout,
-                &log,
-                stem,
-                top_trunc,
-                bot_trunc,
-                depth)?;
-                if depth == 0 {
-                    log.lock().unwrap().append(&mut actions);
-                }
+                match fix_names(&mut data,
+                    alg_ehp,
+                    ahss_and_alg_data,
+                    &getout,
+                    &log,
+                    stem,
+                    top_trunc,
+                    bot_trunc,
+                    depth) {
+                        Ok(i) => match i {
+                            FixNamesResult::Applied(mut actions) => {
+                                if depth == 0 {
+                                    log.lock().unwrap().append(&mut actions);
+                                }
+                            }
+                            FixNamesResult::Cancelled => return BranchResult::Cancelled,
+                            FixNamesResult::Open => return BranchResult::Open,
+                        },
+                        Err(e) => return BranchResult::Contradiction(e),
+                    }
             }
         }
         
         if top_trunc & 1 == 0 && top_trunc <= stem && (top_trunc/2) + stem < MAX_STEM {
-            ehp_recursion(&mut data, top_trunc + 1, stem).map_err(|x| format!("{x:?}"))?;
+            let res = ehp_recursion(&mut data, top_trunc + 1, stem).map_err(|x| format!("{x:?}"));
+            if res.is_err() {
+                panic!();
+            }
         }
         
         
@@ -390,14 +490,38 @@ fn ehp_iterate(
         //         top_trunc -= 3;
         //     }
         // }
-        
-        // Simple formula
-        if top_trunc == stem + 1 {
+
+
+        // Slightly less complicated formula
+        if top_trunc >= stem + 1 {
+            stem += 1;
+            top_trunc = 4;
+        } else if top_trunc == 5 {
             stem += 1;
             top_trunc = 2;
+        } else if top_trunc == 3 {
+            stem += 1;
+            top_trunc = 1;
+        } else if top_trunc == 1 {
+            stem -= 2;
+            top_trunc = 6;
         } else {
             top_trunc += 1;
         }
+
+
+        // // Simple formula
+        // if top_trunc == stem + 1 {
+        //     stem += 1;
+        //     top_trunc = 2;
+        // } else {
+        //     top_trunc += 1;
+        // }
+
+
+
+
+
         bot_trunc = get_first_non_metastable_range(stem, top_trunc);
         if depth == 0 {
             println!("Current stem: {stem} | top_trunc: {top_trunc}");
@@ -415,11 +539,11 @@ fn fix_names(
     top_trunc: i32,
     bot_trunc: i32,
     depth: i32,
-) -> Result<Vec<Action>, String> {
+) -> Result<FixNamesResult, String> {
     let sphere = top_trunc + 1;
 
     let (pages, _) = compute_pages(data, 0, sphere - 1, stem, stem, true);
-    let (alg_pages, _) = compute_pages(&DATA, 0, sphere - 1, stem, stem, true);
+    let alg_pages = &ALGEBRAIC_SPHERE_PAGES.get().unwrap()[sphere as usize];
 
     let mut issues = vec![];
 
@@ -490,7 +614,7 @@ fn fix_names(
             let fil_alg: Vec<_> = alg.iter().filter(|i| !syn.contains(i)).collect();
 
             if fil_alg.len() == 0 {
-                return Err(format!("This should have been seen as an algebraic convergence issue"))
+                    return Err(format!("This should have been seen as an algebraic convergence issue"))
             }
             if fil_syn.len() == 1 && fil_alg.len() == 1 {
                 let name = fil_alg[0];
@@ -512,11 +636,7 @@ fn fix_names(
 
                 // Go do a branching search to find best candidates
                 if fil_syn.len() == 1 && fil_alg.len() == 2 {
-                    return Err("CANT HAVE THIS".to_string());
-                    let mut g = getout.clone();
-                    if depth < PARALLEL_DEPTH {
-                        g[depth as usize] = Some(Arc::new(AtomicBool::new(false)));
-                    }
+                    let g = create_getout(getout, depth);
 
                     let mut a_action = Action::SetInducedName {
                             name: original_name.clone(),
@@ -572,119 +692,33 @@ fn fix_names(
                         println!("Trying Induced name for {}", fil_syn[0]);
                     }
 
-                    if depth < PARALLEL_DEPTH {
-                            let (a_res, b_res) = rayon::join(a, b);
-
-                            if let Err(e) = a_res {
-                                if let Action::SetInducedName { name, new_name, sphere, proof } = &mut b_action {
-                                    *proof = e.clone();
-                                }
-
-                                // DISPROOF !
-                                if ALWAYS_PRINT || depth == 0 {
-                                    println!("Choosing name b: {:?} | because {e}", b_action);
-                                }
-
-                                process_action(data, &b_action, false).unwrap();
-                                sols.push(b_action);
-                            } else if let Err(e) = b_res {
-                                if let Action::SetInducedName { name, new_name, sphere, proof } = &mut a_action {
-                                    *proof = e.clone();
-                                }
-
-                                // PROOF !
-                                if ALWAYS_PRINT || depth == 0 {
-                                    println!("Choosing name a: {:?} | because {e}", a_action);
-                                }
-
-                                process_action(data, &a_action, false).unwrap();
-                                sols.push(a_action);
-                            } else if !matches!(a_res, Ok(BranchResult::Viable))
-                                || !matches!(b_res, Ok(BranchResult::Viable))
-                            {
-                                // Nothing
-                            } else {
-                                let without = b_res;
-
-                                unreachable!("This can not be valid i think for Induced names. We should always be able to seperate two choices.");
-
-
-                                // if matches!(without, Ok(true)) && depth == 0 {
-                                //     println!(
-                                //         "WITH OR WITHOUT ARE BOTH FINE FOR THE DIFFERENTIAL: {:?} | {:?}",
-                                //         d,
-                                //         data.get_names(d.from, d.to)
-                                //     );
-                                // }
-
-                                // // If with and without are both Ok then we continue WITHOUT the differential
-                                // // But we do remember that we don't know the result of this diff
-                                // let kind = Kind::Unknown;
-                                // let proof = None;
-
-                                // data.add_diff(d.from, d.to, proof.clone(), kind);
-
-                                // // Commit choice !
-                                // if ALWAYS_PRINT || depth == 0 {
-                                //     if kind == Kind::Unknown {
-                                //         println!("Unknown diff: {} | {}", from_name, to_name);
-                                //     } else {
-                                //         println!("Proven diff: {} | {} | {proof:?}", from_name, to_name);
-                                //     }
-                                // }
-                                // if depth == 0 {
-                                //     log.lock().unwrap().push(Action::AddDiff {
-                                //         from: from_name,
-                                //         to: to_name,
-                                //         proof,
-                                //         kind,
-                                //     });
-                                // }
-
-                                // return Ok(true);
-                            }
-                        } else {
-                            let a_res = a();
-                            if let Err(e) = a_res {
-                                if let Action::SetInducedName { name, new_name, sphere, proof } = &mut b_action {
-                                    *proof = e.clone();
-                                }
-
-                                // DISPROOF !
-                                if ALWAYS_PRINT || depth == 0 {
-                                    println!("Choosing name b: {:?} | because {e}", b_action);
-                                }
-                                
-                                process_action(data, &b_action, false).unwrap();
-                                sols.push(b_action);
-
-
-                            } else if !matches!(a_res, Ok(BranchResult::Viable)) {
-                                // Nothing
-                            } else {
-                                if let Action::SetInducedName { name, new_name, sphere, proof } = &mut a_action {
-                                    *proof = format!("No error could be found")
-                                }
-
-                                // PROOF !
-                                if ALWAYS_PRINT || depth == 0 {
-                                    println!("Choosing name a: {:?} | because there was no error when running it", a_action);
-                                }
-
-                                process_action(data, &a_action, false).unwrap();
-                                sols.push(a_action);
-                            }
+                    match branch_on_speculative_worlds(depth, a, b) {
+                        SpeculativeBranchOutcome::ChooseRight(e) => {
+                            let action = commit_induced_name_choice(data, depth, &mut b_action, e);
+                            sols.push(action);
                         }
-
-
-
-
-
-
+                        SpeculativeBranchOutcome::ChooseLeft(e) => {
+                            let action = commit_induced_name_choice(data, depth, &mut a_action, e);
+                            sols.push(action);
+                        }
+                        SpeculativeBranchOutcome::Cancelled => {
+                            return Ok(FixNamesResult::Cancelled);
+                        }
+                        SpeculativeBranchOutcome::BothOpen => {
+                            return Ok(FixNamesResult::Open);
+                            // if depth == 0 {
+                            //     unreachable!("Induced-name branching should distinguish the two choices.");
+                            // } else {
+                            //     // What should i do here ?
+                            //     // I probably can't see the result yet ?
+                            //     let action = commit_induced_name_choice(data, depth, &mut a_action, "".to_string());
+                            //     sols.push(action);
+                            // }
+                        }
+                    }
 
                 } else {
                     if depth == 0 {
-    
                         println!("{i:?}");
                         println!("{fil_syn:?}");
                         println!("{fil_alg:?}");
@@ -692,13 +726,14 @@ fn fix_names(
                         println!("This is not necc. an error. It means i DO have to think harder and split on multiple name choices :(.
                         But i probably want to do this manual anyway. Implementing this logic for the few cases where it occurs might not be worth it.");  
                     }
-                    return Err(format!("We have two unknowns in one degree, we probably need to make better differential choices."));
+
+                    return Err(format!("We have two unknowns in one degree, we probably need to make better differential choices. Syn: {fil_syn:?} | Alg: {fil_alg:?} | Issue: {i:?}"));
                 }
             }
         }
     }
 
-    Ok(sols)
+    Ok(FixNamesResult::Applied(sols))
 }
 
 fn try_diff(
@@ -712,7 +747,7 @@ fn try_diff(
     bot_trunc: i32,
     depth: i32,
     d: Diff,
-) -> Result<BranchResult, String> {
+) -> ChoiceResult {
     let (from_name, to_name) = data.get_names(d.from, d.to);
 
     let filter = filter_diff(&data, alg_ehp, bot_trunc, top_trunc, d);
@@ -736,20 +771,17 @@ fn try_diff(
             );
         }
         data.add_diff(d.from, d.to, Some(reason), kind);
-        return Ok(BranchResult::Viable);
+        return ChoiceResult::Chosen;
     }
 
     if ALWAYS_PRINT || depth == 0 {
         println!("Trying diff: {} | {}", from_name, to_name);
     }
 
-
-    let mut g = getout.clone();
-    if depth < PARALLEL_DEPTH {
-        g[depth as usize] = Some(Arc::new(AtomicBool::new(false)));
-    }
+    let g = create_getout(getout, depth);
 
     let with = || {
+        // println!("{depth} With Trying diff: {} | {}", from_name, to_name);
         let mut with_data = data.clone();
         with_data.add_diff(d.from, d.to, Some("".to_string()), Kind::Real);
         ehp_iterate(
@@ -765,6 +797,7 @@ fn try_diff(
         )
     };
     let without = || {
+        // println!("{depth} Without Trying diff: {} | {}", from_name, to_name);
         let mut without_data = data.clone();
         without_data.add_diff(d.from, d.to, Some("".to_string()), Kind::Fake);
         ehp_iterate(
@@ -780,163 +813,23 @@ fn try_diff(
         )
     };
 
-    if depth < PARALLEL_DEPTH {
-        let (with_res, without_res) = rayon::join(with, without);
-
-        if let Err(e) = with_res {
-            // DISPROOF !
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Disproven diff: {} | {} by {e}", from_name, to_name);
-            }
-            // Commit choice !
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof: Some(e.clone()),
-                    kind: Kind::Fake,
-                });
-            }
-
-            data.add_diff(d.from, d.to, Some(e), Kind::Fake);
-
-            // And iterate further
-            return Ok(BranchResult::Viable);
-        } else if let Err(e) = without_res {
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            data.add_diff(d.from, d.to, Some(e.clone()), Kind::Real);
-
-            if ALWAYS_PRINT || depth == 0 {
-                println!(
-                    "Proven diff: {} | {} | {:?}",
-                    from_name,
-                    to_name,
-                    Some(e.clone())
-                );
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof: Some(e),
-                    kind: Kind::Real,
-                });
-            }
-
-            return Ok(BranchResult::Viable);
-        } else if !matches!(with_res, Ok(BranchResult::Viable))
-            || !matches!(without_res, Ok(BranchResult::Viable))
-        {
-            return Ok(BranchResult::Cancelled);
-        } else {
-            let without = without_res;
-
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            if matches!(without, Ok(BranchResult::Viable)) && depth == 0 {
-                println!(
-                    "WITH OR WITHOUT ARE BOTH FINE FOR THE DIFFERENTIAL: {:?} | {:?}",
-                    d,
-                    data.get_names(d.from, d.to)
-                );
-            }
-
-            // If with and without are both Ok then we continue WITHOUT the differential
-            // But we do remember that we don't know the result of this diff
-            let kind = Kind::Unknown;
-            let proof = None;
-
-            data.add_diff(d.from, d.to, proof.clone(), kind);
-
-            // Commit choice !
-            if ALWAYS_PRINT || depth == 0 {
-                if kind == Kind::Unknown {
-                    println!("Unknown diff: {} | {}", from_name, to_name);
-                } else {
-                    println!("Proven diff: {} | {} | {proof:?}", from_name, to_name);
-                }
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof,
-                    kind,
-                });
-            }
-
-            return Ok(BranchResult::Viable);
+    match branch_on_speculative_worlds(depth, with, without) {
+        SpeculativeBranchOutcome::ChooseRight(e) => {
+            commit_diff_choice(data, log, depth, d, Commitment::Fake(e));
+            ChoiceResult::Chosen
         }
-    } else {
-        let with_res = with();
-        if let Err(e) = with_res {
-            // DISPROOF !
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            // Commit choice !
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Disproven diff: {} | {} by {e}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof: Some(e.clone()),
-                    kind: Kind::Fake,
-                });
-            }
-
-            data.add_diff(d.from, d.to, Some(e), Kind::Fake);
-
-            // And iterate further
-            return Ok(BranchResult::Viable);
-        } else if !matches!(with_res, Ok(BranchResult::Viable)) {
-            return Ok(BranchResult::Cancelled);
-        } else {
-            let without = without();
-
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            if matches!(without, Ok(BranchResult::Viable)) && depth == 0 {
-                println!(
-                    "WITH OR WITHOUT ARE BOTH FINE FOR THE DIFFERENTIAL: {:?} | {:?}",
-                    d,
-                    data.get_names(d.from, d.to)
-                );
-            }
-
-            // If with and without are both Ok then we continue WITHOUT the differential
-            // But we do remember that we don't know the result of this diff
-            let (kind, proof) = match without {
-                Err(e) => (Kind::Real, Some(e)),
-                Ok(BranchResult::Viable) => (Kind::Unknown, None),
-                Ok(BranchResult::Cancelled) => return Ok(BranchResult::Cancelled),
-            };
-
-            data.add_diff(d.from, d.to, proof.clone(), kind);
-
-            if ALWAYS_PRINT || depth == 0 {
-                if kind == Kind::Unknown {
-                    println!("Unknown diff: {} | {}", from_name, to_name);
-                } else {
-                    println!("Proven diff: {} | {} | {proof:?}", from_name, to_name);
-                }
-            }
-            // Commit choice !
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof,
-                    kind,
-                });
-            }
-
-            return Ok(BranchResult::Viable);
+        SpeculativeBranchOutcome::ChooseLeft(e) => {
+            commit_diff_choice(data, log, depth, d, Commitment::Real(e));
+            ChoiceResult::Chosen
         }
+        SpeculativeBranchOutcome::BothOpen => {
+            // In this case it merely means that i don't know what happened for sure
+            // if im in depth == 0 i HAVE to make a choice
+            // Else i just return and try to follow the other branch 
+            commit_diff_choice(data, log, depth, d, Commitment::Unknown);
+            ChoiceResult::Open
+        }
+        SpeculativeBranchOutcome::Cancelled => ChoiceResult::Cancelled,
     }
 }
 
@@ -999,7 +892,7 @@ fn try_tau(
     bot_trunc: i32,
     depth: i32,
     d: ExtTauMult,
-) -> Result<BranchResult, String> {
+) -> ChoiceResult {
     let (from_name, to_name) = data.get_names(d.from, d.to);
 
     let filter  = filter_tau(data, alg_ehp, bot_trunc, top_trunc, d);
@@ -1025,7 +918,7 @@ fn try_tau(
             );
         }
         data.add_ext_tau(d.from, d.to, d.af, Some(reason), kind);
-        return Ok(BranchResult::Viable);
+        return ChoiceResult::Chosen;
     }
 
     if ALWAYS_PRINT || depth == 0 {
@@ -1034,11 +927,8 @@ fn try_tau(
             from_name, to_name, d.af, top_trunc + 1
         );
     }
-
-    let mut g = getout.clone();
-    if depth < PARALLEL_DEPTH {
-        g[depth as usize] = Some(Arc::new(AtomicBool::new(false)));
-    }
+    
+    let g = create_getout(getout, depth);
 
     let with = || {
         let mut with_data = data.clone();
@@ -1071,155 +961,22 @@ fn try_tau(
         )
     };
 
-    if depth < PARALLEL_DEPTH {
-        let (with_res, without_res) = rayon::join(with, without);
-
-        if let Err(e) = with_res {
-            // DISPROOF !
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            // Commit choice !
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Disproven tau: {} | {} by {e}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof: e.clone(),
-                    kind: Kind::Fake,
-                });
-            }
-
-            data.add_ext_tau(d.from, d.to, d.af, Some(e), Kind::Fake);
-
-            // And iterate further
-            return Ok(BranchResult::Viable);
-        } else if let Err(e) = without_res {
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-            let proof = e.clone();
-
-            data.add_ext_tau(d.from, d.to, d.af, Some(proof.clone()), Kind::Real);
-
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Proven tau: {} | {} by {proof}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof,
-                    kind: Kind::Real,
-                });
-            }
-            return Ok(BranchResult::Viable);
-        } else if !matches!(with_res, Ok(BranchResult::Viable))
-            || !matches!(without_res, Ok(BranchResult::Viable))
-        {
-            return Ok(BranchResult::Cancelled);
-        } else {
-            let without = without_res;
-
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            if matches!(without, Ok(BranchResult::Viable)) && depth == 0 {
-                println!(
-                    "WITH OR WITHOUT ARE BOTH FINE FOR THE TAU: {:?} | {:?}",
-                    d,
-                    data.get_names(d.from, d.to)
-                );
-            }
-
-            // If with and without are both Ok then we continue WITHOUT the differential
-            // But we do remember that we don't know the result of this diff
-            let kind = Kind::Unknown;
-            let proof = "".to_string();
-
-            data.add_ext_tau(d.from, d.to, d.af, Some(proof.clone()), kind);
-
-            // Commit choice !
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Proven tau: {} | {} by {proof}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof,
-                    kind,
-                });
-            }
-
-            return Ok(BranchResult::Viable);
+    match branch_on_speculative_worlds(depth, with, without) {
+        SpeculativeBranchOutcome::ChooseRight(e) => {
+            commit_tau_choice(data, log, depth, d, Commitment::Fake(e));
+            ChoiceResult::Chosen
         }
-    } else {
-        let with_res = with();
-        if let Err(e) = with_res {
-            // DISPROOF !
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            // Commit choice !
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Disproven tau: {} | {} by {e}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof: e.clone(),
-                    kind: Kind::Fake,
-                });
-            }
-
-            data.add_ext_tau(d.from, d.to, d.af, Some(e), Kind::Fake);
-
-            // And iterate further
-            return Ok(BranchResult::Viable);
-        } else if !matches!(with_res, Ok(BranchResult::Viable)) {
-            return Ok(BranchResult::Cancelled);
-        } else {
-            let without = without();
-
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            if matches!(without, Ok(BranchResult::Viable)) && depth == 0 {
-                println!(
-                    "WITH OR WITHOUT ARE BOTH FINE FOR THE TAU: {:?} | {:?}",
-                    d,
-                    data.get_names(d.from, d.to)
-                );
-            }
-
-            // If with and without are both Ok then we continue WITHOUT the differential
-            // But we do remember that we don't know the result of this diff
-            let (kind, proof) = match without {
-                Err(e) => (Kind::Real, e),
-                Ok(BranchResult::Viable) => (Kind::Unknown, "".to_string()),
-                Ok(BranchResult::Cancelled) => return Ok(BranchResult::Cancelled),
-            };
-
-            data.add_ext_tau(d.from, d.to, d.af, Some(proof.clone()), kind);
-
-            // Commit choice !
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Proven tau: {} | {} by {proof}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof,
-                    kind,
-                });
-            }
-
-            return Ok(BranchResult::Viable);
+        SpeculativeBranchOutcome::ChooseLeft(e) => {
+            commit_tau_choice(data, log, depth, d, Commitment::Real(e));
+            ChoiceResult::Chosen
         }
+        SpeculativeBranchOutcome::BothOpen => {
+            // commit_tau_choice(data, log, depth, d, Commitment::Unknown);
+            ChoiceResult::Open
+        }
+        SpeculativeBranchOutcome::Cancelled => {
+            ChoiceResult::Cancelled
+        },
     }
 }
 
@@ -1296,41 +1053,9 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
         ];
 
         
-    let mut log = if let Some(log) = log {
-        log
-    } else {
-        vec![
-            Action::AddExt { from: "2 4 1 1 2 4 3 3 3[7]".to_string(), to: "2 3 3 6 6 5 3[2]".to_string(), af: 9, kind: Kind::Real, proof: format!("This tau extension should be lifted of off the AHSS, but that is only visible synthetically. It can be seen that on stem 28, 3 3 6 6 5 3[2] will tau extend with 6 2 3 4 4 1 1 1[6]. What this means is that 2 3 3 6 6 5 3[2] on S^5 will hit tau * 6 2 2 4 5 3 3 3[2] on the sphere spectrum.") },
-            // TODO: Don't remove this !!!
-            // {
-            //     "AddExt": {
-            //         "from": "2 4 1 1 2 4 3 3 3[7]",
-            //         "to": "2 3 3 6 6 5 3[2]",
-            //         "af": 9,
-            //         "kind": "Real",
-            //         "proof": "This tau extension should be lifted of off the AHSS, but that is only visible synthetically. It can be seen that on stem 36, 2 2 2 2 3 3 6 6 5 3[2] will tau extend with 2 2 2 2 2 2 4 5 3 3 3[6]. What this means is that 2 2 2 2 2 3 3 6 6 5 3[2] on S^5 will hit tau * 6 2 2 2 2 2 2 4 5 3 3 3[2] on the sphere spectrum."
-            //     }
-            // },
-            
-            // Action::SetInducedName { name:"12 1 1 1[15]".to_string(), new_name:"9 3 3 3[12]".to_string(), sphere: 17, proof:format!("Observation") },
-            // Action::SetInducedName { name:"2 4 1 1 2 4 3 3 3[9]".to_string(), new_name:"8 1 1 2 4 3 3 3[7]".to_string(), sphere: 11, proof:format!("Observation") },
-            // Action::SetInducedName { name:"6 2 3 4 4 1 1 1[10]".to_string(), new_name:"13 1 2 4 1 1 1[9]".to_string(), sphere: 11, proof:format!("Observation") },
-            
-            
-            Action::AddDiff { from: "5 2 3 5 7 7[6]".to_string(), to: "2 2 2 2 3 5 7 3 3[5]".to_string(), kind: Kind::Real, proof: Some(format!("Obs")) },
-            Action::AddExt { from: "2 2 2 2 3 5 7 3 3[6]".to_string(), to: "7 3 6 6 5 3[5]".to_string(), af: 13, kind: Kind::Real, proof: format!("Observation") },
-            
-            
-            Action::AddDiff { from: "7 3 6 6 5 3[5]".to_string(), to: "3 4 4 1 1 2 4 1 1 2 4 1 1 1[4]".to_string(), kind: Kind::Fake, proof: Some(format!("Lets see what really breaks if this (obviously) is fake")) },
-            Action::AddDiff { from: "7 2 4 1 1 2 4 3 3 3[4]".to_string(), to: "3 4 4 1 1 2 4 1 1 2 4 1 1 1[4]".to_string(), kind: Kind::Fake, proof: Some(format!("Lets see what really breaks if this (obviously) is fake")) },
-            // Action::AddDiff { from: "12 1 1 1[15]".to_string(), to: "2 2 2 3 5 7 3 3[2]".to_string(), kind: Kind::Fake, proof: Some(format!("Lets see what really breaks if this (obviously) is fake")) },
-            // Action::AddDiff { from: "7 7 7[9]".to_string(), to: "2 2 2 3 5 7 3 3[2]".to_string(), kind: Kind::Fake, proof: Some(format!("Lets see what really breaks if this (obviously) is fake")) },
-            // Action::AddDiff { from: "2 2 2 2 2 2 2 4 5 3 3 3[2]".to_string(), to: "1 2 4 1 1 2 4 1 1 2 4 3 3 3[1]".to_string(), kind: Kind::Real, proof: Some(format!("Observation")) },
-            // Action::AddExt { from: "4 1 1 2 4 1 1 2 4 3 3 3[2]".to_string(), to: "2 2 2 2 2 2 4 5 3 3 3[1]".to_string(), af: 13, kind: Kind::Real, proof: format!("Observation") },
-            // Action::AddDiff { from: "2 2 3 3 6 6 5 3[2]".to_string(), to: "2 2 2 2 2 2 4 5 3 3 3[1]".to_string(), kind: Kind::Real, proof: Some(format!("Observation")) },
-            // Action::AddDiff { from: "4 2 2 2 2 4 5 3 3 3[6]".to_string(), to: "6 2 3 4 4 1 1 2 4 1 1 1[5]".to_string(), kind: Kind::Real, proof: Some(format!("Observation")) },
-        ]
-    };
+    let mut log = log.unwrap_or(vec![
+        
+    ]);
 
 
     // Add EHP Algebraic Diffs

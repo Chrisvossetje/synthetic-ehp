@@ -30,7 +30,7 @@ use crate::{
     types::{Kind, Torsion},
 };
 
-pub const PARALLEL_DEPTH: i32 = 3;
+pub const PARALLEL_DEPTH: i32 = 4;
 pub const ALWAYS_PRINT: bool = false;
 
 fn check_issue(
@@ -41,7 +41,7 @@ fn check_issue(
 ) -> Result<(), Vec<Issue>> {
     for &(synthetic, bt, tt) in rp_truncations() {
         if (top_trunc == tt || (stem + 1 == top_trunc && tt == 256)) && bot_trunc == bt {
-            let pages = (if synthetic {
+            let pages = if synthetic {
                 let (pages, issues) = compute_pages(data, bt, tt, stem, stem, true);
 
                 let observed = pages.convergence_at_stem(data, stem);
@@ -63,7 +63,7 @@ fn check_issue(
                     return Err(issues);
                 }
                 pages
-            });
+            };
             compare_algebraic_spectral_sequence(data, &pages, stem, bt, tt, true)?;
         }
     }

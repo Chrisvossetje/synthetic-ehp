@@ -8,3 +8,4 @@ pub mod ehp_ahss;
 pub mod generate;
 pub mod issues;
 pub mod solve;
+pub mod search;
