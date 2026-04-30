@@ -11,7 +11,7 @@ let stableData: SyntheticEHP | null = null;
 let stableDataLoadPromise: Promise<void> | null = null;
 
 export async function initializeData() {
-    const mainModule = await import("./data");
+    const mainModule = await import("./data.js");
     mainData = mainModule.data;
     ensureStableDataLoading();
 }
@@ -21,7 +21,7 @@ export function ensureStableDataLoading(): Promise<void> {
         return Promise.resolve();
     }
     if (!stableDataLoadPromise) {
-        stableDataLoadPromise = import("./data_stable")
+        stableDataLoadPromise = import("./data_stable.js")
             .then((stableModule) => {
                 stableData = stableModule.data_stable;
             })
