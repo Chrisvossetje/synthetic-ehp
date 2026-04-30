@@ -40,9 +40,9 @@ export class Chart {
     private showNames: boolean;
     private showFiltration: boolean;
 
-    public dotCallback: Function;
-    public lineCallback: Function;
-    public tauMultCallback: Function;
+    public dotCallback?: (name: string) => void;
+    public lineCallback?: (from: string, to: string) => void;
+    public tauMultCallback?: (from: string, to: string) => void;
 
     constructor(containerId: string, mode: ChartMode) {
         this.mode = mode;
@@ -169,9 +169,9 @@ export class Chart {
         }
 
         if (display) {
-            el.style.visibility = null;
-            if (labelEl) labelEl.style.visibility = null;
-            if (filtrationEl) filtrationEl.style.visibility = null;
+            el.style.visibility = "";
+            if (labelEl) labelEl.style.visibility = "";
+            if (filtrationEl) filtrationEl.style.visibility = "";
         } else {
             el.style.visibility = "hidden";
             if (labelEl) labelEl.style.visibility = "hidden";
@@ -195,7 +195,7 @@ export class Chart {
         if (!el) return;
 
         if (display) {
-            el.style.visibility = null;
+            el.style.visibility = "";
         } else {
             el.style.visibility = "hidden";
         }
@@ -211,7 +211,7 @@ export class Chart {
         if (!el) return;
 
         if (display) {
-            el.style.visibility = null;
+            el.style.visibility = "";
         } else {
             el.style.visibility = "hidden";
         }
@@ -224,7 +224,7 @@ export class Chart {
         if (!el) return;
 
         if (display) {
-            el.style.visibility = null;
+            el.style.visibility = "";
         } else {
             el.style.visibility = "hidden";
         }
@@ -400,6 +400,9 @@ export class Chart {
     }
 
     private cacheElementReferences() {
+        const shadowRoot = this.svgchart.shadowRoot;
+        if (!shadowRoot) return;
+
         // Clear existing caches
         this.dotElements.clear();
         this.labelElements.clear();
@@ -410,9 +413,9 @@ export class Chart {
 
         // Cache dot, label, and filtration elements for each generator
         this.generators.forEach(gen => {
-            const dotEl = this.svgchart.shadowRoot.getElementById(`dot-${gen.name}`) as unknown as SVGCircleElement;
-            const labelEl = this.svgchart.shadowRoot.getElementById(`label-${gen.name}`) as unknown as SVGTextElement;
-            const filtrationEl = this.svgchart.shadowRoot.getElementById(`filtration-${gen.name}`) as unknown as SVGTextElement;
+            const dotEl = shadowRoot.getElementById(`dot-${gen.name}`) as unknown as SVGCircleElement | null;
+            const labelEl = shadowRoot.getElementById(`label-${gen.name}`) as unknown as SVGTextElement | null;
+            const filtrationEl = shadowRoot.getElementById(`filtration-${gen.name}`) as unknown as SVGTextElement | null;
 
             if (dotEl) this.dotElements.set(gen.name, dotEl);
             if (labelEl) this.labelElements.set(gen.name, labelEl);
@@ -424,7 +427,7 @@ export class Chart {
             if (!diff.from || !diff.to) return;
 
             const key = `${diff.from}-${diff.to}`;
-            const diffEl = this.svgchart.shadowRoot.getElementById(`diff-${diff.from}-${diff.to}`) as unknown as SVGLineElement;
+            const diffEl = shadowRoot.getElementById(`diff-${diff.from}-${diff.to}`) as unknown as SVGLineElement | null;
 
             if (diffEl) this.diffElements.set(key, diffEl);
         });
@@ -434,7 +437,7 @@ export class Chart {
             if (!mult.from || !mult.to) return;
 
             const key = `${mult.from}-${mult.to}`;
-            const multEl = this.svgchart.shadowRoot.getElementById(`mult-${mult.from}-${mult.to}`) as unknown as SVGLineElement;
+            const multEl = shadowRoot.getElementById(`mult-${mult.from}-${mult.to}`) as unknown as SVGLineElement | null;
 
             if (multEl) this.multElements.set(key, multEl);
         });
@@ -444,7 +447,7 @@ export class Chart {
             if (!tauMult.from || !tauMult.to) return;
 
             const key = `${tauMult.from}-${tauMult.to}`;
-            const tauMultEl = this.svgchart.shadowRoot.getElementById(`tau-mult-${tauMult.from}-${tauMult.to}`) as unknown as SVGLineElement;
+            const tauMultEl = shadowRoot.getElementById(`tau-mult-${tauMult.from}-${tauMult.to}`) as unknown as SVGLineElement | null;
 
             if (tauMultEl) this.tauMultElements.set(key, tauMultEl);
         });
@@ -459,7 +462,7 @@ export class Chart {
         this.generators.forEach(gen => {
             let xy: Point = [gen.stem, gen.y];
             if (temp.has(xy)) {
-                temp.get(xy).push(gen);
+                temp.get(xy)?.push(gen);
             } else {
                 temp.set(xy, [gen]);
             }

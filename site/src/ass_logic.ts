@@ -143,7 +143,8 @@ export function update_ass_chart(
         const g = find(name);
         if (!g) return;
         
-        let algebraic_name = get_induced_name(g, truncation - 1);
+        const algebraicSphere = truncation === undefined ? 0 : truncation - 1;
+        let algebraic_name = get_induced_name(g, algebraicSphere);
 
         if (torsion == undefined) {
             gens.push({
