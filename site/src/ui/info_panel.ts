@@ -41,7 +41,7 @@ export function buildGeneratorInfoLines(
         lines.push(`Homotopy name: ${gen.hom_name}`);
     }
 
-    const filteredInducedNames = gen.induced_name.filter(([num, _]) => num !== 0);
+    const filteredInducedNames = (gen.induced_name ?? []).filter(([num, _]) => num !== 0);
     if (filteredInducedNames.length > 0) {
         const namesList = filteredInducedNames
             .map(([sphere, name]) => `${name} (sphere ${sphere})`)

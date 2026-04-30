@@ -266,7 +266,7 @@ function buildSyntheticCache(
         if (!shouldIncludeKind(diff.kind, data)) return;
         // if (diff.kind !== "Real") return;
         const diffPage = getDiffPage(diff, yByName);
-        if (!Number.isFinite(diffPage)) return;
+        if (diffPage === undefined || !Number.isFinite(diffPage)) return;
         if (diffPage < 0 || diffPage > MAX_STEM) return;
         diffsByPage[diffPage].push(diff);
     });
@@ -402,7 +402,7 @@ function computeSyntheticPages(
         torsion[name] = [st.torsion, st.af];
     });
 
-    const diffs = cache.allDiffs.filter((d) => d.d < page);
+    const diffs = cache.allDiffs.filter((d) => d.d !== undefined && d.d < page);
     return [torsion, diffs];
 }
 
@@ -456,7 +456,7 @@ function parseSphereFromName(name: string): number | undefined {
 }
 
 export function get_induced_name(gen: Generators, sphere: number): string {
-    let l = gen.induced_name;
+    let l = gen.induced_name ?? [[0, gen.name] as [number, string]];
     let id = 0; 
 
     while (true) {
@@ -481,7 +481,7 @@ export function getSphereLifecycleInfo(gen: Generators): { bornSphere: string; d
         };
     }
 
-    const inducedSpheres = gen.induced_name
+    const inducedSpheres = (gen.induced_name ?? [])
         .map(([sphere]) => sphere)
         .filter((sphere) => sphere > 0);
 
@@ -536,7 +536,7 @@ export function get_filtered_data(
     limit_x?: number,
     applyTauMults: boolean = false,
     bottomTruncation: number | undefined = undefined
-): [Object, Differential[]] {
+): [Record<string, TorsionFiltration>, Differential[]] {
     if (category == Category.Synthetic) {
         return computeSyntheticPages(data, truncation, page, limit_x, applyTauMults, bottomTruncation);
     }
@@ -544,15 +544,16 @@ export function get_filtered_data(
     const yByName = buildYByName(data);
 
     // name -> torsion + adams filtration
-    const torsion = new Object();
-    const original_af = new Object();
+    const torsion: Record<string, TorsionFiltration> = {};
+    const original_af: Record<string, number> = {};
 
     data.generators.forEach((g) => {
         original_af[g.name] = g.af;
 
         const passesTop = !truncation || g.y <= truncation;
         const passesBottom = bottomTruncation === undefined || g.y >= bottomTruncation;
-        if (passesTop && passesBottom && ((limit_x - 1 <= g.stem && g.stem <= limit_x + 1) || !limit_x)) {
+        const passesStem = !limit_x || (limit_x - 1 <= g.stem && g.stem <= limit_x + 1);
+        if (passesTop && passesBottom && passesStem) {
             if (category == Category.Algebraic) { // Special Algebraic
                 torsion[g.name] = [undefined, g.af];
             }
@@ -566,7 +567,7 @@ export function get_filtered_data(
         }
     });
 
-    let diffs = [];
+    let diffs: Differential[] = [];
 
     // Find all generators killed by differentials before this page
     for (const diff of data.differentials) {
@@ -574,7 +575,7 @@ export function get_filtered_data(
             continue;
         }
         const diffPage = getDiffPage(diff, yByName);
-        if (!Number.isFinite(diffPage)) {
+        if (diffPage === undefined || !Number.isFinite(diffPage)) {
             continue;
         }
         const coeff = diff.coeff ?? 0;

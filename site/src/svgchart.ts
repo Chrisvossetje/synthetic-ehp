@@ -43,30 +43,30 @@ export class SvgChart extends HTMLElement {
     public chartMaxX: number;
     public chartMaxY: number;
 
-    public height: number;
-    public width: number;
+    public height: number = 0;
+    public width: number = 0;
 
-    public animationId: number;
+    public animationId: number = 0;
 
     public svg: SVGSVGElement;
 
     public zoom: any;
     public select: any;
-    public zoomTimeout: number;
+    public zoomTimeout: number = 0;
     private xAxisLabelNodes: Map<number, SVGTextElement>;
     private yAxisLabelNodes: Map<number, SVGTextElement>;
 
-    public inner: HTMLElement;
-    public axis: HTMLElement;
-    public axisLabels: HTMLElement;
-    public grid: HTMLElement;
-    public invalidCells: HTMLElement;
-    public contents: HTMLElement;
-    public xBlock: HTMLElement;
-    public yBlock: HTMLElement;
-    public topBorder: HTMLElement;
-    public leftBorder: HTMLElement;
-    public bottomBorder: HTMLElement;
+    public inner!: HTMLElement;
+    public axis: HTMLElement | null = null;
+    public axisLabels!: HTMLElement;
+    public grid!: HTMLElement;
+    public invalidCells: HTMLElement | null = null;
+    public contents!: HTMLElement;
+    public xBlock!: HTMLElement;
+    public yBlock!: HTMLElement;
+    public topBorder: HTMLElement | null = null;
+    public leftBorder!: HTMLElement;
+    public bottomBorder: HTMLElement | null = null;
     private bigGridPattern: SVGPatternElement | null;
 
     public node_style: HTMLElement;
@@ -76,7 +76,7 @@ export class SvgChart extends HTMLElement {
         return ['minx', 'miny', 'maxx', 'maxy'];
     }
 
-    attributeChangedCallback(name, _oldValue, newValue) {
+    attributeChangedCallback(name: string, _oldValue: string | null, newValue: string) {
         if (name == 'minx') {
             this.minX = Math.max(0, parseInt(newValue) - SvgChart.GRID_MARGIN);
         } else if (name == 'miny') {
@@ -101,7 +101,7 @@ export class SvgChart extends HTMLElement {
         this.node_style.textContent = style;
     }
 
-    public set_size(minx, maxx, miny, maxy) {
+    public set_size(minx: number, maxx: number, miny: number, maxy: number) {
         this.chartMinX = minx;
         this.chartMaxX = maxx;
         this.chartMinY = miny;
@@ -136,7 +136,6 @@ export class SvgChart extends HTMLElement {
         this.mode = chartMode;
         this.attachShadow({ mode: 'open' });
 
-        this.animationId = null;
         this.xAxisLabelNodes = new Map();
         this.yAxisLabelNodes = new Map();
 
@@ -160,11 +159,16 @@ export class SvgChart extends HTMLElement {
         this.line_style = document.createElement('style');
         this.node_style = document.createElement('style');
 
-        this.shadowRoot.appendChild(node);
-        this.shadowRoot.appendChild(this.line_style);
-        this.shadowRoot.appendChild(this.node_style);
+        const shadowRoot = this.shadowRoot;
+        if (!shadowRoot) {
+            throw new Error("SvgChart shadow root was not created");
+        }
 
-        this.shadowRoot.appendChild(this.svg);
+        shadowRoot.appendChild(node);
+        shadowRoot.appendChild(this.line_style);
+        shadowRoot.appendChild(this.node_style);
+
+        shadowRoot.appendChild(this.svg);
 
         if (chartMode == ChartMode.EHP) {
         this.svg.innerHTML = `
@@ -215,28 +219,31 @@ this.svg.innerHTML =
 `
         }
 
-        for (const item of [
-            'inner',
-            'axis',
-            'axisLabels',
-            'grid',
-            'invalidCells',
-            'contents',
-            'xBlock',
-            'yBlock',
-            'topBorder',
-            'leftBorder',
-            'bottomBorder',
-        ]) {
-            this[item] = this.shadowRoot.getElementById(`${item}`);
-        }
-        this.bigGridPattern = this.shadowRoot.querySelector<SVGPatternElement>('#bigGrid');
+        const requireElement = (id: string): HTMLElement => {
+            const element = shadowRoot.getElementById(id);
+            if (!element) {
+                throw new Error(`SvgChart missing required element: ${id}`);
+            }
+            return element;
+        };
+        this.inner = requireElement('inner');
+        this.axis = shadowRoot.getElementById('axis');
+        this.axisLabels = requireElement('axisLabels');
+        this.grid = requireElement('grid');
+        this.invalidCells = shadowRoot.getElementById('invalidCells');
+        this.contents = requireElement('contents');
+        this.xBlock = requireElement('xBlock');
+        this.yBlock = requireElement('yBlock');
+        this.topBorder = shadowRoot.getElementById('topBorder');
+        this.leftBorder = requireElement('leftBorder');
+        this.bottomBorder = shadowRoot.getElementById('bottomBorder');
+        this.bigGridPattern = shadowRoot.querySelector<SVGPatternElement>('#bigGrid');
 
         this.select = select(this.svg);
         this.zoom = zoom().on('zoom', this._zoomFunc.bind(this));
 
         if (navigator.userAgent.includes('Firefox')) {
-            this.zoom.on('zoom', e => {
+            this.zoom.on('zoom', (e: any) => {
                 this._zoomFunc(e);
                 clearTimeout(this.zoomTimeout);
                 this.zoomTimeout = setTimeout(() => this._zoomFunc(e), 500);
@@ -250,7 +257,7 @@ this.svg.innerHTML =
 
 
     replace_inner(inner: string) {
-        this["contents"].innerHTML = inner;
+        this.contents.innerHTML = inner;
     }
 
     /**
@@ -258,10 +265,10 @@ this.svg.innerHTML =
      *
      * @return {HTMLStyleElement} The node containing the stylesheet
      */
-    addStyle(style) {
+    addStyle(style: string) {
         const node = document.createElementNS(svgNS, 'style');
         node.textContent = style;
-        this["contents"].appendChild(node);
+        this.contents.appendChild(node);
         return node;
     }
 
@@ -270,16 +277,16 @@ this.svg.innerHTML =
      * @param {number} x
      * @param {number} y
      */
-    goto(x, y) {
+    goto(x: number, y: number) {
         this.zoom.translateTo(this.select, x, y);
     }
 
-    _zoomFunc(e) {
+    _zoomFunc(e: any) {
         window.cancelAnimationFrame(this.animationId);
         this.animationId = requestAnimationFrame(() => this._zoomFuncInner(e));
     }
 
-    _zoomFuncInner({ transform }) {
+    _zoomFuncInner({ transform }: { transform: any }) {
         this.inner.setAttribute('transform', transform);
         this.updateGridCoverage(transform);
 
@@ -431,7 +438,7 @@ this.svg.innerHTML =
             );
         }
 
-        this.zoom.constrain(transform => this.constrainTransform(transform, min_k));
+        this.zoom.constrain((transform: any) => this.constrainTransform(transform, min_k));
 
         // xBlock covers the top margin area (where x-axis labels go)
         this.xBlock.setAttribute('width', size.width.toString());

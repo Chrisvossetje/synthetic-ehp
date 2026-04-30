@@ -235,7 +235,7 @@ export function update_ehp_chart() {
 
     // Hide all generators and differentials first
     activeData.generators.forEach((g) => {
-        ehpChart.display_dot(g.name, false, false, undefined, g.af);
+        ehpChart.display_dot(g.name, false, false, null, g.af);
     });
     activeData.differentials.forEach((d) => {
         ehpChart.display_diff(d.from, d.to, false);
@@ -283,7 +283,8 @@ export function update_ehp_chart() {
     });
     displayedDiffsByKey.clear();
     real_diffs.forEach((d) => {
-        if (viewSettings.allDiffs && d.d < viewSettings.page) {
+        const diffPage = d.d ?? Number.POSITIVE_INFINITY;
+        if (viewSettings.allDiffs && diffPage < viewSettings.page) {
             return;
         }
         const key = `${d.from}->${d.to}`;
@@ -292,15 +293,17 @@ export function update_ehp_chart() {
             displayedDiffsByKey.set(key, d);
             return;
         }
-        if (d.d < existing.d) {
+        const existingPage = existing.d ?? Number.POSITIVE_INFINITY;
+        if (diffPage < existingPage) {
             displayedDiffsByKey.set(key, d);
         }
     });
 
     Object.entries(gens).forEach(([name, [torsion, filtration]]) => {
         if (torsion == undefined || torsion > 0) {
-            let perm = perm_classes[name] != undefined && (perm_classes[name][0] == undefined || perm_classes[name][0] > 0);
-            ehpChart.display_dot(name, true, perm, torsion, filtration);
+            const permanentEntry = perm_classes[name];
+            let perm = permanentEntry != undefined && (permanentEntry[0] == undefined || permanentEntry[0] > 0);
+            ehpChart.display_dot(name, true, perm, torsion ?? null, filtration);
         }
     });
     displayedDiffsByKey.forEach((d) => {
