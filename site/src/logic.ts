@@ -122,8 +122,12 @@ function mapBetweenGenerators(from: GeneratorState, to: GeneratorState): { from:
     }
 
     if (to.torsion !== undefined) {
+        const delta = to.torsion - coeff;
+        if (delta <= 0) {
+            return null;
+        }
+
         if (from.torsion !== undefined) {
-            const delta = to.torsion - coeff;
             if (delta > from.torsion) {
                 return null;
             }
@@ -136,7 +140,7 @@ function mapBetweenGenerators(from: GeneratorState, to: GeneratorState): { from:
             };
         }
 
-        const newFromAf = from.af - to.torsion + coeff;
+        const newFromAf = from.af - delta;
         return {
             from: { af: newFromAf, torsion: undefined },
             to: { af: to.af, torsion: coeff },

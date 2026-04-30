@@ -174,6 +174,7 @@ fn check_issue(data: &SyntheticSS, stem: i32, sphere: i32) -> Result<(), Vec<Iss
 
         compare_synthetic(&observed, &S0, 0, sphere - 1, stem)?;
         
+        compare_algebraic_spectral_sequence(data, &pages, stem, 0, sphere - 1, false)?;
         
         pages
     } else {
@@ -185,7 +186,6 @@ fn check_issue(data: &SyntheticSS, stem: i32, sphere: i32) -> Result<(), Vec<Iss
         pages
     };
     
-    compare_algebraic_spectral_sequence(data, &pages, stem, 0, sphere - 1, false)?;
     
     for &f_id in data.model.gens_id_in_stem(stem) {
         if let Some(t_id) = EHP_TO_AHSS[f_id] && STABLE_SYNTHETIC_PAGES.get().unwrap()[(sphere - 1) as usize].element_in_pages(t_id) {

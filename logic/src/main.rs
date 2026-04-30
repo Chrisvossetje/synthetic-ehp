@@ -5,7 +5,7 @@ use crate::{
     domain::{model::SyntheticSS, process::compute_pages, ss::SSPages},
     io::{
         cli::process_input,
-        export::{get_log, write_all},
+        export::{export_order_table, get_log, write_all},
     },
     solve::{
         action::{Action, process_action, revert_log_and_remake},
@@ -362,6 +362,8 @@ fn main() {
     write_all(&ehp, &ehp_log, false);
 
     verify_geometric(&ehp);
+
+    export_order_table(&ehp);
 
     // let (ahss, input_time_ahss) = ahss();
     // let start_ehp = Instant::now();

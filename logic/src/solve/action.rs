@@ -25,7 +25,7 @@ pub static D_R_REPEATS: LazyLock<Vec<usize>> = LazyLock::new(|| {
     r
 });
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Hash)]
 pub enum Action {
     AddDiff {
         from: String,

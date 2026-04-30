@@ -222,8 +222,8 @@ pub fn compare_algebraic_spectral_sequence(
     // At least for EHP this is important
 
     
-    
-    for (from, tos) in data.out_diffs.iter().enumerate() {
+    for &from in data.model.gens_id_in_stem(stem + 1) {
+        let tos = &data.out_diffs[from];
         for &to in tos {
             if data.model.stem(to) == stem
             && bot_trunc <= data.model.y(to)
@@ -274,6 +274,7 @@ pub fn compare_algebraic_spectral_sequence(
             }
         }
     }
+    
 
     // We should also check that any coeff 0 diff (seen from the ORIGINAL AF) is an algebraic one
 

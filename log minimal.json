@@ -168,5 +168,13 @@
             "sphere": 9,
             "proof": "With the normal choice we get that on stem 41 the synthetic lifts do not line up as naturally as we want to. Also without this, the induced element on stem 41 will become the other on the 5-sphere already!"
         }
+    },
+    {
+        "AddDiff": {
+            "from": "2 2 2 2 2 2 2 2 3 5 7 3 3[8]",
+            "to": "2 2 2 2 2 2 2 2 2 2 4 5 3 3 3[6]",
+            "kind": "Real",
+            "proof": "We have that the element 2 2 2 2 2 2 2 2 2 2 4 5 3 3 3[6] injects into 6 2 3 4 4 1 1 2 4 1 1 2 4 1 1 1[6], and thus the lift of the AHSS differential should target this generator."
+        }
     }
 ]
