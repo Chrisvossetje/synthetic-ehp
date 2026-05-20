@@ -22,8 +22,7 @@ use crate::{
             synthetic_issue_is_tau_structure_issue,
         },
         search::{
-            BranchResult, ChoiceResult, SpeculativeBranchOutcome, branch_on_speculative_worlds,
-            check_getout, create_getout, signal_parent_getout,
+            BranchResult, ChoiceResult, SpeculativeBranchOutcome, branch_on_speculative_worlds, check_getout, create_getout, empty_getout, signal_parent_getout
         },
         solve::{suggest_tau_solution_algebraic, suggest_tau_solution_generator_synthetic},
     },
@@ -340,7 +339,7 @@ fn ehp_iterate(
     mut stem: i32,
     mut top_trunc: i32,
     mut bot_trunc: i32,
-    mut depth: i32,
+    depth: i32,
 ) -> BranchResult {
     loop {
         if depth == 0 && stem >= 47 {
@@ -1083,9 +1082,6 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
         let d_y = alg_ehp.model.y(from) - alg_ehp.model.y(to);
         // Exclude metastable ones, as they have already been added
         if !in_metastable_range(alg_ehp.model.y(to), alg_ehp.model.stem(to)) {
-            // if in_metastable_range(alg_ehp.model.y(to) + 1, alg_ehp.model.stem(to)) {
-            //     partial_ehp.add_diff(from, to, None, Kind::Real);
-            // } else {
             if d_y == 1 {
                 partial_ehp.add_diff(from, to, None, Kind::Real);
             } else {
@@ -1098,7 +1094,6 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
                     None,
                 ));
             }
-            // }
         }
     }
 
@@ -1229,7 +1224,7 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
         ehp,
         &alg_ehp,
         &ahss_and_alg_data,
-        [const { None }; PARALLEL_DEPTH as usize],
+        empty_getout(),
         log.clone(),
         2,
         2,

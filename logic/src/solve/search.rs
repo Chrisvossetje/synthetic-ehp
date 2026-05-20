@@ -27,6 +27,13 @@ pub enum SpeculativeBranchOutcome {
     Cancelled,
 }
 
+// TODO : This will only work for AHSS until stem 62, for EHP unclear until which stem
+// Should actually do AtomicUint or smthng
+
+pub fn empty_getout() -> [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize] {
+    [const { None }; PARALLEL_DEPTH as usize]
+}   
+
 pub fn create_getout(
     getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
     depth: i32,

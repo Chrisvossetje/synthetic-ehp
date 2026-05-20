@@ -345,19 +345,19 @@ pub fn load_ahss_from_log() -> SyntheticSS {
     revert_log_and_remake(0, &mut log, &STABLE_DATA, true)
 }
 
-pub fn run_automated_ahss() -> Option<SyntheticSS> {
-    let log = match get_log(false, true) {
-        Ok(log) => Some(log),
-        Err(_) => None,
-    };
+// pub fn run_automated_ahss() -> Option<SyntheticSS> {
+//     let log = match get_log(false, true) {
+//         Ok(log) => Some(log),
+//         Err(_) => None,
+//     };
 
-    if let Ok((ahss_log, ahss)) = crate::solve::automated::ahss_solver(log) {
-        write_all(&ahss, &ahss_log, true);
-        Some(ahss)
-    } else {
-        None
-    }
-}
+//     if let Ok((ahss_log, ahss)) = crate::solve::automated::ahss_solver(log) {
+//         write_all(&ahss, &ahss_log, true);
+//         Some(ahss)
+//     } else {
+//         None
+//     }
+// }
 
 pub fn run_automated_ehp(ahss: &SyntheticSS) -> SyntheticSS {
     initialize_page_cache(ahss);

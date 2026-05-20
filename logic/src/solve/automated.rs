@@ -1,6 +1,6 @@
 use std::sync::{
     Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
+    atomic::AtomicBool,
 };
 
 use crate::{
@@ -10,18 +10,21 @@ use crate::{
         curtis::STABLE_DATA,
     },
     domain::{
-        model::{Diff, ExtTauMult, FromTo, SyntheticSS},
+        model::{Diff, ExtTauMult, SyntheticSS},
         process::compute_pages,
     },
     solve::{
         action::{Action, D_R_REPEATS, revert_log_and_remake},
         ahss::ahss_synthetic_e1_issue,
-        ahss_e1::get_all_e1_solutions,
+        ahss_e1::{get_all_e1_solutions, get_e1_solutions},
         generate::get_a_diff,
         issues::{
             Issue, algebraic_issue_is_fixable_by_tau_extensions, compare_algebraic,
             compare_algebraic_spectral_sequence, compare_synthetic,
             synthetic_issue_is_tau_structure_issue,
+        },
+        search::{
+            BranchResult, ChoiceResult, SpeculativeBranchOutcome, branch_on_speculative_worlds, check_getout, create_getout, empty_getout, signal_parent_getout
         },
         solve::{
             auto_deduce, suggest_tau_solution_algebraic, suggest_tau_solution_generator_synthetic,
@@ -32,6 +35,125 @@ use crate::{
 
 pub const PARALLEL_DEPTH: i32 = 4;
 pub const ALWAYS_PRINT: bool = false;
+
+enum Commitment {
+    Real(String),
+    Fake(String),
+    Unknown,
+}
+
+fn commit_diff_choice(
+    data: &mut SyntheticSS,
+    log: &Arc<Mutex<Vec<Action>>>,
+    depth: i32,
+    d: Diff,
+    commitment: Commitment,
+) {
+    let (from_name, to_name) = data.get_names(d.from, d.to);
+
+    match commitment {
+        Commitment::Fake(proof) => {
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Disproven diff: {} | {} by {proof}", from_name, to_name);
+            }
+            if depth == 0 {
+                log.lock().unwrap().push(Action::AddDiff {
+                    from: from_name,
+                    to: to_name,
+                    proof: Some(proof.clone()),
+                    kind: Kind::Fake,
+                });
+            }
+            data.add_diff(d.from, d.to, Some(proof), Kind::Fake);
+        }
+        Commitment::Real(proof) => {
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Proven diff: {} | {} | {:?}", from_name, to_name, proof);
+            }
+            if depth == 0 {
+                log.lock().unwrap().push(Action::AddDiff {
+                    from: from_name,
+                    to: to_name,
+                    proof: Some(proof.clone()),
+                    kind: Kind::Real,
+                });
+            }
+            data.add_diff(d.from, d.to, Some(proof), Kind::Real);
+        }
+        Commitment::Unknown => {
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Unknown diff: {} | {}", from_name, to_name);
+            }
+            if depth == 0 {
+                log.lock().unwrap().push(Action::AddDiff {
+                    from: from_name,
+                    to: to_name,
+                    proof: None,
+                    kind: Kind::Unknown,
+                });
+            }
+            data.add_diff(d.from, d.to, None, Kind::Unknown);
+        }
+    }
+}
+
+fn commit_tau_choice(
+    data: &mut SyntheticSS,
+    log: &Arc<Mutex<Vec<Action>>>,
+    depth: i32,
+    d: ExtTauMult,
+    commitment: Commitment,
+) {
+    let (from_name, to_name) = data.get_names(d.from, d.to);
+
+    match commitment {
+        Commitment::Fake(proof) => {
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Disproven tau: {} | {} by {proof}", from_name, to_name);
+            }
+            if depth == 0 {
+                log.lock().unwrap().push(Action::AddExt {
+                    from: from_name,
+                    to: to_name,
+                    af: d.af,
+                    proof: proof.clone(),
+                    kind: Kind::Fake,
+                });
+            }
+            data.add_ext_tau(d.from, d.to, d.af, Some(proof), Kind::Fake);
+        }
+        Commitment::Real(proof) => {
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Proven tau: {} | {} by {proof}", from_name, to_name);
+            }
+            if depth == 0 {
+                log.lock().unwrap().push(Action::AddExt {
+                    from: from_name,
+                    to: to_name,
+                    af: d.af,
+                    proof: proof.clone(),
+                    kind: Kind::Real,
+                });
+            }
+            data.add_ext_tau(d.from, d.to, d.af, Some(proof), Kind::Real);
+        }
+        Commitment::Unknown => {
+            if ALWAYS_PRINT || depth == 0 {
+                println!("Unknown tau: {} | {}", from_name, to_name);
+            }
+            if depth == 0 {
+                log.lock().unwrap().push(Action::AddExt {
+                    from: from_name,
+                    to: to_name,
+                    af: d.af,
+                    proof: "".to_string(),
+                    kind: Kind::Unknown,
+                });
+            }
+            data.add_ext_tau(d.from, d.to, d.af, Some("".to_string()), Kind::Unknown);
+        }
+    }
+}
 
 fn check_issue(
     data: &SyntheticSS,
@@ -122,146 +244,174 @@ fn filter_diff(
     }
 }
 
-fn ahss_iterate(
-    data: SyntheticSS,
+fn iterate_e1_issues(
+    mut data: SyntheticSS,
     alg_ahss: &SyntheticSS,
-    alg_data: &Vec<Vec<Vec<Vec<FromTo>>>>,
+    alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
+    e1_issues: &Vec<Vec<Vec<Vec<Action>>>>,
     mut getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
     log: Arc<Mutex<Vec<Action>>>,
-    stem: i32,
-    top_trunc: i32,
-    bot_trunc: i32,
+    mut stem: i32,
+    mut top_trunc: i32,
+    mut bot_trunc: i32,
     depth: i32,
-    bounded: bool,
-    tau_mode: bool,
-) -> Result<bool, String> {
-    for g in &getout {
-        if let Some(g) = g {
-            if g.load(Ordering::Relaxed) {
-                return Ok(false);
-            }
+) -> BranchResult {
+
+}
+
+fn ahss_iterate(
+    mut data: SyntheticSS,
+    alg_ahss: &SyntheticSS,
+    alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
+    e1_issues: &Vec<Vec<Vec<Vec<Action>>>>,
+    mut getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+    log: Arc<Mutex<Vec<Action>>>,
+    mut stem: i32,
+    mut top_trunc: i32,
+    mut bot_trunc: i32,
+    depth: i32,
+) -> BranchResult {
+    loop {
+        if check_getout(&getout) {
+            return BranchResult::Cancelled;
         }
-    }
 
-    // The log here does nothing special, we do not rely on it.
-    // This also means that we cannot reconstruct our data from this log
-    // The reason this is fine is because we just look at a single stem
-    // So any James periodicity additions will come later down the line
+        let option = get_a_diff(&data, top_trunc, bot_trunc, stem);
 
-    let option = get_a_diff(&data, top_trunc, bot_trunc, stem);
-
-    // Should only need first option here
-    if let Some(d) = option {
-        return try_diff(
-            data, alg_ahss, alg_data, getout, &log, stem, top_trunc, bot_trunc, depth, bounded, d,
-        );
-    }
-
-    let potential_tau_thing = match is_tau_issue(&data, stem, top_trunc, bot_trunc, depth) {
-        Ok(tau_issue) => tau_issue,
-        Err(is) => {
-            if depth <= PARALLEL_DEPTH
-                && depth != 0
-                && let Some(getout) = &mut getout[(depth - 1) as usize]
-            {
-                getout.store(true, Ordering::Relaxed);
-            }
-            return Err(is);
-        }
-    };
-
-    if let Some((synthetic, mut issues)) = potential_tau_thing {
-        let option = match synthetic {
-            TauIssue::AlgTauIssue => {
-                suggest_tau_solution_algebraic(&data, &mut issues, top_trunc, bot_trunc, stem)
-            }
-            TauIssue::SynTauGeneratorIssue => suggest_tau_solution_generator_synthetic(
-                &data,
-                &mut issues,
+        if let Some(d) = option {
+            match try_diff(
+                &mut data,
+                alg_ahss,
+                alg_data,
+                e1_issues,
+                &getout,
+                &log,
+                stem,
                 top_trunc,
                 bot_trunc,
-                stem,
-            ),
-            TauIssue::SynTauModuleIssue => {
-                // get_a_tau(&data, top_trunc, bot_trunc, stem)
-                suggest_tau_solution_generator_synthetic(
+                depth,
+                d,
+            ) {
+                ChoiceResult::Chosen => continue,
+                ChoiceResult::Open => return BranchResult::Open,
+                ChoiceResult::Cancelled => return BranchResult::Cancelled,
+            }
+        }
+
+        let potential_tau_thing = match is_tau_issue(&data, stem, top_trunc, bot_trunc) {
+            Ok(tau_issue) => tau_issue,
+            Err(is) => {
+                signal_parent_getout(&mut getout, depth);
+                return BranchResult::Contradiction(is);
+            }
+        };
+
+        if let Some((synthetic, mut issues)) = potential_tau_thing {
+            let option = match synthetic {
+                TauIssue::AlgTauIssue => {
+                    suggest_tau_solution_algebraic(&data, &mut issues, top_trunc, bot_trunc, stem)
+                }
+                TauIssue::SynTauGeneratorIssue => suggest_tau_solution_generator_synthetic(
                     &data,
                     &mut issues,
                     top_trunc,
                     bot_trunc,
                     stem,
-                )
-            }
-        };
+                ),
+                TauIssue::SynTauModuleIssue => suggest_tau_solution_generator_synthetic(
+                    &data,
+                    &mut issues,
+                    top_trunc,
+                    bot_trunc,
+                    stem,
+                ),
+            };
 
-        if let Some(d) = option {
-            return try_tau(
-                data, alg_ahss, alg_data, getout, log, stem, top_trunc, bot_trunc, depth, bounded,
-                d,
-            );
-        } else {
-            if depth <= PARALLEL_DEPTH
-                && depth != 0
-                && let Some(getout) = &mut getout[(depth - 1) as usize]
-            {
-                getout.store(true, Ordering::Relaxed);
+            if let Some(d) = option {
+                match try_tau(
+                    &mut data,
+                    alg_ahss,
+                    alg_data,
+                    e1_issues,
+                    &getout,
+                    &log,
+                    stem,
+                    top_trunc,
+                    bot_trunc,
+                    depth,
+                    d,
+                ) {
+                    ChoiceResult::Chosen => continue,
+                    ChoiceResult::Open => return BranchResult::Open,
+                    ChoiceResult::Cancelled => return BranchResult::Cancelled,
+                }
+            } else {
+                signal_parent_getout(&mut getout, depth);
+                return BranchResult::Contradiction(format!(
+                    "Issue at RP{bot_trunc}_{top_trunc}: {issues:?}"
+                ));
             }
-            return Err(format!("Issue at RP{bot_trunc}_{top_trunc}: {issues:?}"));
         }
-    }
 
-    // TODO:
-    // if bounded {
-    //     return Ok(true);
-    // }
+        if bot_trunc != 0 {
+            let d_y = top_trunc - bot_trunc + 1;
+            for &(from, to) in &alg_data[stem as usize][d_y as usize][top_trunc as usize] {
+                if depth == 0 {
+                    let (from_name, to_name) = data.get_names(from, to);
+                    println!("Applying Algebraic diff {from_name} -> {to_name}");
+                }
+                data.add_diff(from, to, None, Kind::Real);
+            }
+            bot_trunc -= 1;
+            continue;
+        }
 
-    if bot_trunc != 0 {
-        return add_algebraic_diffs(
-            data, alg_ahss, alg_data, getout, log, stem, top_trunc, bot_trunc, depth, bounded,
-        );
-    }
+        if top_trunc == stem + 1 {
+            // Check E_1 page errors here already ?
+            match iterate_e1_issues() {
+                BranchResult::Contradiction(_) => todo!(),
+                BranchResult::Open => todo!(),
+                BranchResult::Cancelled => todo!(),
+            }
 
-    if top_trunc == stem + 1 || top_trunc >= MAX_AUTOMATED_TOP_TRUNC {
-        Ok(true)
-    } else {
-        ahss_iterate(
-            data,
-            alg_ahss,
-            alg_data,
-            getout,
-            log,
-            stem,
-            top_trunc + 1,
-            top_trunc,
-            depth,
-            bounded,
-            tau_mode,
-        )
+            stem += 1;
+            top_trunc = 2;
+        } else {
+            top_trunc += 1;
+        }
+
+        bot_trunc = top_trunc - 1;
+
+        if depth == 0 {
+            println!("Current stem: {stem} | top_trunc: {top_trunc}");
+        }
     }
 }
 
 fn try_diff(
-    mut data: SyntheticSS,
+    data: &mut SyntheticSS,
     alg_ahss: &SyntheticSS,
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
-    mut getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+    e1_issues: &Vec<Vec<Vec<Vec<Action>>>>,
+    getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
     log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
     top_trunc: i32,
     bot_trunc: i32,
     depth: i32,
-    bounded: bool,
     d: Diff,
-) -> Result<bool, String> {
+) -> ChoiceResult {
     let (from_name, to_name) = data.get_names(d.from, d.to);
 
-    let filter = filter_diff(&data, alg_ahss, bot_trunc, top_trunc, d);
-
-    if ALWAYS_PRINT || depth == 0 {
-        println!("Trying diff: {} | {}", from_name, to_name);
-    }
+    let filter = filter_diff(data, alg_ahss, bot_trunc, top_trunc, d);
 
     if let Some((kind, reason)) = filter {
+        if ALWAYS_PRINT || depth == 0 {
+            println!(
+                "Finished diff by: {} | {} -> {kind:?} + {reason}",
+                from_name, to_name
+            );
+        }
         if depth == 0 {
             log.lock().unwrap().push(Action::AddDiff {
                 from: from_name,
@@ -270,26 +420,15 @@ fn try_diff(
                 kind,
             });
         }
-
         data.add_diff(d.from, d.to, Some(reason), kind);
-        return ahss_iterate(
-            data,
-            alg_ahss,
-            alg_data,
-            getout.clone(),
-            log.clone(),
-            stem,
-            top_trunc,
-            bot_trunc,
-            depth,
-            bounded,
-            false,
-        );
+        return ChoiceResult::Chosen;
     }
 
-    if depth < PARALLEL_DEPTH {
-        getout[depth as usize] = Some(Arc::new(AtomicBool::new(false)));
+    if ALWAYS_PRINT || depth == 0 {
+        println!("Trying diff: {} | {}", from_name, to_name);
     }
+
+    let g = create_getout(getout, depth);
 
     let with = || {
         let mut with_data = data.clone();
@@ -298,14 +437,13 @@ fn try_diff(
             with_data,
             alg_ahss,
             alg_data,
-            getout.clone(),
+            e1_issues,
+            g.clone(),
             log.clone(),
             stem,
             top_trunc,
             bot_trunc,
             depth + 1,
-            bounded,
-            false,
         )
     };
     let without = || {
@@ -315,239 +453,30 @@ fn try_diff(
             without_data,
             alg_ahss,
             alg_data,
-            getout.clone(),
+            e1_issues,
+            g.clone(),
             log.clone(),
             stem,
             top_trunc,
             bot_trunc,
             depth + 1,
-            bounded,
-            false,
         )
     };
 
-    if depth < PARALLEL_DEPTH {
-        let (with_res, without_res) = rayon::join(with, without);
-
-        if let Err(e) = with_res {
-            // DISPROOF !
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            // Proof: Tau Issue: false | SyntheticConvergence { bot_trunc: 1, top_trunc: 30, stem: 30, af: 4, expected: [Torsion(Some(1))], observed: [Torsion(None)] }
-
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Disproven diff: {} | {} by {e}", from_name, to_name);
-            }
-            // Commit choice !
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof: Some(e.clone()),
-                    kind: Kind::Fake,
-                });
-            }
-
-            data.add_diff(d.from, d.to, Some(e), Kind::Fake);
-
-            // And iterate further
-            getout[depth as usize] = None;
-            return ahss_iterate(
-                data,
-                alg_ahss,
-                alg_data,
-                getout,
-                log.clone(),
-                stem,
-                top_trunc,
-                bot_trunc,
-                depth,
-                bounded,
-                false,
-            );
-        } else if let Err(e) = without_res {
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            data.add_diff(d.from, d.to, Some(e.clone()), Kind::Real);
-
-            if ALWAYS_PRINT || depth == 0 {
-                println!(
-                    "Proven diff: {} | {} | {:?}",
-                    from_name,
-                    to_name,
-                    Some(e.clone())
-                );
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof: Some(e),
-                    kind: Kind::Real,
-                });
-            }
-
-            getout[depth as usize] = None;
-            return ahss_iterate(
-                data,
-                alg_ahss,
-                alg_data,
-                getout,
-                log.clone(),
-                stem,
-                top_trunc,
-                bot_trunc,
-                depth,
-                bounded,
-                false,
-            );
-        } else if !matches!(with_res, Ok(true)) || !matches!(without_res, Ok(true)) {
-            return Ok(false);
-        } else {
-            let without = without_res;
-
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            if matches!(without, Ok(true)) && depth == 0 {
-                println!(
-                    "WITH OR WITHOUT ARE BOTH FINE FOR THE DIFFERENTIAL: {:?} | {:?}",
-                    d,
-                    data.get_names(d.from, d.to)
-                );
-            }
-
-            // If with and without are both Ok then we continue WITHOUT the differential
-            // But we do remember that we don't know the result of this diff
-            let kind = Kind::Unknown;
-            let proof = None;
-
-            data.add_diff(d.from, d.to, proof.clone(), kind);
-
-            // Commit choice !
-            if ALWAYS_PRINT || depth == 0 {
-                if kind == Kind::Unknown {
-                    println!("Unknown diff: {} | {}", from_name, to_name);
-                } else {
-                    println!("Proven diff: {} | {} | {proof:?}", from_name, to_name);
-                }
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof,
-                    kind,
-                });
-            }
-
-            getout[depth as usize] = None;
-            return ahss_iterate(
-                data,
-                alg_ahss,
-                alg_data,
-                getout,
-                log.clone(),
-                stem,
-                top_trunc,
-                bot_trunc,
-                depth,
-                bounded,
-                false,
-            );
+    match branch_on_speculative_worlds(depth, with, without) {
+        SpeculativeBranchOutcome::ChooseRight(e) => {
+            commit_diff_choice(data, log, depth, d, Commitment::Fake(e));
+            ChoiceResult::Chosen
         }
-    } else {
-        let with_res = with();
-        if let Err(e) = with_res {
-            // DISPROOF !
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            // Commit choice !
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Disproven diff: {} | {} by {e}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof: Some(e.clone()),
-                    kind: Kind::Fake,
-                });
-                getout = [const { None }; PARALLEL_DEPTH as usize];
-            }
-
-            data.add_diff(d.from, d.to, Some(e), Kind::Fake);
-
-            // And iterate further
-            return ahss_iterate(
-                data,
-                alg_ahss,
-                alg_data,
-                getout.clone(),
-                log.clone(),
-                stem,
-                top_trunc,
-                bot_trunc,
-                depth,
-                bounded,
-                false,
-            );
-        } else if !matches!(with_res, Ok(true)) {
-            return Ok(false);
-        } else {
-            let without = without();
-
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            if matches!(without, Ok(true)) && depth == 0 {
-                println!(
-                    "WITH OR WITHOUT ARE BOTH FINE FOR THE DIFFERENTIAL: {:?} | {:?}",
-                    d,
-                    data.get_names(d.from, d.to)
-                );
-            }
-
-            // If with and without are both Ok then we continue WITHOUT the differential
-            // But we do remember that we don't know the result of this diff
-            let (kind, proof) = match without {
-                Err(e) => (Kind::Real, Some(e)),
-                Ok(true) => (Kind::Unknown, None),
-                Ok(false) => return Ok(false),
-            };
-
-            data.add_diff(d.from, d.to, proof.clone(), kind);
-
-            if ALWAYS_PRINT || depth == 0 {
-                if kind == Kind::Unknown {
-                    println!("Unknown diff: {} | {}", from_name, to_name);
-                } else {
-                    println!("Proven diff: {} | {} | {proof:?}", from_name, to_name);
-                }
-            }
-            // Commit choice !
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof,
-                    kind,
-                });
-                getout = [const { None }; PARALLEL_DEPTH as usize];
-            }
-
-            return ahss_iterate(
-                data,
-                alg_ahss,
-                alg_data,
-                getout.clone(),
-                log.clone(),
-                stem,
-                top_trunc,
-                bot_trunc,
-                depth,
-                bounded,
-                false,
-            );
+        SpeculativeBranchOutcome::ChooseLeft(e) => {
+            commit_diff_choice(data, log, depth, d, Commitment::Real(e));
+            ChoiceResult::Chosen
         }
+        SpeculativeBranchOutcome::BothOpen => {
+            commit_diff_choice(data, log, depth, d, Commitment::Unknown);
+            ChoiceResult::Open
+        }
+        SpeculativeBranchOutcome::Cancelled => ChoiceResult::Cancelled,
     }
 }
 
@@ -567,7 +496,6 @@ fn is_tau_issue(
     stem: i32,
     top_trunc: i32,
     bot_trunc: i32,
-    depth: i32,
 ) -> Result<Option<(TauIssue, Vec<Issue>)>, String> {
     match check_issue(data, stem, bot_trunc, top_trunc) {
         Ok(_) => Ok(None),
@@ -613,18 +541,18 @@ fn is_tau_issue(
 }
 
 fn try_tau(
-    mut data: SyntheticSS,
+    data: &mut SyntheticSS,
     alg_ahss: &SyntheticSS,
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
-    mut getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
-    log: Arc<Mutex<Vec<Action>>>,
+    e1_issues: &Vec<Vec<Vec<Vec<Action>>>>,
+    getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+    log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
     top_trunc: i32,
     bot_trunc: i32,
     depth: i32,
-    bounded: bool,
     d: ExtTauMult,
-) -> Result<bool, String> {
+) -> ChoiceResult {
     let (from_name, to_name) = data.get_names(d.from, d.to);
 
     if ALWAYS_PRINT || depth == 0 {
@@ -634,9 +562,7 @@ fn try_tau(
         );
     }
 
-    if depth < PARALLEL_DEPTH {
-        getout[depth as usize] = Some(Arc::new(AtomicBool::new(false)));
-    }
+    let g = create_getout(getout, depth);
 
     let with = || {
         let mut with_data = data.clone();
@@ -645,14 +571,13 @@ fn try_tau(
             with_data,
             alg_ahss,
             alg_data,
-            getout.clone(),
+            e1_issues,
+            g.clone(),
             log.clone(),
             stem,
             top_trunc,
             bot_trunc,
             depth + 1,
-            bounded,
-            true,
         )
     };
     let without = || {
@@ -662,321 +587,159 @@ fn try_tau(
             without_data,
             alg_ahss,
             alg_data,
-            getout.clone(),
+            e1_issues,
+            g.clone(),
             log.clone(),
             stem,
             top_trunc,
             bot_trunc,
             depth + 1,
-            bounded,
-            true,
         )
     };
 
-    if depth < PARALLEL_DEPTH {
-        let (with_res, without_res) = rayon::join(with, without);
-
-        if let Err(e) = with_res {
-            // DISPROOF !
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            // Commit choice !
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Disproven tau: {} | {} by {e}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof: e.clone(),
-                    kind: Kind::Fake,
-                });
-            }
-
-            data.add_ext_tau(d.from, d.to, d.af, Some(e), Kind::Fake);
-
-            // And iterate further
-            getout[depth as usize] = None;
-            return ahss_iterate(
-                data, alg_ahss, alg_data, getout, log, stem, top_trunc, bot_trunc, depth, bounded,
-                true,
-            );
-        } else if let Err(e) = without_res {
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-            let proof = e.clone();
-
-            data.add_ext_tau(d.from, d.to, d.af, Some(proof.clone()), Kind::Real);
-
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Proven tau: {} | {} by {proof}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof,
-                    kind: Kind::Real,
-                });
-            }
-
-            getout[depth as usize] = None;
-            return ahss_iterate(
-                data, alg_ahss, alg_data, getout, log, stem, top_trunc, bot_trunc, depth, bounded,
-                true,
-            );
-        } else if !matches!(with_res, Ok(true)) || !matches!(without_res, Ok(true)) {
-            return Ok(false);
-        } else {
-            let without = without_res;
-
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            if matches!(without, Ok(true)) && depth == 0 {
-                println!(
-                    "WITH OR WITHOUT ARE BOTH FINE FOR THE TAU: {:?} | {:?}",
-                    d,
-                    data.get_names(d.from, d.to)
-                );
-            }
-
-            // If with and without are both Ok then we continue WITHOUT the differential
-            // But we do remember that we don't know the result of this diff
-            let kind = Kind::Unknown;
-            let proof = "".to_string();
-
-            data.add_ext_tau(d.from, d.to, d.af, Some(proof.clone()), kind);
-
-            // Commit choice !
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Proven tau: {} | {} by {proof}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof,
-                    kind,
-                });
-            }
-
-            getout[depth as usize] = None;
-            return ahss_iterate(
-                data, alg_ahss, alg_data, getout, log, stem, top_trunc, bot_trunc, depth, bounded,
-                true,
-            );
+    match branch_on_speculative_worlds(depth, with, without) {
+        SpeculativeBranchOutcome::ChooseRight(e) => {
+            commit_tau_choice(data, log, depth, d, Commitment::Fake(e));
+            ChoiceResult::Chosen
         }
-    } else {
-        let with_res = with();
-        if let Err(e) = with_res {
-            // DISPROOF !
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            // Commit choice !
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Disproven tau: {} | {} by {e}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof: e.clone(),
-                    kind: Kind::Fake,
-                });
-                getout = [const { None }; PARALLEL_DEPTH as usize];
-            }
-
-            data.add_ext_tau(d.from, d.to, d.af, Some(e), Kind::Fake);
-
-            // And iterate further
-            return ahss_iterate(
-                data, alg_ahss, alg_data, getout, log, stem, top_trunc, bot_trunc, depth, bounded,
-                true,
-            );
-        } else if !matches!(with_res, Ok(true)) {
-            return Ok(false);
-        } else {
-            let without = without();
-
-            let (from_name, to_name) = data.get_names(d.from, d.to);
-
-            if matches!(without, Ok(true)) && depth == 0 {
-                println!(
-                    "WITH OR WITHOUT ARE BOTH FINE FOR THE TAU: {:?} | {:?}",
-                    d,
-                    data.get_names(d.from, d.to)
-                );
-            }
-
-            // If with and without are both Ok then we continue WITHOUT the differential
-            // But we do remember that we don't know the result of this diff
-            let (kind, proof) = match without {
-                Err(e) => (Kind::Real, e),
-                Ok(true) => (Kind::Unknown, "".to_string()),
-                Ok(false) => return Ok(false),
-            };
-
-            data.add_ext_tau(d.from, d.to, d.af, Some(proof.clone()), kind);
-
-            // Commit choice !
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Proven tau: {} | {} by {proof}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof,
-                    kind,
-                });
-                getout = [const { None }; PARALLEL_DEPTH as usize];
-            }
-
-            return ahss_iterate(
-                data, alg_ahss, alg_data, getout, log, stem, top_trunc, bot_trunc, depth, bounded,
-                true,
-            );
+        SpeculativeBranchOutcome::ChooseLeft(e) => {
+            commit_tau_choice(data, log, depth, d, Commitment::Real(e));
+            ChoiceResult::Chosen
         }
+        SpeculativeBranchOutcome::BothOpen => {
+            // commit_tau_choice(data, log, depth, d, Commitment::Unknown);
+            ChoiceResult::Open
+        }
+        SpeculativeBranchOutcome::Cancelled => ChoiceResult::Cancelled,
     }
 }
 
-fn add_algebraic_diffs(
-    mut data: SyntheticSS,
-    alg_ahss: &SyntheticSS,
-    alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
-    getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
-    log: Arc<Mutex<Vec<Action>>>,
-    stem: i32,
-    top_trunc: i32,
-    bot_trunc: i32,
-    depth: i32,
-    bounded: bool,
-) -> Result<bool, String> {
-    // As we are moving up a page for possible diffs,
-    // we should add all adams differentials which could arise from here
+// fn e1_to_ahss_loop(
+//     partial_ahss: &SyntheticSS,
+//     alg_ahss: &SyntheticSS,
+//     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
+//     e1_issues: &Vec<Vec<Vec<Vec<Action>>>>,
 
-    let d_y = top_trunc - bot_trunc + 1;
-    for &(from, to) in &alg_data[stem as usize][d_y as usize][top_trunc as usize] {
-        if depth == 0 {
-            let (from, to) = data.get_names(from, to);
-            println!("Applying Algebraic diff {from} -> {to}");
-        }
-        data.add_diff(from, to, None, Kind::Real);
-    }
-    return ahss_iterate(
-        data,
-        alg_ahss,
-        alg_data,
-        getout.clone(),
-        log,
-        stem,
-        top_trunc,
-        bot_trunc - 1,
-        depth,
-        bounded,
-        false,
-    );
-}
+//     mut log: Vec<Action>,
+//     stem: i32,
+// ) -> (Result<bool, String>, Vec<Action>) {
+//     let ahss = revert_log_and_remake(0, &mut log, &partial_ahss, true);
+//     let log = Arc::new(Mutex::new(log));
+//     let res = ahss_iterate(
+//         ahss,
+//         alg_ahss,
+//         alg_data,
+//         [const { None }; PARALLEL_DEPTH as usize],
+//         log.clone(),
+//         stem,
+//         2,
+//         1,
+//         0,
+//     );
 
-fn e1_to_ahss_loop(
-    partial_ahss: &SyntheticSS,
-    alg_ahss: &SyntheticSS,
-    alg_data: &Vec<Vec<Vec<Vec<FromTo>>>>,
-    mut log: Vec<Action>,
-    stem: i32,
-) -> (Result<bool, String>, Vec<Action>) {
-    let ahss = revert_log_and_remake(0, &mut log, &partial_ahss, true);
-    let log = Arc::new(Mutex::new(log));
-    let res = ahss_iterate(
-        ahss,
-        alg_ahss,
-        &alg_data,
-        [const { None }; PARALLEL_DEPTH as usize],
-        log.clone(),
-        stem,
-        2,
-        1,
-        0,
-        false,
-        false,
-    );
+//     let res = match res {
+//         BranchResult::Open => Ok(true),
+//         BranchResult::Cancelled => Ok(false),
+//         BranchResult::Contradiction(e) => Err(e),
+//     };
 
-    (res, Arc::try_unwrap(log).unwrap().into_inner().unwrap())
-}
+//     (res, Arc::try_unwrap(log).unwrap().into_inner().unwrap())
+// }
 
-fn e1_loop(
-    ahss: SyntheticSS,
-    partial_ahss: &SyntheticSS,
-    alg_ahss: &SyntheticSS,
-    alg_data: &Vec<Vec<Vec<Vec<FromTo>>>>,
-    mut log: Vec<Action>,
-    stem: i32,
-) -> (Result<bool, String>, Vec<Action>) {
-    println!("\nStarted stem {stem}\n");
+// fn e1_loop(
+//     ahss: SyntheticSS,
+//     partial_ahss: &SyntheticSS,
+//     alg_ahss: &SyntheticSS,
+//     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
+//     mut log: Vec<Action>,
+//     stem: i32,
+// ) -> (Result<bool, String>, Vec<Action>) {
+//     println!("\nStarted stem {stem}\n");
 
-    let mut proper_issues = vec![];
-    match ahss_synthetic_e1_issue(&ahss, stem) {
-        Ok(_) => {}
-        Err(issues) => {
-            for i in issues {
-                // First we solve all the e1 issues we can resolve
-                match auto_deduce(&ahss, &i) {
-                    Ok(mut a) => log.append(&mut a),
-                    Err(_) => proper_issues.push(i),
+//     let mut proper_issues = vec![];
+//     match ahss_synthetic_e1_issue(&ahss, stem) {
+//         Ok(_) => {}
+//         Err(issues) => {
+//             for i in issues {
+//                 // First we solve all the e1 issues we can resolve
+//                 match auto_deduce(&ahss, &i) {
+//                     Ok(mut a) => log.append(&mut a),
+//                     Err(_) => proper_issues.push(i),
+//                 }
+//             }
+//         }
+//     }
+
+//     if proper_issues.len() != 0 {
+//         println!("We need to try multiple E1 options");
+//         println!("{proper_issues:?}");
+
+//         // TODO: Par iter
+//         let res: Vec<_> = get_all_e1_solutions(&ahss, &proper_issues).into_iter().map(|options| {
+//             let mut clone_log = log.clone();
+//             for a in &options {
+//                 clone_log.push(a.clone());
+//             }
+
+//             let res = e1_to_ahss_loop(partial_ahss, alg_ahss, alg_data, clone_log, stem);
+//             println!("\nIn the following option we have the following result: \n{options:?} \n{:?}\n", res.0);
+//             res
+//         }).collect();
+
+//         let positives = res.iter().fold(0, |acc, r| {
+//             if matches!(r.0, Ok(true)) {
+//                 acc + 1
+//             } else {
+//                 acc
+//             }
+//         });
+//         if positives != 1 {
+//             let first = res[0].1.clone();
+//             return (
+//                 Err(format!(
+//                     "We have {positives} positives. Which means we can't decide on E1 stuff sadge :("
+//                 )),
+//                 first,
+//             );
+//         } else {
+//             for r in res {
+//                 if matches!(r.0, Ok(true)) {
+//                     return r;
+//                 }
+//             }
+//             unreachable!("There was one positive result.")
+//         }
+//     } else {
+//         e1_to_ahss_loop(partial_ahss, alg_ahss, alg_data, log, stem)
+//     }
+// }
+
+
+pub fn ahss_solve_e1_issues(ahss: &SyntheticSS, log: &mut Vec<Action>) -> Vec<Vec<Vec<Vec<Action>>>> {    
+    let mut proper_issues = vec![vec![]; (MAX_STEM + 1) as usize];
+
+    for stem in 2..=MAX_STEM {
+        match ahss_synthetic_e1_issue(&ahss, stem) {
+            Ok(_) => {}
+            Err(issues) => {
+                for i in issues {
+                    // First we solve all the e1 issues we can resolve
+                    match auto_deduce(&ahss, &i) {
+                        Ok(mut a) => log.append(&mut a),
+                        Err(_) => {
+                            let sol = get_e1_solutions(ahss, &i);
+                            proper_issues[stem as usize].push(sol)
+                        },
+                    }
                 }
             }
         }
-    }
+    }  
 
-    if proper_issues.len() != 0 {
-        println!("We need to try multiple E1 options");
-        println!("{proper_issues:?}");
-
-        // TODO: Par iter
-        let res: Vec<_> = get_all_e1_solutions(&ahss, &proper_issues).into_iter().map(|options| {
-            let mut clone_log = log.clone();
-            for a in &options {
-                clone_log.push(a.clone());
-            } 
-
-            let res = e1_to_ahss_loop(partial_ahss, alg_ahss, alg_data, clone_log, stem);
-            println!("\nIn the following option we have the following result: \n{options:?} \n{:?}\n", res.0);
-            res
-        }).collect();
-
-        let positives = res.iter().fold(0, |acc, r| {
-            if matches!(r.0, Ok(true)) {
-                acc + 1
-            } else {
-                acc
-            }
-        });
-        if positives != 1 {
-            let first = res[0].1.clone();
-            return (
-                Err(format!(
-                    "We have {positives} positives. Which means we can't decide on E1 stuff sadge :("
-                )),
-                first,
-            );
-        } else {
-            for r in res {
-                if matches!(r.0, Ok(true)) {
-                    return r;
-                }
-            }
-            unreachable!("There was one positive result.")
-        }
-    } else {
-        e1_to_ahss_loop(partial_ahss, alg_ahss, alg_data, log, stem)
-    }
+    proper_issues 
 }
 
-pub fn ahss_solver(log: Option<Vec<Action>>) -> Result<(Vec<Action>, SyntheticSS), ()> {
+pub fn ahss_solver(log: Option<Vec<Action>>) -> (Vec<Action>, SyntheticSS) {
     let alg_ahss = STABLE_DATA.clone();
     let mut partial_ahss = SyntheticSS::empty(alg_ahss.model.clone());
     // We should add all d1's from the algebraic data
@@ -998,79 +761,26 @@ pub fn ahss_solver(log: Option<Vec<Action>>) -> Result<(Vec<Action>, SyntheticSS
         }
     }
 
-    let mut log = if let Some(log) = log {
-        log
-    } else {
-        vec![
-        Action::AddInt { 
-            from: "6 5 3[2]".to_string(), 
-            to: "6 2 3 3[2]".to_string(), 
-            page: 2, 
-            proof: "Unique solution to RP1_2".to_string(), 
-            kind: Kind::Real 
-        },
-        Action::AddDiff { from: "2 3 5 7 3 3[2]".to_string(), to: "2 4 1 1 2 4 3 3 3[1]".to_string(), proof: Some("This differential cannot be deduced by just looking at the current stem. It must be deduced by convergence on RP1_4 stem 26.".to_string()), kind: Kind::Real },
 
-        Action::SetE1 { tag: "17 7 7 7".to_string(), torsion: Torsion(Some(0)), proof: "This E1 generator cannot be deduced by looking at the stem in which it occurs. It can only be concluded by looking further + James periodicity.".to_string() },
-        Action::AddDiff { from: "3 5 7 3 3[10]".to_string(), to: "1 2 3 4 4 1 1 2 4 1 1 1[5]".to_string(), proof: Some("Program takes a long time to deduce this differential + results in Unknown. We just say its fake.".to_string()), kind: Kind::Fake },
-        Action::AddDiff { from: "3 5 7 3 3[10]".to_string(), to: "2 3 4 4 1 1 2 4 1 1 1[6]".to_string(), proof: Some("Program takes a long time to deduce this differential + results in Unknown. We just say its fake.".to_string()), kind: Kind::Fake },
-        Action::AddDiff { from: "15 15[6]".to_string(), to: "9 3 5 7 7[4]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Fake },
-        Action::AddDiff { from: "12 1 1 1[5]".to_string(), to: "2 3 4 4 1 1 1[3]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
-        Action::AddDiff { from: "14 4 5 7 7[8]".to_string(), to: "19 7 7 7[4]".to_string(), proof: Some("Program can't figure this out.".to_string()), kind: Kind::Real },
-        Action::AddDiff {
-            from: "14 5 7 7[8]".to_string(),
-            to: "14 4 5 7 7[3]".to_string(),
-            kind: Kind::Real,
-            proof: Some("If we don't have this differential we have a problem at RP3_47. (This could not have been deduced by just looking at RP1_8 at most)".to_string()),
-        },
-        // "AddExt": {
-        //     "from": "6 2 3 4 4 1 1 2 4 1 1 2 4 1 1 1[5]",
-        //     "to": "2 2 2 2 2 2 2 2 2 3 5 7 3 3[4]",
-        //     "af": 16,
-        //     "kind": "Real",
-        //     "proof": "Without this extension the problems in AF 5 at RP4_12 stem 43 cannot be resolved."
-        // }
-        //  "AddDiff": {
-        //     "from": "11 15 7 7[5]",
-        //     "to": "9 11 7 7 7[3]",d
-        //     "kind": "Real",
-        //     "proof": "The source of this must also be this one, not the other AF5 element in this grid point. For RP3_5 the F_2 vector space generators don't add up. [SyntheticConvergence { bot_trunc: 3, top_trunc: 5, stem: 44, af: 7, expected: [Torsion(None), Torsion(Some(1))], observed: [Torsion(None), Torsion(None)] }, SyntheticConvergence { bot_trunc: 3, top_trunc: 5, stem: 44, af: 11, expected: [Torsion(None), Torsion(Some(1))], observed: [Torsion(None), Torsion(None)] }]"
-        // }
-        //         "AddDiff": {
-        //     "from": "27 3 3[13]",
-        //     "to": "21 11 3 3[7]",
-        //     "kind": "Unknown",
-        //     "proof": "(Custom) This differential must be here to support resolve the Synthetic convergence for RP7_256, stem 45, af 7. "
-        // }
-    ]
-    };
-
-    for stem in 2..MAX_VERIFY_STEM {
-        let ahss = revert_log_and_remake(0, &mut log, &partial_ahss, true);
-        let (res, l) = e1_loop(ahss, &mut partial_ahss, &alg_ahss, &alg_data, log, stem);
-        log = l;
-        for dss in &alg_data[stem as usize] {
-            for ds in dss {
-                for &(from, to) in ds {
-                    partial_ahss.add_diff(from, to, None, Kind::Real);
-                }
-            }
-        }
-        match res {
-            Ok(true) => {
-                println!("\n\nNEXT\n\n");
-            }
-            Ok(false) => {
-                println!("\n\nCancelled on stem {stem}\n\n");
-                break;
-            }
-            Err(e) => {
-                println!("\n\nError on stem {stem}: {e}\n\n");
-                break;
-            }
-        }
-    }
+    let mut log = log.unwrap_or(vec![]);
+    
+    let e1_issues = ahss_solve_e1_issues(&partial_ahss, &mut log);
 
     let ahss = revert_log_and_remake(0, &mut log, &partial_ahss, true);
-    Ok((log, ahss))
+    let log = Arc::new(Mutex::new(log));
+
+
+    let res = ahss_iterate(ahss, &alg_ahss, &alg_data, &e1_issues, empty_getout(), log.clone(), 
+    2, 2, 1, 0);
+
+    // Add EHP Algebraic Diffs
+    for (&(from, to), _) in &alg_ahss.proven_from_to {
+        partial_ahss.add_diff(from, to, None, Kind::Real);
+    }
+
+    println!("{res:?}");
+
+    let mut log = Arc::try_unwrap(log).unwrap().into_inner().unwrap();
+    let ahss = revert_log_and_remake(0, &mut log, &partial_ahss, true);
+    (log, ahss)
 }

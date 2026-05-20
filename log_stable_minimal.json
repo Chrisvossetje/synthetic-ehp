@@ -1,1 +1,11 @@
-[]
+[
+    {
+        "AddInt": {
+            "from": "6 5 3[2]",
+            "to": "6 2 3 3[2]",
+            "page": 2,
+            "kind": "Real",
+            "proof": "This says that we actually had a differential from 6 5 3[8] to 5 1 2 3 3[7]."
+        }
+    }
+]

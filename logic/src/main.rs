@@ -1,19 +1,15 @@
 use std::{cell::{LazyCell, OnceCell}, sync::OnceLock, time::{Duration, Instant}};
 
-use logic::solve::automated::ahss_solver;
 
 use crate::{
     data::curtis::{DATA, STABLE_DATA},
     domain::{model::SyntheticSS, process::compute_pages, ss::SSPages},
     io::{
         cli::process_input,
-        export::{write_all}, import::get_log,
+        export::write_all, import::get_log,
     },
     solve::{
-        action::{Action, process_action, revert_log_and_remake},
-        ehp::{apply_ehp_recursively, find_ehp_issues, verify_geometric},
-        ehp_ahss::{ehp_to_ahss_map, set_metastable_range},
-        solve::auto_deduce,
+        action::{Action, process_action, revert_log_and_remake}, ahss::find_ahss_issues, automated::ahss_solver, automated_ehp::ehp_solver, ehp::{apply_ehp_recursively, find_ehp_issues, verify_geometric}, ehp_ahss::{ehp_to_ahss_map, set_metastable_range}, solve::auto_deduce
     },
 };
 
