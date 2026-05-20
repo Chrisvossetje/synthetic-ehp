@@ -1,4 +1,3 @@
-
 use crate::{
     data::curtis::DATA,
     domain::{

@@ -1,11 +1,16 @@
-Compare with unstable generators (stable is done)
+There is a E_1 multiplication structure which could be exploited/displayed,
+E_infty multiplication also interesting.
 
-Think on how to do AEHP names
+Implement some super fast lambda algebra algo's to deduce the multiplication needed for the above
 
-Maybe implement the "stable" element name, also te deduce possible multiplications ?
-Implement some multiplications
+Implement different names (stable algebraic names ala Lin (prob. originaly from Bruner?), geometric names from toda)
 
-View the (U)ASS based on this information
+Implement more specific Kind type
 
+Implement better proofs
 
-Stem (21,1) gaat nu niet correct dood 
+Implement more effecient recursion stuff (now stuff gets copied which don't need to be copied)
+
+Redo AHSS automated, just like EHP automated.
+
+Implement correct FromTo indexing type ?

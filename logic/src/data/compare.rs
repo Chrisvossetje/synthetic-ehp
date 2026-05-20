@@ -16,6 +16,13 @@ use crate::{
     types::Torsion,
 };
 
+pub static RADON_HURWITZ_NUMBERS: [i32; 102] = [
+    1, 2, 1, 4, 1, 2, 1, 8, 1, 2, 1, 4, 1, 2, 1, 9, 1, 2, 1, 4, 1, 2, 1, 8, 1, 2, 1, 4, 1, 2, 1,
+    10, 1, 2, 1, 4, 1, 2, 1, 8, 1, 2, 1, 4, 1, 2, 1, 9, 1, 2, 1, 4, 1, 2, 1, 8, 1, 2, 1, 4, 1, 2,
+    1, 12, 1, 2, 1, 4, 1, 2, 1, 8, 1, 2, 1, 4, 1, 2, 1, 9, 1, 2, 1, 4, 1, 2, 1, 8, 1, 2, 1, 4, 1,
+    2, 1, 10, 1, 2, 1, 4, 1, 2,
+];
+
 // (stem, af) -> Sorted vec of tau-modules
 #[allow(non_camel_case_types)]
 type SYNTHETIC_COMPARE_DATA = HashMap<(i32, i32), Vec<Torsion>>;
@@ -76,21 +83,20 @@ pub static TRUNCS: LazyLock<Vec<(bool, i32, i32)>> = LazyLock::new(|| {
 });
 
 pub static EHP_TO_AHSS: LazyLock<Vec<Option<usize>>> = LazyLock::new(|| {
-    DATA
-            .model
-            .gens()
-            .iter()
-            .map(|g| STABLE_DATA.model.try_index(&g.name))
-            .collect()
+    DATA.model
+        .gens()
+        .iter()
+        .map(|g| STABLE_DATA.model.try_index(&g.name))
+        .collect()
 });
 
 pub static AHSS_TO_EHP: LazyLock<Vec<Option<usize>>> = LazyLock::new(|| {
     STABLE_DATA
-            .model
-            .gens()
-            .iter()
-            .map(|g| DATA.model.try_index(&g.name))
-            .collect()
+        .model
+        .gens()
+        .iter()
+        .map(|g| DATA.model.try_index(&g.name))
+        .collect()
 });
 
 pub fn synthetic_rp_truncations() -> &'static [(i32, i32)] {

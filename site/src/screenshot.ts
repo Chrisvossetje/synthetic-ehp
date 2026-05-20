@@ -26,6 +26,10 @@ function getTikzColor(torsion: number | undefined): string {
     return "black";
 }
 
+function shouldExportDifferentialKind(kind: "Real" | "Fake" | "Unknown"): boolean {
+    return viewSettings.showFakeData || kind !== "Fake";
+}
+
 /**
  * Start screenshot mode
  */
@@ -155,6 +159,25 @@ function formatNameForLatex(name: string): string {
     return withLatexInfinity.replace(/\[/g, '{[}').replace(/\]/g, '{]}');
 }
 
+function isVisibleSvgElement(element: SVGElement | null): boolean {
+    return !!element && element.style.visibility !== "hidden" && element.style.display !== "none";
+}
+
+function getVisibleDotElement(chart: Chart, name: string): SVGCircleElement | null {
+    const element = chart.svgchart.shadowRoot?.getElementById(`dot-${name}`) as unknown as SVGCircleElement | null;
+    return isVisibleSvgElement(element) ? element : null;
+}
+
+function getVisibleDiffElement(chart: Chart, from: string, to: string): SVGLineElement | null {
+    const element = chart.svgchart.shadowRoot?.getElementById(`diff-${from}-${to}`) as unknown as SVGLineElement | null;
+    return isVisibleSvgElement(element) ? element : null;
+}
+
+function getVisibleTauMultElement(chart: Chart, from: string, to: string): SVGLineElement | null {
+    const element = chart.svgchart.shadowRoot?.getElementById(`tau-mult-${from}-${to}`) as unknown as SVGLineElement | null;
+    return isVisibleSvgElement(element) ? element : null;
+}
+
 /**
  * Generate TikZ code for the selected region
  */
@@ -171,7 +194,10 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
     const yMinFlipped = flipY(yMax);
     const yMaxFlipped = flipY(yMin);
 
-    let tikz = "\\begin{figure}\n\\centering\n\\begin{tikzpicture}[scale=1.2]\n";
+    const isPointInSelectedRegion = ([x, y]: [number, number]): boolean =>
+        x >= xMin && x <= xMax + 1 && y >= yMin && y <= yMax + 1;
+
+    let tikz = "\\begin{figure}[H]\n\\centering\n\\begin{tikzpicture}\n";
 
     // Draw border (add 1 to max values to include the full cell)
     tikz += `\\draw (${xMin},${flipY(yMax + 1)}) rectangle (${xMax + 1},${flipY(yMin)});\n`;
@@ -212,12 +238,18 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
 
     // Draw differentials first (so they're behind dots)
     const differentials = chart.differentials.filter(d => {
+        if (!shouldExportDifferentialKind(d.kind)) {
+            return false;
+        }
+        if (!getVisibleDiffElement(chart, d.from, d.to)) {
+            return false;
+        }
+
         const fromLoc = chart.name_to_location.get(d.from);
         const toLoc = chart.name_to_location.get(d.to);
         if (!fromLoc || !toLoc) return false;
 
-        return (fromLoc[0] >= xMin && fromLoc[0] <= xMax && fromLoc[1] >= yMin && fromLoc[1] <= yMax) ||
-               (toLoc[0] >= xMin && toLoc[0] <= xMax && toLoc[1] >= yMin && toLoc[1] <= yMax);
+        return isPointInSelectedRegion(fromLoc) || isPointInSelectedRegion(toLoc);
     });
 
     for (const diff of differentials) {
@@ -233,9 +265,34 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
         tikz += `\\draw[${color},line width=0.4pt${lineStyle}] (${roundCoord(fromLoc[0])},${roundCoord(fromYFlip)}) -- (${roundCoord(toLoc[0])},${roundCoord(toYFlip)});\n`;
     }
 
+    // Draw tau extensions with the same visibility/page/fake filtering as the chart.
+    const tauMults = chart.tau_mults.filter((tauMult) => {
+        if (!getVisibleTauMultElement(chart, tauMult.from, tauMult.to)) {
+            return false;
+        }
+
+        const fromLoc = chart.name_to_location.get(tauMult.from);
+        const toLoc = chart.name_to_location.get(tauMult.to);
+        if (!fromLoc || !toLoc) return false;
+
+        return isPointInSelectedRegion(fromLoc) || isPointInSelectedRegion(toLoc);
+    });
+
+    for (const tauMult of tauMults) {
+        const fromLoc = chart.name_to_location.get(tauMult.from);
+        const toLoc = chart.name_to_location.get(tauMult.to);
+        if (!fromLoc || !toLoc) continue;
+
+        const lineStyle = tauMult.kind !== "Real" ? ",dotted" : "";
+        const fromYFlip = flipY(fromLoc[1]);
+        const toYFlip = flipY(toLoc[1]);
+        tikz += `\\draw[color={rgb,255:red,255;green,165;blue,0},line width=0.4pt${lineStyle}] (${roundCoord(fromLoc[0])},${roundCoord(fromYFlip)}) -- (${roundCoord(toLoc[0])},${roundCoord(toYFlip)});\n`;
+    }
+
     // Draw generators (dots)
     const generators = chart.generators.filter(g =>
-        g.stem >= xMin && g.stem <= xMax && g.y >= yMin && g.y <= yMax
+        g.stem >= xMin && g.stem <= xMax && g.y >= yMin && g.y <= yMax &&
+        getVisibleDotElement(chart, g.name)
     );
 
     for (const gen of generators) {
@@ -248,7 +305,7 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
         const radius = 0.022; // Match SVG radius of 0.022 in chart units
 
         // Check if the dot is filled (permanent) by looking at the actual SVG element
-        const dotElement = chart.svgchart.shadowRoot?.getElementById(`dot-${gen.name}`) as unknown as SVGCircleElement;
+        const dotElement = getVisibleDotElement(chart, gen.name);
         const isFilled = dotElement && dotElement.style.fill && dotElement.style.fill !== 'white' && dotElement.style.fill !== '';
 
         if (isFilled) {

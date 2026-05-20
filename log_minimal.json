@@ -131,14 +131,6 @@
     },
     {
         "AddDiff": {
-            "from": "7 7 7 7[5]",
-            "to": "2 3 5 7 7 7[1]",
-            "kind": "Unknown",
-            "proof": "If we assume this we have one generator less in stem 32/33 sphere 6/7/8. It's shadow also reduces one generator on the 35/36 stem only for the 4 sphere, and has no further effects."
-        }
-    },
-    {
-        "AddDiff": {
             "from": "9 7 7 7[6]",
             "to": "7 3 6 6 5 3[5]",
             "kind": "Unknown",

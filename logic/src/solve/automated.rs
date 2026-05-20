@@ -6,7 +6,7 @@ use std::sync::{
 use crate::{
     MAX_AUTOMATED_TOP_TRUNC, MAX_STEM, MAX_VERIFY_STEM,
     data::{
-        compare::{algebraic_rp, rp_truncations, synthetic_rp},
+        compare::{RADON_HURWITZ_NUMBERS, algebraic_rp, rp_truncations, synthetic_rp},
         curtis::STABLE_DATA,
     },
     domain::{
@@ -80,19 +80,19 @@ fn filter_diff(
     let stem = data.model.stem(d.to);
     let y = data.model.y(d.from);
 
-    if y == 3 || y == 7 || (y == 15 && stem != 14) || (y == 31 && stem != 30) {
+    if y - data.model.y(d.to) < RADON_HURWITZ_NUMBERS[y as usize] {
         Some((
-            Kind::Fake,
+            Kind::MinimalLength,
             format!(
-                "By Hopf Invariant one things we cannot have a differential form the 2^i-1 sphere"
-            ),
+                "The differential of the fundamental class is longer than this differential or zero."
+            )
         ))
     } else if data.in_diffs[d.to]
         .iter()
         .any(|from| data.model.y(*from) == top_trunc && data.model.original_torsion(*from).alive())
     {
         Some((
-            Kind::Unknown,
+            Kind::AdditiveStructure,
             format!(
                 "As we are only interested in the module structure, we won't consider the case where two differentials target the same generator."
             ),
@@ -103,8 +103,8 @@ fn filter_diff(
         && data.model.y(*alg_to) + 1 == bot_trunc
     {
         Some((
-            Kind::Unknown,
-            format!("We don't have enough Synthetic information to deduce this differential."),
+            Kind::Invisible,
+            format!("Invisible differential."),
         ))
     } else if top_trunc & 1 == 1
         && !(top_trunc == 5 && bot_trunc == 3)
@@ -114,8 +114,8 @@ fn filter_diff(
         && top_trunc + 2 == dies
     {
         Some((
-            Kind::Unknown,
-            format!("We don't have enough Synthetic information to deduce this differential."),
+            Kind::Unneccessary,
+            format!("Unneccessary differrential."),
         ))
     } else {
         None

@@ -53,7 +53,7 @@ fn apply_diff(
     let stem = data.model.stem(from);
 
     let (new_from_g, new_to_g) = if from_g.1.alive() {
-            if !to_g.1.alive() {
+        if !to_g.1.alive() {
             if data.proven_from_to[&(from, to)].is_some() {
                 let (from_name, to_name) = data.get_names(from, to);
                 return Err(Issue::UselessDifferential {
@@ -156,16 +156,16 @@ fn apply_diff(
         }
     } else {
         if to_g.1.alive() && data.proven_from_to[&(from, to)].is_some() {
-                let (from_name, to_name) = data.get_names(from, to);
-                return Err(Issue::UselessDifferential {
-                    from,
-                    to,
-                    bot_trunc: pages.bot_trunc,
-                    top_trunc: pages.top_trunc,
-                    from_name,
-                    to_name,
-                    stem,
-                });
+            let (from_name, to_name) = data.get_names(from, to);
+            return Err(Issue::UselessDifferential {
+                from,
+                to,
+                bot_trunc: pages.bot_trunc,
+                top_trunc: pages.top_trunc,
+                from_name,
+                to_name,
+                stem,
+            });
         } else {
             (from_g, to_g)
         }
@@ -188,8 +188,6 @@ fn apply_tau(
     let from_g = pages.element_final(from);
     let to_g = pages.element_final(to);
 
-
-
     if from_g.1.alive() && to_g.1.alive() && from_g.0 >= af {
         if let Some(from_torsion) = from_g.1.0 {
             let af_diff = from_g.0 - to_g.0;
@@ -209,7 +207,7 @@ fn apply_tau(
                 }
                 None => (Torsion::default(), Torsion::new(from_torsion - af_diff)),
             };
-            
+
             if from_g.0 - from_torsion <= to_g.0 && af_diff >= 0 {
                 pages.push(from, page, (from_g.0, new_from_torsion));
                 pages.push(to, page, (to_g.0, new_to_torsion));
@@ -238,7 +236,8 @@ pub fn try_compute_pages(
     to_stem: i32,
     include_tau: bool,
 ) -> Result<SSPages, Vec<Issue>> {
-    let (pages, issues) = compute_pages(data, bot_trunc, top_trunc, from_stem, to_stem, include_tau);
+    let (pages, issues) =
+        compute_pages(data, bot_trunc, top_trunc, from_stem, to_stem, include_tau);
 
     if issues.len() != 0 {
         return Err(issues);
@@ -320,7 +319,9 @@ pub fn ehp_recursion(ehp: &mut SyntheticSS, sphere: i32, stem: i32) -> Result<()
 
     // Set everything to what we expect
     for id in ehp.model.gens_id_in_stem(stem).clone() {
-        if let Some(g) = pages.try_element_final(id) && g.1.alive() {
+        if let Some(g) = pages.try_element_final(id)
+            && g.1.alive()
+        {
             let name = ehp.get_name_at_sphere(id, sphere).to_string();
             let gen_tag = generating_tag(&name);
 
@@ -336,8 +337,6 @@ pub fn ehp_recursion(ehp: &mut SyntheticSS, sphere: i32, stem: i32) -> Result<()
                             from_name: name,
                             to_name: target_name,
                         });
-                        
-                        
                     } else {
                         t_g.torsion = g.1;
                     }
@@ -352,7 +351,6 @@ pub fn ehp_recursion(ehp: &mut SyntheticSS, sphere: i32, stem: i32) -> Result<()
                     });
                 }
             }
-            
         }
     }
 

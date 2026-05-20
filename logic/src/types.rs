@@ -67,6 +67,12 @@ pub enum Kind {
     Real,
     Fake,
     Unknown,
+    Lifted,
+    Uninteresting,
+    Invisible,
+    Unneccessary,
+    MinimalLength,
+    AdditiveStructure,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]

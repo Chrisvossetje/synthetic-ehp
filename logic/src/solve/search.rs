@@ -1,7 +1,9 @@
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use crate::solve::automated::PARALLEL_DEPTH;
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BranchResult {
@@ -9,7 +11,6 @@ pub enum BranchResult {
     Open,
     Cancelled,
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChoiceResult {
@@ -26,10 +27,9 @@ pub enum SpeculativeBranchOutcome {
     Cancelled,
 }
 
-
 pub fn create_getout(
     getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
-    depth: i32
+    depth: i32,
 ) -> [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize] {
     let mut g = getout.clone();
     if depth < PARALLEL_DEPTH {
@@ -50,9 +50,7 @@ pub fn signal_parent_getout(
     }
 }
 
-pub fn check_getout(
-    getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
-) -> bool {
+pub fn check_getout(getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize]) -> bool {
     for g in getout {
         if let Some(g) = g {
             if g.load(Ordering::Relaxed) {
@@ -71,20 +69,14 @@ pub fn resolve_speculative_branch_results(
         SpeculativeBranchOutcome::ChooseRight(e)
     } else if let BranchResult::Contradiction(e) = right_res {
         SpeculativeBranchOutcome::ChooseLeft(e)
-    } else if left_res == BranchResult::Cancelled
-        && right_res == BranchResult::Cancelled
-    {
+    } else if left_res == BranchResult::Cancelled && right_res == BranchResult::Cancelled {
         SpeculativeBranchOutcome::Cancelled
     } else {
         SpeculativeBranchOutcome::BothOpen
     }
 }
 
-pub fn branch_on_speculative_worlds<L, R>(
-    depth: i32,
-    left: L,
-    right: R,
-) -> SpeculativeBranchOutcome
+pub fn branch_on_speculative_worlds<L, R>(depth: i32, left: L, right: R) -> SpeculativeBranchOutcome
 where
     L: FnOnce() -> BranchResult + Send,
     R: FnOnce() -> BranchResult + Send,
