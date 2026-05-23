@@ -3,11 +3,13 @@ use std::sync::{
     atomic::AtomicBool,
 };
 
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+
 use crate::{
     MAX_AUTOMATED_TOP_TRUNC, MAX_STEM, MAX_VERIFY_STEM,
     data::{
         compare::{RADON_HURWITZ_NUMBERS, algebraic_rp, rp_truncations, synthetic_rp},
-        curtis::STABLE_DATA,
+        curtis::STABLE_DATA, naming::generate_names_from_tag_special,
     },
     domain::{
         model::{Diff, ExtTauMult, SyntheticSS},
@@ -24,7 +26,7 @@ use crate::{
             synthetic_issue_is_tau_structure_issue,
         },
         search::{
-            BranchResult, ChoiceResult, SpeculativeBranchOutcome, branch_on_speculative_worlds, check_getout, create_getout, empty_getout, signal_parent_getout
+            BranchResult, ChoiceResult, GetOut, SpeculativeBranchOutcome, branch_on_speculative_worlds, check_getout, create_getout, empty_getout, signal_parent_getout
         },
         solve::{
             auto_deduce, suggest_tau_solution_algebraic, suggest_tau_solution_generator_synthetic,
@@ -245,26 +247,75 @@ fn filter_diff(
 }
 
 fn iterate_e1_issues(
-    mut data: SyntheticSS,
+    data: &mut SyntheticSS,
     alg_ahss: &SyntheticSS,
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
-    e1_issues: &Vec<Vec<Vec<Vec<Action>>>>,
-    mut getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
-    log: Arc<Mutex<Vec<Action>>>,
-    mut stem: i32,
-    mut top_trunc: i32,
-    mut bot_trunc: i32,
+    e1_issues: &Vec<Vec<Vec<(usize, Torsion)>>>,
+    getout: &GetOut,
+    log: &Arc<Mutex<Vec<Action>>>,
+    stem: i32,
+    top_trunc: i32,
+    bot_trunc: i32,
     depth: i32,
 ) -> BranchResult {
+    BranchResult::Open
+    // if e1_issues[stem as usize].len() == 0 {
+    // } else {
+    //     let g = create_getout(&getout, e1_issues[stem as usize].len() as i32, depth);
 
+
+    //     let outcomes: Vec<_> = e1_issues[stem as usize].par_iter().map(|x| {
+    //         let mut data = data.clone();
+
+    //         // Apply possible solution to torsion on E_1 page
+    //         for j in x {
+    //             data.model.get_mut(j.0).torsion = j.1;
+    //         }
+
+    //         ahss_iterate(data, alg_ahss, alg_data, e1_issues, g.clone(), log.clone(), stem, top_trunc, bot_trunc, depth + 1)
+    //     }).collect();
+
+    //     let positives = outcomes.iter().fold(0, |acc, r| {
+    //         if let BranchResult::Contradiction(_) = r {
+    //             acc
+    //         } else {
+    //             acc + 1
+    //         }
+    //     });
+
+
+
+    //     if check_getout(&getout) {
+    //         return BranchResult::Cancelled;
+    //     }
+
+    //     if positives == 1 {
+    //         for (index, r) in outcomes.into_iter().enumerate() {
+    //             if let BranchResult::Contradiction(_) = r {
+
+    //             }  else {
+    //                 for j in &e1_issues[stem as usize][index] {
+    //                     data.model.get_mut(j.0).torsion = j.1;
+    //                 }
+    //                 return BranchResult::Open
+    //             }
+    //         }
+    //     } 
+
+    //     return BranchResult::Contradiction(
+    //         format!(
+    //             "We have {positives} positives. Which means we can't decide on E1 stuff :("
+    //         )
+    //     );
+    // }
 }
 
 fn ahss_iterate(
     mut data: SyntheticSS,
     alg_ahss: &SyntheticSS,
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
-    e1_issues: &Vec<Vec<Vec<Vec<Action>>>>,
-    mut getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+    e1_issues: &Vec<Vec<Vec<(usize, Torsion)>>>,
+    mut getout: GetOut,
     log: Arc<Mutex<Vec<Action>>>,
     mut stem: i32,
     mut top_trunc: i32,
@@ -367,20 +418,31 @@ fn ahss_iterate(
         }
 
         if top_trunc == stem + 1 {
-            // Check E_1 page errors here already ?
-            match iterate_e1_issues() {
-                BranchResult::Contradiction(_) => todo!(),
-                BranchResult::Open => todo!(),
-                BranchResult::Cancelled => todo!(),
-            }
-
             stem += 1;
             top_trunc = 2;
+            bot_trunc = top_trunc - 1;
+
+            match iterate_e1_issues(
+                &mut data,
+                alg_ahss,
+                alg_data,
+                e1_issues,
+                &getout,
+                &log,
+                stem,
+                top_trunc,
+                bot_trunc,
+                depth,
+            ) {
+                BranchResult::Open => {},
+                BranchResult::Contradiction(e) => return BranchResult::Contradiction(e),
+                BranchResult::Cancelled => return BranchResult::Cancelled,
+            }
         } else {
             top_trunc += 1;
+            bot_trunc = top_trunc - 1;
         }
 
-        bot_trunc = top_trunc - 1;
 
         if depth == 0 {
             println!("Current stem: {stem} | top_trunc: {top_trunc}");
@@ -392,8 +454,8 @@ fn try_diff(
     data: &mut SyntheticSS,
     alg_ahss: &SyntheticSS,
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
-    e1_issues: &Vec<Vec<Vec<Vec<Action>>>>,
-    getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+    e1_issues: &Vec<Vec<Vec<(usize, Torsion)>>>,
+    getout: &GetOut,
     log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
     top_trunc: i32,
@@ -428,7 +490,7 @@ fn try_diff(
         println!("Trying diff: {} | {}", from_name, to_name);
     }
 
-    let g = create_getout(getout, depth);
+    let g = create_getout(getout, 2, depth);
 
     let with = || {
         let mut with_data = data.clone();
@@ -544,8 +606,8 @@ fn try_tau(
     data: &mut SyntheticSS,
     alg_ahss: &SyntheticSS,
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
-    e1_issues: &Vec<Vec<Vec<Vec<Action>>>>,
-    getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+    e1_issues: &Vec<Vec<Vec<(usize, Torsion)>>>,
+    getout: &GetOut,
     log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
     top_trunc: i32,
@@ -562,7 +624,7 @@ fn try_tau(
         );
     }
 
-    let g = create_getout(getout, depth);
+    let g = create_getout(getout, 2, depth);
 
     let with = || {
         let mut with_data = data.clone();
@@ -715,10 +777,11 @@ fn try_tau(
 // }
 
 
-pub fn ahss_solve_e1_issues(ahss: &SyntheticSS, log: &mut Vec<Action>) -> Vec<Vec<Vec<Vec<Action>>>> {    
-    let mut proper_issues = vec![vec![]; (MAX_STEM + 1) as usize];
-
+pub fn ahss_solve_e1_issues(ahss: &SyntheticSS, log: &mut Vec<Action>) -> Vec<Vec<Vec<(usize, Torsion)>>> {    
+    let mut stem_sols = vec![vec![]; (MAX_STEM + 1) as usize];
+    
     for stem in 2..=MAX_STEM {
+        let mut proper_issues = vec![];
         match ahss_synthetic_e1_issue(&ahss, stem) {
             Ok(_) => {}
             Err(issues) => {
@@ -727,16 +790,37 @@ pub fn ahss_solve_e1_issues(ahss: &SyntheticSS, log: &mut Vec<Action>) -> Vec<Ve
                     match auto_deduce(&ahss, &i) {
                         Ok(mut a) => log.append(&mut a),
                         Err(_) => {
-                            let sol = get_e1_solutions(ahss, &i);
-                            proper_issues[stem as usize].push(sol)
+                            proper_issues.push(i);
                         },
                     }
                 }
             }
         }
+        
+        let proper_sols = get_all_e1_solutions(ahss, &proper_issues);
+        
+        let l: Vec<_> = proper_sols.into_iter().flat_map(|x|  {
+            x.into_iter().map(|y| {
+                if let Action::SetE1 { tag, torsion, proof }  = y {
+                    let mut ids = vec![];
+                    for g in generate_names_from_tag_special(&tag, 1, 1){
+                        if let Some(id) = ahss.model.try_index(&g) {
+                            ids.push((id, torsion));
+                        } else {
+                            break;
+                        }
+                    }
+                    ids
+                } else {
+                    unreachable!()
+                }
+            })
+        }).collect();
+
+        stem_sols[stem as usize] = l;
     }  
 
-    proper_issues 
+    stem_sols
 }
 
 pub fn ahss_solver(log: Option<Vec<Action>>) -> (Vec<Action>, SyntheticSS) {

@@ -22,7 +22,7 @@ use crate::{
             synthetic_issue_is_tau_structure_issue,
         },
         search::{
-            BranchResult, ChoiceResult, SpeculativeBranchOutcome, branch_on_speculative_worlds, check_getout, create_getout, empty_getout, signal_parent_getout
+            BranchResult, ChoiceResult, GetOut, SpeculativeBranchOutcome, branch_on_speculative_worlds, check_getout, create_getout, empty_getout, signal_parent_getout
         },
         solve::{suggest_tau_solution_algebraic, suggest_tau_solution_generator_synthetic},
     },
@@ -334,7 +334,7 @@ fn ehp_iterate(
     mut data: SyntheticSS,
     alg_ehp: &SyntheticSS,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
-    mut getout: [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+    mut getout: GetOut,
     log: Arc<Mutex<Vec<Action>>>,
     mut stem: i32,
     mut top_trunc: i32,
@@ -554,7 +554,7 @@ fn fix_names(
     data: &mut SyntheticSS,
     alg_ehp: &SyntheticSS,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
-    getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+    getout: &GetOut,
     log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
     top_trunc: i32,
@@ -659,7 +659,7 @@ fn fix_names(
 
                 // Go do a branching search to find best candidates
                 if fil_syn.len() == 1 && fil_alg.len() == 2 {
-                    let g = create_getout(getout, depth);
+                    let g = create_getout(getout, 2, depth);
 
                     let mut a_action = Action::SetInducedName {
                         name: original_name.clone(),
@@ -760,7 +760,7 @@ fn try_diff(
     data: &mut SyntheticSS,
     alg_ehp: &SyntheticSS,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
-    getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+    getout: &GetOut,
     log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
     top_trunc: i32,
@@ -798,7 +798,7 @@ fn try_diff(
         println!("Trying diff: {} | {}", from_name, to_name);
     }
 
-    let g = create_getout(getout, depth);
+    let g = create_getout(getout, 2, depth);
 
     let with = || {
         // println!("{depth} With Trying diff: {} | {}", from_name, to_name);
@@ -905,7 +905,7 @@ fn try_tau(
     data: &mut SyntheticSS,
     alg_ehp: &SyntheticSS,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
-    getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+    getout: &GetOut,
     log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
     top_trunc: i32,
@@ -950,7 +950,7 @@ fn try_tau(
         );
     }
 
-    let g = create_getout(getout, depth);
+    let g = create_getout(getout, 2, depth);
 
     let with = || {
         let mut with_data = data.clone();

@@ -9,7 +9,7 @@ use crate::{
         export::write_all, import::get_log,
     },
     solve::{
-        action::{Action, process_action, revert_log_and_remake}, ahss::find_ahss_issues, automated::ahss_solver, automated_ehp::ehp_solver, ehp::{apply_ehp_recursively, find_ehp_issues, verify_geometric}, ehp_ahss::{ehp_to_ahss_map, set_metastable_range}, solve::auto_deduce
+        action::{Action, process_action, revert_log_and_remake}, ahss::find_ahss_issues, automated_ehp::ehp_solver, ehp::{apply_ehp_recursively, find_ehp_issues, verify_geometric}, ehp_ahss::{ehp_to_ahss_map, set_metastable_range}, solve::auto_deduce
     },
 };
 
@@ -324,83 +324,38 @@ fn temp_lol(data: &SyntheticSS) {
 pub static STABLE_SYNTHETIC_PAGES: OnceLock<[SSPages; (MAX_STEM + 1) as usize]> = OnceLock::new();
 pub static ALGEBRAIC_SPHERE_PAGES: OnceLock<[SSPages; (MAX_STEM + 1) as usize]> = OnceLock::new();
 
-// fn main() {
-//     let start = Instant::now();
-
-//     let mut log = match get_log(false, true) {
-//         Ok(log) => log,
-//         Err(_) => {
-//             panic!("Log importing was not succesful");
-//         }
-//     };
-    
-//     let ahss = revert_log_and_remake(0, &mut log, &STABLE_DATA, true);
-    
-//     let ahss_pages = std::array::from_fn(|x| compute_pages(&ahss, 0, x as i32, 0, 150, false).0);
-//     STABLE_SYNTHETIC_PAGES.set(ahss_pages).unwrap();
-    
-//     let alg_ehp_pages = std::array::from_fn(|x| compute_pages(&DATA, 0, x as i32 - 1, 0, MAX_STEM + 5, false).0);
-//     ALGEBRAIC_SPHERE_PAGES.set(alg_ehp_pages).unwrap();
-    
-//     // if let Ok((ahss_log, ahss)) = ahss_solver(Some(log)) {
-//     //     write_all(&ahss, &ahss_log, true);
-    
-//     // }
-
-//     let mut ehp_log = match get_log(true, false) {
-//         Ok(log) => log,
-//         Err(_) => {
-//             panic!("Log importing was not succesful");
-//         }
-//     };
-        
-//     let (ehp_log, ehp) = ehp_solver(&ahss, Some(ehp_log));
-//     write_all(&ehp, &ehp_log, false);
-
-
-//     // export_order_table(&ehp);
-
-//     // let (ahss, input_time_ahss) = ahss();
-//     // let start_ehp = Instant::now();
-//     // let (ehp, input_time_ehp) = ehp(&ahss);
-
-//     // verify_geometric(&ehp);
-
-//     // println!(
-//     //     "\nAHSS Compute took: {:.2?}",
-//     //     start.elapsed() - input_time_ahss - start_ehp.elapsed()
-//     // );
-//     // println!(
-//     //     "EHP Compute took: {:.2?}",
-//     //     start_ehp.elapsed() - input_time_ehp
-//     // );
-//     // println!(
-//     //     "Compute took: {:.2?}",
-//     //     start.elapsed() - input_time_ahss - input_time_ehp
-//     // );
-//     // println!("\nInput took: {:.2?}", input_time_ahss + input_time_ehp);
-//     println!("Program took: {:.2?}", start.elapsed());
-// }
-
 fn main() {
     let start = Instant::now();
 
-    let ahss_log = match get_log(true, true) {
-        Ok(log) => Some(log),
-        Err(_) => None,
+    let mut log = match get_log(false, true) {
+        Ok(log) => log,
+        Err(_) => {
+            panic!("Log importing was not succesful");
+        }
     };
-
-    let (ahss_log, ahss) = ahss_solver(ahss_log);
-    // if let Ok((ahss_log, ahss)) = crate::solve::automated::ahss_solver(log) {
-    //     write_all(&ahss, &ahss_log, true);
-    //     Some(ahss)
-    // } else {
-    //     None
-    // }
     
+    let ahss = revert_log_and_remake(0, &mut log, &STABLE_DATA, true);
+    
+    let ahss_pages = std::array::from_fn(|x| compute_pages(&ahss, 0, x as i32, 0, 150, false).0);
+    STABLE_SYNTHETIC_PAGES.set(ahss_pages).unwrap();
+    
+    let alg_ehp_pages = std::array::from_fn(|x| compute_pages(&DATA, 0, x as i32 - 1, 0, MAX_STEM + 5, false).0);
+    ALGEBRAIC_SPHERE_PAGES.set(alg_ehp_pages).unwrap();
+    
+    // if let Ok((ahss_log, ahss)) = ahss_solver(Some(log)) {
+    //     write_all(&ahss, &ahss_log, true);
+    
+    // }
+
+    let mut ehp_log = match get_log(true, false) {
+        Ok(log) => log,
+        Err(_) => {
+            panic!("Log importing was not succesful");
+        }
+    };
         
-    // let (ehp_log, ehp) = ehp_solver(&ahss, Some(ehp_log));
-    write_all(&ahss, &ahss_log, true);
+    let (ehp_log, ehp) = ehp_solver(&ahss, Some(ehp_log));
+    write_all(&ehp, &ehp_log, false);
 
 
     // export_order_table(&ehp);
@@ -426,3 +381,48 @@ fn main() {
     // println!("\nInput took: {:.2?}", input_time_ahss + input_time_ehp);
     println!("Program took: {:.2?}", start.elapsed());
 }
+
+// fn main() {
+//     let start = Instant::now();
+
+//     let ahss_log = match get_log(true, true) {
+//         Ok(log) => Some(log),
+//         Err(_) => None,
+//     };
+
+//     let (ahss_log, ahss) = ahss_solver(ahss_log);
+//     // if let Ok((ahss_log, ahss)) = crate::solve::automated::ahss_solver(log) {
+//     //     write_all(&ahss, &ahss_log, true);
+//     //     Some(ahss)
+//     // } else {
+//     //     None
+//     // }
+    
+        
+//     // let (ehp_log, ehp) = ehp_solver(&ahss, Some(ehp_log));
+//     write_all(&ahss, &ahss_log, true);
+
+
+//     // export_order_table(&ehp);
+
+//     // let (ahss, input_time_ahss) = ahss();
+//     // let start_ehp = Instant::now();
+//     // let (ehp, input_time_ehp) = ehp(&ahss);
+
+//     // verify_geometric(&ehp);
+
+//     // println!(
+//     //     "\nAHSS Compute took: {:.2?}",
+//     //     start.elapsed() - input_time_ahss - start_ehp.elapsed()
+//     // );
+//     // println!(
+//     //     "EHP Compute took: {:.2?}",
+//     //     start_ehp.elapsed() - input_time_ehp
+//     // );
+//     // println!(
+//     //     "Compute took: {:.2?}",
+//     //     start.elapsed() - input_time_ahss - input_time_ehp
+//     // );
+//     // println!("\nInput took: {:.2?}", input_time_ahss + input_time_ehp);
+//     println!("Program took: {:.2?}", start.elapsed());
+// }

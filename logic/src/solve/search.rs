@@ -1,6 +1,6 @@
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
 use crate::solve::automated::PARALLEL_DEPTH;
@@ -30,37 +30,40 @@ pub enum SpeculativeBranchOutcome {
 // TODO : This will only work for AHSS until stem 62, for EHP unclear until which stem
 // Should actually do AtomicUint or smthng
 
-pub fn empty_getout() -> [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize] {
+pub type GetOut = [Option<Arc<AtomicI32>>; PARALLEL_DEPTH as usize];
+
+pub fn empty_getout() -> GetOut {
     [const { None }; PARALLEL_DEPTH as usize]
 }   
 
 pub fn create_getout(
-    getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+    getout: &GetOut,
+    choices: i32,
     depth: i32,
-) -> [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize] {
+) -> GetOut {
     let mut g = getout.clone();
     if depth < PARALLEL_DEPTH {
-        g[depth as usize] = Some(Arc::new(AtomicBool::new(false)));
+        g[depth as usize] = Some(Arc::new(AtomicI32::new(choices - 1)));
     }
     g
 }
 
 pub fn signal_parent_getout(
-    getout: &mut [Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize],
+    getout: &mut GetOut,
     depth: i32,
 ) {
     if depth <= PARALLEL_DEPTH
         && depth != 0
         && let Some(flag) = &mut getout[(depth - 1) as usize]
     {
-        flag.store(true, Ordering::Relaxed);
+        flag.fetch_sub(-1, Ordering::Relaxed);
     }
 }
 
-pub fn check_getout(getout: &[Option<Arc<AtomicBool>>; PARALLEL_DEPTH as usize]) -> bool {
+pub fn check_getout(getout: &GetOut) -> bool {
     for g in getout {
         if let Some(g) = g {
-            if g.load(Ordering::Relaxed) {
+            if g.load(Ordering::Relaxed) <= 0 {
                 return true;
             }
         }
