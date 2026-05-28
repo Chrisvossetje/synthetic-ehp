@@ -48,6 +48,7 @@ fn apply_diff(
     let from_g = pages.element_final(from);
     let to_g = pages.element_final(to);
 
+    #[allow(unused)]
     let (from_name, to_name) = data.get_names(from, to);
 
     let stem = data.model.stem(from);

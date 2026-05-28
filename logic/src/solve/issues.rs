@@ -8,7 +8,7 @@ use crate::{
         compare::EMPTY_LIST_TORSION,
         curtis::{DATA_PAGES, STABLE_DATA_PAGES},
     },
-    domain::{model::SyntheticSS, process::try_compute_pages, ss::SSPages},
+    domain::{model::SyntheticSS, ss::SSPages},
     types::Torsion,
 };
 
@@ -228,10 +228,11 @@ pub fn compare_algebraic_spectral_sequence(
                 && bot_trunc <= data.model.y(to)
                 && data.model.y(from) <= top_trunc
             {
+                let (from_name, to_name) = data.get_names(from, to);
                 let alg = data.proven_from_to.get(&(from, to)).unwrap().is_none();
                 if alg {
                     if !data.model.original_torsion(to).alive()
-                        && data.model.original_torsion(from).alive()
+                    && data.model.original_torsion(from).alive()
                     {
                         let page = data.model.y(from) - data.model.y(to);
                         // From should die before the corresponding page.

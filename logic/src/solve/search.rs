@@ -1,6 +1,6 @@
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, AtomicI32, Ordering},
+    atomic::{AtomicI32, Ordering},
 };
 
 use crate::solve::automated::PARALLEL_DEPTH;
@@ -56,7 +56,7 @@ pub fn signal_parent_getout(
         && depth != 0
         && let Some(flag) = &mut getout[(depth - 1) as usize]
     {
-        flag.fetch_sub(-1, Ordering::Relaxed);
+        flag.fetch_sub(1, Ordering::Relaxed);
     }
 }
 

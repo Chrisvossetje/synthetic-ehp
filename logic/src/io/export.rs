@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{self, Read, Write},
+    io::{self, Write},
     path::{Path, PathBuf},
 };
 
@@ -8,7 +8,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    MAX_STEM, domain::{model::SyntheticSS, process::compute_pages}, io::import::get_log, solve::action::Action, types::Kind
+    MAX_STEM, domain::model::SyntheticSS, solve::action::Action, types::Kind
 };
 
 pub fn write_vec_to_file<T: std::fmt::Debug>(vec: &[T], path: &str) -> io::Result<()> {
@@ -265,11 +265,9 @@ pub fn write_typescript_file(
 pub fn write_all(data: &SyntheticSS, log: &Vec<Action>, ahss: bool) {
     let log = log.iter().unique().map(|x| x.clone()).collect();
     if ahss {
-        let (pages, _) = compute_pages(&data, 0, 256, 0, MAX_STEM, true);
         write_typescript_file("../site/src/data_stable.ts", "_stable", &data).unwrap();
         write_log(&log, ahss).unwrap();
     } else {
-        let (pages, _) = compute_pages(&data, 0, 256, 0, MAX_STEM, true);
         write_typescript_file("../site/src/data.ts", "", &data).unwrap();
         write_log(&log, ahss).unwrap();
     }
@@ -287,6 +285,7 @@ pub fn write_log(log: &Vec<Action>, ahss: bool) -> io::Result<()> {
 
 
 // TODO : Fix again
+#[allow(unused)]
 fn export_table() {
 
     // let ehp = get_log();

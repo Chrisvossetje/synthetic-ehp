@@ -11,7 +11,7 @@ use itertools::{Itertools, chain};
 use crate::{
     MAX_STEM, MAX_VERIFY_STEM,
     data::curtis::{DATA, STABLE_DATA},
-    domain::process::compute_pages,
+    domain::{process::compute_pages, ss::SSPages},
     solve::action::D_R_REPEATS,
     types::Torsion,
 };
@@ -90,6 +90,7 @@ pub static EHP_TO_AHSS: LazyLock<Vec<Option<usize>>> = LazyLock::new(|| {
         .collect()
 });
 
+#[allow(unused)]
 pub static AHSS_TO_EHP: LazyLock<Vec<Option<usize>>> = LazyLock::new(|| {
     STABLE_DATA
         .model
@@ -187,6 +188,15 @@ pub fn algebraic_spheres(sphere: i32) -> &'static HashMap<(i32, i32), usize> {
         "There is no Algebraic data available for S^{sphere}"
     ))
 }
+
+
+// TODO : Move this ?
+pub static ALGEBRAIC_SPHERE_PAGES: LazyLock<[SSPages; (MAX_STEM + 1) as usize]> = LazyLock::new(|| {
+    std::array::from_fn(|x| compute_pages(&DATA, 0, x as i32 - 1, 0, MAX_STEM + 5, false).0)
+});
+
+
+
 
 // This bot / top trunc is for compatibility with C2, which is shifted 1 down wrt. RP1_2
 // So for S0, we just dont do anything with bot trunc and toptrunc

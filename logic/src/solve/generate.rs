@@ -17,12 +17,20 @@ pub fn get_a_diff(data: &SyntheticSS, top_trunc: i32, bot_trunc: i32, stem: i32)
         {
             for &s_id in data.model.gens_id_in_stem_y(stem + 1, top_trunc) {
                 let (from_name, to_name) = data.get_names(s_id, t_id);
-                if let Some((_, s_torsion)) = sources.try_element_final(s_id)
+                if let Some((s_af_final, s_torsion)) = sources.try_element_final(s_id)
                     && s_torsion.alive()
                 {
-                    let (s_af, _) = sources.element_at_page(d_y + 1, s_id);
+                    let (s_af_at_page, _) = sources.element_at_page(d_y, s_id);
 
-                    let coeff = t_af - s_af - 1;
+                    let coeff = t_af - s_af_final - 1;
+                    
+                    // Make sure the diff is valid at that page
+                    // The restriction to only have 1 differential per generator per page is to strong.
+                    // We could have a diff from free to torsion, which will need to also have a tau multiple diff to a higher free generator for example.
+                    if t_af - s_af_at_page < 1 {
+                        continue;
+                    }
+
 
                     // TODO: top_trunc - target_y >= s_page
                     // This should only hold whenever the s_page came from an actual
@@ -37,7 +45,7 @@ pub fn get_a_diff(data: &SyntheticSS, top_trunc: i32, bot_trunc: i32, stem: i32)
                         // Would have been seen algebraically
                         if coeff == 0 {
                             if t_af == data.model.original_af(t_id)
-                                && s_af == data.model.original_af(s_id)
+                                && s_af_final == data.model.original_af(s_id)
                             {
                                 if let Some(died) = data.model.get(t_id).dies {
                                     if died > data.model.y(s_id) {

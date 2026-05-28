@@ -45,26 +45,13 @@ impl SSPages {
         b.last().unwrap().1.clone()
     }
 
-    pub fn available_on_page(&self, elt: usize) -> i32 {
-        self.generators[elt].as_deref().unwrap().last().unwrap().0
-    }
-
     pub fn try_element_final(&self, elt: usize) -> Option<GeneratorState> {
         let a = &self.generators[elt];
         let b = a.as_deref()?;
         Some(b.last().unwrap().1.clone())
     }
-    pub fn try_element_final_with_page(&self, elt: usize) -> Option<(i32, GeneratorState)> {
-        let a = &self.generators[elt];
-        let b = a.as_deref()?;
-        Some(b.last().unwrap().clone())
-    }
 
     pub fn push(&mut self, elt: usize, page: i32, g: GeneratorState) {
-        self.generators[elt].as_mut().unwrap().push((page, g));
-    }
-
-    pub fn pop(&mut self, elt: usize, page: i32, g: GeneratorState) {
         self.generators[elt].as_mut().unwrap().push((page, g));
     }
 

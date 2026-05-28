@@ -1,19 +1,19 @@
 use core::panic;
-use std::sync::{Arc, Mutex, atomic::AtomicBool};
+use std::sync::{Arc, Mutex};
 
 use crate::{
-    ALGEBRAIC_SPHERE_PAGES, MAX_STEM, STABLE_SYNTHETIC_PAGES,
+    MAX_STEM,
     data::{
-        compare::{EHP_TO_AHSS, RADON_HURWITZ_NUMBERS, S0, algebraic_spheres},
+        compare::{ALGEBRAIC_SPHERE_PAGES, EHP_TO_AHSS, RADON_HURWITZ_NUMBERS, S0, algebraic_spheres},
         curtis::DATA,
     },
     domain::{
         model::{Diff, ExtTauMult, SyntheticSS},
-        process::{compute_pages, ehp_recursion, try_compute_pages},
+        process::{compute_pages, ehp_recursion, try_compute_pages}, ss::SSPages,
     },
     solve::{
         action::{Action, process_action, revert_log_and_remake},
-        automated::{ALWAYS_PRINT, PARALLEL_DEPTH, TauIssue},
+        automated::{ALWAYS_PRINT, MAX_DEPTH, TauIssue},
         ehp_ahss::{in_metastable_range, set_metastable_range},
         generate::get_a_diff,
         issues::{
@@ -29,7 +29,6 @@ use crate::{
     types::Kind,
 };
 
-pub const MAX_DEPTH: i32 = 14;
 
 enum Commitment {
     Real(String),
@@ -178,7 +177,7 @@ fn commit_induced_name_choice(
     action.clone()
 }
 
-fn check_issue(data: &SyntheticSS, stem: i32, sphere: i32) -> Result<(), Vec<Issue>> {
+fn check_issue(data: &SyntheticSS, ahss_pages: &[SSPages; (MAX_STEM + 1) as usize], stem: i32, sphere: i32) -> Result<(), Vec<Issue>> {
     let pages = if stem + 2 == sphere {
         let pages = try_compute_pages(data, 0, sphere - 1, stem, stem, true)?;
 
@@ -200,13 +199,12 @@ fn check_issue(data: &SyntheticSS, stem: i32, sphere: i32) -> Result<(), Vec<Iss
 
     for &f_id in data.model.gens_id_in_stem(stem) {
         if let Some(t_id) = EHP_TO_AHSS[f_id]
-            && STABLE_SYNTHETIC_PAGES.get().unwrap()[(sphere - 1) as usize].element_in_pages(t_id)
+            && ahss_pages[(sphere - 1) as usize].element_in_pages(t_id)
         {
             if let Some(ps) = &pages.generators[f_id] {
                 for (f_page, (f_af, f_torsion)) in ps {
                     if f_torsion.alive() {
-                        let (t_af, t_torsion) = STABLE_SYNTHETIC_PAGES.get().unwrap()
-                            [(sphere - 1) as usize]
+                        let (t_af, t_torsion) = ahss_pages[(sphere - 1) as usize]
                             .element_at_page(*f_page, t_id);
 
                         if !t_torsion.can_map_with_coeff(&f_torsion, t_af - f_af) {
@@ -334,6 +332,7 @@ fn ehp_iterate(
     mut data: SyntheticSS,
     alg_ehp: &SyntheticSS,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
+    ahss_pages: &[SSPages; (MAX_STEM + 1) as usize],
     mut getout: GetOut,
     log: Arc<Mutex<Vec<Action>>>,
     mut stem: i32,
@@ -363,6 +362,7 @@ fn ehp_iterate(
                     &mut data,
                     alg_ehp,
                     ahss_and_alg_data,
+                    ahss_pages,
                     &getout,
                     &log,
                     stem,
@@ -383,7 +383,7 @@ fn ehp_iterate(
                 }
             }
         } else {
-            let potential_tau_thing = match is_tau_issue(&data, stem, top_trunc + 1) {
+            let potential_tau_thing = match is_tau_issue(&data, ahss_pages, stem, top_trunc + 1) {
                 Ok(tau_issue) => tau_issue,
                 Err(is) => {
                     signal_parent_getout(&mut getout, depth);
@@ -421,6 +421,7 @@ fn ehp_iterate(
                         &mut data,
                         alg_ehp,
                         ahss_and_alg_data,
+                        ahss_pages,
                         &getout,
                         &log,
                         stem,
@@ -470,6 +471,7 @@ fn ehp_iterate(
                     &mut data,
                     alg_ehp,
                     ahss_and_alg_data,
+                    ahss_pages,
                     &getout,
                     &log,
                     stem,
@@ -554,6 +556,7 @@ fn fix_names(
     data: &mut SyntheticSS,
     alg_ehp: &SyntheticSS,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
+    ahss_pages: &[SSPages; (MAX_STEM + 1) as usize],
     getout: &GetOut,
     log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
@@ -564,7 +567,7 @@ fn fix_names(
     let sphere = top_trunc + 1;
 
     let (pages, _) = compute_pages(data, 0, sphere - 1, stem, stem, true);
-    let alg_pages = &ALGEBRAIC_SPHERE_PAGES.get().unwrap()[sphere as usize];
+    let alg_pages = &ALGEBRAIC_SPHERE_PAGES[sphere as usize];
 
     let mut issues = vec![];
 
@@ -682,6 +685,7 @@ fn fix_names(
                             with_data,
                             alg_ehp,
                             ahss_and_alg_data,
+                            ahss_pages,
                             g.clone(),
                             log.clone(),
                             *stem,
@@ -698,6 +702,7 @@ fn fix_names(
                             without_data,
                             alg_ehp,
                             ahss_and_alg_data,
+                            ahss_pages,
                             g.clone(),
                             log.clone(),
                             *stem,
@@ -760,6 +765,7 @@ fn try_diff(
     data: &mut SyntheticSS,
     alg_ehp: &SyntheticSS,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
+    ahss_pages: &[SSPages; (MAX_STEM + 1) as usize],
     getout: &GetOut,
     log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
@@ -808,6 +814,7 @@ fn try_diff(
             with_data,
             alg_ehp,
             ahss_and_alg_data,
+            ahss_pages,
             g.clone(),
             log.clone(),
             stem,
@@ -824,6 +831,7 @@ fn try_diff(
             without_data,
             alg_ehp,
             ahss_and_alg_data,
+            ahss_pages,
             g.clone(),
             log.clone(),
             stem,
@@ -855,10 +863,11 @@ fn try_diff(
 
 fn is_tau_issue(
     data: &SyntheticSS,
+    ahss_pages: &[SSPages; (MAX_STEM + 1) as usize],
     real_stem: i32,
     sphere: i32,
 ) -> Result<Option<(TauIssue, Vec<Issue>)>, String> {
-    match check_issue(data, real_stem, sphere) {
+    match check_issue(data, ahss_pages, real_stem, sphere) {
         Ok(_) => Ok(None),
         Err(is) => {
             let all_synth_conv = if let Issue::SyntheticConvergence {
@@ -905,6 +914,7 @@ fn try_tau(
     data: &mut SyntheticSS,
     alg_ehp: &SyntheticSS,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
+    ahss_pages: &[SSPages; (MAX_STEM + 1) as usize],
     getout: &GetOut,
     log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
@@ -959,6 +969,7 @@ fn try_tau(
             with_data,
             alg_ehp,
             ahss_and_alg_data,
+            ahss_pages,
             g.clone(),
             log.clone(),
             stem,
@@ -974,6 +985,7 @@ fn try_tau(
             without_data,
             alg_ehp,
             ahss_and_alg_data,
+            ahss_pages,
             g.clone(),
             log.clone(),
             stem,
@@ -1220,10 +1232,13 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
     let ehp = revert_log_and_remake(0, &mut log, &partial_ehp, false);
     let log = Arc::new(Mutex::new(log));
 
+    let ahss_pages = std::array::from_fn(|x| compute_pages(&ahss, 0, x as i32, 0, 150, false).0);
+
     let res = ehp_iterate(
         ehp,
         &alg_ehp,
         &ahss_and_alg_data,
+        &ahss_pages,
         empty_getout(),
         log.clone(),
         2,

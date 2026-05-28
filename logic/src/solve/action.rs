@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     MAX_STEM,
-    data::naming::{generate_names_from_tag_special, name_to_sphere},
+    data::naming::{generate_names_from_tag, name_to_sphere},
     domain::{model::SyntheticSS, process::ehp_recursion},
     types::{Kind, Torsion},
 };
@@ -99,8 +99,8 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                 let from_start = from_start - a * (repeats as i32);
                 let to_start = to_start - a * (repeats as i32);
 
-                for (f, t) in generate_names_from_tag_special(from_tag, from_start, repeats)
-                    .zip(generate_names_from_tag_special(to_tag, to_start, repeats))
+                for (f, t) in generate_names_from_tag(from_tag, from_start, repeats)
+                    .zip(generate_names_from_tag(to_tag, to_start, repeats))
                 {
                     let p = if &f == from {
                         proof.clone()
@@ -109,6 +109,7 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                             "By James periodicity it follows from the external tau from {from} to {to}"
                         ))
                     };
+
                     if data.add_diff_name(f, t, p, *kind).is_err() {
                         break;
                     }
@@ -155,8 +156,8 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                 let from_start = from_start - a * (repeats as i32);
                 let to_start = to_start - a * (repeats as i32);
 
-                for (f, t) in generate_names_from_tag_special(from_tag, from_start, repeats)
-                    .zip(generate_names_from_tag_special(to_tag, to_start, repeats))
+                for (f, t) in generate_names_from_tag(from_tag, from_start, repeats)
+                    .zip(generate_names_from_tag(to_tag, to_start, repeats))
                 {
                     let p = if &f == from {
                         proof.clone()
@@ -215,8 +216,8 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                             repeats *= 2_usize.pow(a as u32);
                         }
 
-                        for (f, t) in generate_names_from_tag_special(from_tag, from_start, repeats)
-                            .zip(generate_names_from_tag_special(to_tag, to_start, repeats))
+                        for (f, t) in generate_names_from_tag(from_tag, from_start, repeats)
+                            .zip(generate_names_from_tag(to_tag, to_start, repeats))
                         {
                             let p = if &f == from {
                                 proof.clone()
@@ -225,7 +226,7 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                                     "By James periodicity it follows from the external tau from {from} to {to}"
                                 )
                             };
-
+                            
                             if data.add_ext_tau_name(f, t, *af, Some(p), *kind).is_err() {
                                 break;
                             }
@@ -234,7 +235,6 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                     }
                 }
             }
-
             data.add_ext_tau_name(from.clone(), to.clone(), *af, Some(proof.clone()), *kind)?;
             Ok(2)
         }
@@ -247,7 +247,7 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                 panic!("We can't Set E1 in EHP mode")
             }
             let mut to_start = 0;
-            for g in generate_names_from_tag_special(tag, 1, 1) {
+            for g in generate_names_from_tag(tag, 1, 1) {
                 if data.set_generator(&g, *torsion).is_err() {
                     break;
                 }
@@ -290,11 +290,27 @@ pub fn revert_log_and_remake(
         log.pop();
     }
 
+    let log = &*log;
+
     let mut data = original_data.clone();
+    // First do all SetE1's
     for action in log {
-        process_action(&mut data, action, ahss).expect(&format!(
-            "There was an invalid action in the log. That should not be possible :( {action:?}"
-        ));
+        if let Action::SetE1 { tag, torsion, proof } = action {
+            process_action(&mut data, action, ahss).expect(&format!(
+                "There was an invalid action in the log. That should not be possible :( {action:?}"
+            ));
+        }
+    }
+    
+    // Then do the rest
+    for action in log {
+        if let Action::SetE1 { tag, torsion, proof } = action {
+            
+        }  else {
+            process_action(&mut data, action, ahss).expect(&format!(
+                "There was an invalid action in the log. That should not be possible :( {action:?}"
+            ));
+        }
     }
 
     if !ahss {

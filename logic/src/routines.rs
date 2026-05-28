@@ -1,62 +1,15 @@
-use std::{
-    sync::OnceLock,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use crate::{
-    data::curtis::{DATA, STABLE_DATA},
-    domain::{model::SyntheticSS, process::compute_pages, ss::SSPages},
-    io::{
+    MAX_STEM, MAX_VERIFY_STEM, data::curtis::{DATA, STABLE_DATA}, domain::model::SyntheticSS, io::{
         cli::process_input,
-        export::{write_all}, import::get_log,
-    },
-    solve::{
-        action::{Action, process_action, revert_log_and_remake},
-        ahss::find_ahss_issues,
-        automated_ehp::ehp_solver,
-        ehp::{apply_ehp_recursively, find_ehp_issues, verify_geometric},
-        ehp_ahss::{ehp_to_ahss_map, set_metastable_range},
-        solve::auto_deduce,
-    },
+        export::write_all, import::get_log,
+    }, solve::{
+        action::{Action, process_action, revert_log_and_remake}, ahss::find_ahss_issues, automated::ahss_solver, automated_ehp::ehp_solver, ehp::{apply_ehp_recursively, find_ehp_issues}, ehp_ahss::{ehp_to_ahss_map, set_metastable_range}, solve::auto_deduce
+    }
 };
 
-pub mod data;
-pub mod domain;
-pub mod io;
-pub mod solve;
-pub mod types;
-
-pub const MAX_STEM: i32 = 48;
-// TODO: AHSS CURTIS DATA IS VALID UNTIL STEM 48
-// TODO: It seems EHP curtis data is also valid until +- STEM 48
-pub const MAX_VERIFY_STEM: i32 = 48;
-pub const MAX_AUTOMATED_TOP_TRUNC: i32 = 256;
-
-// const MAX_VERIFY_SPHERE: i32 = MAX_VERIFY_STEM + 2;
-// const MAX_UNEVEN_INPUT: i32 = (MAX_STEM + 1) * 2;
-
-// pub fn add_final_diagonal(data: &mut OldSyntheticSS) {
-//     // Generate the degree zero parts
-//     for n in (3..MAX_UNEVEN_INPUT).step_by(4) {
-//         let y = n / 2;
-
-//         data.generators.push(Generator::new(format!("2(∞)[{}]", y), y, y, 2, 0, None));
-//         data.generators.push(Generator::new(format!("1(∞)[{}]", y + 1), y + 1, y + 1, 1, 0, None));
-
-//         data.differentials.push(Differential {
-//             from: format!("1(∞)[{}]", y + 1),
-//             to: format!("2(∞)[{}]", y),
-//             coeff: 0,
-//             d: 1,
-//             proof: Some("Lifted AEHP differential.".to_string()),
-//             synthetic: None,
-//             kind: Kind::Real,
-//         });
-//     }
-// }
-
-
-pub fn run_manual_ahss() -> (SyntheticSS, Duration) {
+pub fn interactive_ahss() -> (SyntheticSS, Duration) {
     let original_data = STABLE_DATA.clone();
 
     let mut log = match get_log(false, true) {
@@ -80,6 +33,7 @@ pub fn run_manual_ahss() -> (SyntheticSS, Duration) {
     println!("");
     println!("----------------------------------------");
     println!("");
+
 
     'outer: while stem <= MAX_VERIFY_STEM {
         print!("{stem}-");
@@ -163,7 +117,7 @@ pub fn run_manual_ahss() -> (SyntheticSS, Duration) {
     return (data, total_input_time);
 }
 
-pub fn run_manual_ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
+pub fn interactive_ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
     let mut original_data = DATA.clone();
     set_metastable_range(&mut original_data, ahss).unwrap();
 
@@ -290,141 +244,40 @@ pub fn run_manual_ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
     (data, total_input_time)
 }
 
-// This check whether the data maps its original AF to the original AF target when both source and target between a AEHP diff exist.
-// BUT THIS IS NOT IMPORTANT SOMEHOW !
-fn temp_lol(data: &SyntheticSS) {
-    let (page, _) = compute_pages(data, 0, 256, 0, MAX_STEM, true);
-
-    for (&(from, to), proof) in &data.proven_from_to {
-        if proof.is_none() {
-            if page.element_in_pages(from) && page.element_in_pages(to) {
-                let d_y = data.model.y(from) - data.model.y(to);
-
-                let from_af = data.model.original_af(from);
-                let to_af = data.model.original_af(to);
-
-                if page.element_at_page(d_y, from).0 != from_af
-                    || page.element_at_page(d_y, to).0 != to_af
-                    || !page.element_at_page(d_y, to).1.alive()
-                // || !page.element_at_page(d_y, from).1.alive()
-                {
-                    if data.model.stem(from) <= MAX_VERIFY_STEM {
-                        println!(
-                            "STEM: {} | Issue from: {:?} \n to: {:?}\n\n",
-                            data.model.stem(to),
-                            data.model.get(from),
-                            data.model.get(to)
-                        );
-                    }
-                }
-            }
-        }
-    }
-}
-
-pub static STABLE_SYNTHETIC_PAGES: OnceLock<[SSPages; (MAX_STEM + 1) as usize]> = OnceLock::new();
-pub static ALGEBRAIC_SPHERE_PAGES: OnceLock<[SSPages; (MAX_STEM + 1) as usize]> = OnceLock::new();
-
-pub fn initialize_page_cache(ahss: &SyntheticSS) {
-    let ahss_pages = std::array::from_fn(|x| compute_pages(ahss, 0, x as i32, 0, 150, false).0);
-    let _ = STABLE_SYNTHETIC_PAGES.set(ahss_pages);
-
-    let alg_ehp_pages =
-        std::array::from_fn(|x| compute_pages(&DATA, 0, x as i32 - 1, 0, MAX_STEM + 5, false).0);
-    let _ = ALGEBRAIC_SPHERE_PAGES.set(alg_ehp_pages);
-}
-
-pub fn load_ahss_from_log() -> SyntheticSS {
-    let mut log = match get_log(false, true) {
-        Ok(log) => log,
-        Err(_) => {
-            panic!("Log importing was not succesful");
-        }
-    };
-
-    revert_log_and_remake(0, &mut log, &STABLE_DATA, true)
-}
-
-// pub fn run_automated_ahss() -> Option<SyntheticSS> {
-//     let log = match get_log(false, true) {
-//         Ok(log) => Some(log),
-//         Err(_) => None,
-//     };
-
-//     if let Ok((ahss_log, ahss)) = crate::solve::automated::ahss_solver(log) {
-//         write_all(&ahss, &ahss_log, true);
-//         Some(ahss)
-//     } else {
-//         None
-//     }
-// }
-
-pub fn run_automated_ehp(ahss: &SyntheticSS) -> SyntheticSS {
-    initialize_page_cache(ahss);
-
-    let ehp_log = match get_log(false, true) {
-        Ok(log) => log,
-        Err(_) => {
-            panic!("Log importing was not succesful");
-        }
-    };
-
-    let (ehp_log, ehp) = ehp_solver(ahss, Some(ehp_log));
-    write_all(&ehp, &ehp_log, false);
-    ehp
-}
-
-pub fn run_default_pipeline() {
+pub fn automated_ahss() {
     let start = Instant::now();
 
-    let ahss = load_ahss_from_log();
-    let ehp = run_automated_ehp(&ahss);
+    let ahss_log = match get_log(true, true) {
+        Ok(log) => Some(log),
+        Err(_) => None,
+    };
 
-    verify_geometric(&ehp);
+    let (ahss_log, ahss) = ahss_solver(ahss_log);
 
+    println!("\nProgram took: {:.2?}\n", start.elapsed());
+}
+
+pub fn automated_ehp(ahss: &SyntheticSS) -> SyntheticSS {
+    let start = Instant::now();
+
+    let ehp_log = match get_log(true, false) {
+        Ok(log) => log,
+        Err(_) => {
+            panic!("Log importing was not succesful");
+        }
+    };
+        
+    let (ehp_log, ehp) = ehp_solver(&ahss, Some(ehp_log));
+    
+    write_all(&ehp, &ehp_log, false);
+    
+    // verify_geometric(&ehp);
     // export_order_table(&ehp);
 
-    // let (ahss, input_time_ahss) = ahss();
-    // let start_ehp = Instant::now();
-    // let (ehp, input_time_ehp) = ehp(&ahss);
 
-    // verify_geometric(&ehp);
-
-    // println!(
-    //     "\nAHSS Compute took: {:.2?}",
-    //     start.elapsed() - input_time_ahss - start_ehp.elapsed()
-    // );
-    // println!(
-    //     "EHP Compute took: {:.2?}",
-    //     start_ehp.elapsed() - input_time_ehp
-    // );
-    // println!(
-    //     "Compute took: {:.2?}",
-    //     start.elapsed() - input_time_ahss - input_time_ehp
-    // );
-    // println!("\nInput took: {:.2?}", input_time_ahss + input_time_ehp);
     println!("Program took: {:.2?}", start.elapsed());
-}
 
-pub fn run_manual_pipeline() {
-    let start = Instant::now();
-    let (ahss, input_time_ahss) = run_manual_ahss();
-    let start_ehp = Instant::now();
-    let (ehp, input_time_ehp) = run_manual_ehp(&ahss);
-
-    verify_geometric(&ehp);
-
-    println!(
-        "\nAHSS Compute took: {:.2?}",
-        start.elapsed() - input_time_ahss - start_ehp.elapsed()
-    );
-    println!(
-        "EHP Compute took: {:.2?}",
-        start_ehp.elapsed() - input_time_ehp
-    );
-    println!(
-        "Compute took: {:.2?}",
-        start.elapsed() - input_time_ahss - input_time_ehp
-    );
-    println!("\nInput took: {:.2?}", input_time_ahss + input_time_ehp);
+    println!("\nProgram took: {:.2?}\n", start.elapsed());
+    
+    ehp
 }

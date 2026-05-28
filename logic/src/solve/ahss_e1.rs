@@ -98,7 +98,7 @@ fn get_all_elts_belonging_to_this_e1(data: &SyntheticSS, g: usize) -> Vec<usize>
     let tag = name_get_tag(&name);
 
     let mut idxs = vec![];
-    for n in generate_names_from_tag(tag) {
+    for n in generate_names_from_tag(tag, 1, 1) {
         if let Some(id) = data.model.try_index(&n) {
             idxs.push(id);
         } else {

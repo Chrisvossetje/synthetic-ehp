@@ -5,11 +5,8 @@ use std::{
 
 use crate::MAX_STEM;
 
-pub fn generate_names_from_tag(tag: &str) -> Map<RangeInclusive<i32>, impl FnMut(i32) -> String> {
-    (1..=MAX_STEM).map(move |x| format!("{tag}[{x}]"))
-}
 
-pub fn generate_names_from_tag_special(
+pub fn generate_names_from_tag(
     tag: &str,
     start: i32,
     step: usize,
@@ -49,6 +46,7 @@ pub fn name_to_sphere(name: &str) -> i32 {
 /// Extract the generating name from a generator
 /// Example: "5 3[6]" -> "3[5]"
 /// Takes the first number and moves it to the bracket, removes the rest
+#[allow(unused)]
 pub fn generated_by_name(name: &str) -> String {
     let initial = name.split('[').next().unwrap();
 

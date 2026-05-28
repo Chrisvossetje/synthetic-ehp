@@ -80,6 +80,7 @@ impl E1 {
         self.get(self.get_index(name))
     }
 
+    #[allow(unused)]
     pub fn get_name_mut(&mut self, name: &String) -> &mut Generator {
         self.get_mut(self.get_index(name))
     }

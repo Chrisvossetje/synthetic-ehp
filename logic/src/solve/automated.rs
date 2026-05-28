@@ -1,24 +1,23 @@
 use std::sync::{
     Arc, Mutex,
-    atomic::AtomicBool,
 };
 
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use crate::{
-    MAX_AUTOMATED_TOP_TRUNC, MAX_STEM, MAX_VERIFY_STEM,
+    MAX_STEM,
     data::{
         compare::{RADON_HURWITZ_NUMBERS, algebraic_rp, rp_truncations, synthetic_rp},
-        curtis::STABLE_DATA, naming::generate_names_from_tag_special,
+        curtis::STABLE_DATA, naming::generate_names_from_tag,
     },
     domain::{
         model::{Diff, ExtTauMult, SyntheticSS},
         process::compute_pages,
     },
     solve::{
-        action::{Action, D_R_REPEATS, revert_log_and_remake},
+        action::{Action, D_R_REPEATS, process_action, revert_log_and_remake},
         ahss::ahss_synthetic_e1_issue,
-        ahss_e1::{get_all_e1_solutions, get_e1_solutions},
+        ahss_e1::get_all_e1_solutions,
         generate::get_a_diff,
         issues::{
             Issue, algebraic_issue_is_fixable_by_tau_extensions, compare_algebraic,
@@ -35,8 +34,9 @@ use crate::{
     types::{Kind, Torsion},
 };
 
-pub const PARALLEL_DEPTH: i32 = 4;
-pub const ALWAYS_PRINT: bool = false;
+pub const PARALLEL_DEPTH: i32 = 0;
+pub const ALWAYS_PRINT: bool = true;
+pub const MAX_DEPTH: i32 = 6;
 
 enum Commitment {
     Real(String),
@@ -80,7 +80,15 @@ fn commit_diff_choice(
                     kind: Kind::Real,
                 });
             }
-            data.add_diff(d.from, d.to, Some(proof), Kind::Real);
+
+            let action = Action::AddDiff { 
+                from: data.model.name(d.from).to_string(), 
+                to: data.model.name(d.to).to_string(), 
+                kind: Kind::Real, 
+                proof: Some(proof) 
+            };
+            
+            let _ = process_action(data, &action, true);
         }
         Commitment::Unknown => {
             if ALWAYS_PRINT || depth == 0 {
@@ -122,7 +130,16 @@ fn commit_tau_choice(
                     kind: Kind::Fake,
                 });
             }
-            data.add_ext_tau(d.from, d.to, d.af, Some(proof), Kind::Fake);
+
+            let action = Action::AddExt { 
+                from: data.model.name(d.from).to_string(), 
+                to: data.model.name(d.to).to_string(), 
+                af: d.af,
+                kind: Kind::Fake, 
+                proof: proof
+            };
+
+            let _ = process_action(data, &action, true);
         }
         Commitment::Real(proof) => {
             if ALWAYS_PRINT || depth == 0 {
@@ -137,7 +154,16 @@ fn commit_tau_choice(
                     kind: Kind::Real,
                 });
             }
-            data.add_ext_tau(d.from, d.to, d.af, Some(proof), Kind::Real);
+
+            let action = Action::AddExt { 
+                from: data.model.name(d.from).to_string(), 
+                to: data.model.name(d.to).to_string(), 
+                af: d.af,
+                kind: Kind::Real, 
+                proof: proof 
+            };
+
+            let _ = process_action(data, &action, true);
         }
         Commitment::Unknown => {
             if ALWAYS_PRINT || depth == 0 {
@@ -250,71 +276,141 @@ fn iterate_e1_issues(
     data: &mut SyntheticSS,
     alg_ahss: &SyntheticSS,
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
-    e1_issues: &Vec<Vec<Vec<(usize, Torsion)>>>,
-    getout: &GetOut,
+    e1_issues: &Vec<Vec<(Vec<(usize, Torsion)>, Vec<Action>)>>,
+    getout: &mut GetOut,
     log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
     top_trunc: i32,
     bot_trunc: i32,
     depth: i32,
-) -> BranchResult {
-    BranchResult::Open
-    // if e1_issues[stem as usize].len() == 0 {
-    // } else {
-    //     let g = create_getout(&getout, e1_issues[stem as usize].len() as i32, depth);
+) -> Option<BranchResult> {
+    if e1_issues[stem as usize].len() == 0 {
+        None
+    } else {
+        if depth >= (MAX_DEPTH - 1) {
+            return Some(BranchResult::Open);
+        }
+
+        let outcomes: Vec<_> = if depth < PARALLEL_DEPTH {
+            let g = create_getout(&getout, e1_issues[stem as usize].len() as i32, depth);
+            
+            e1_issues[stem as usize].iter().enumerate().par_bridge().map(|(index, x)| {
+                if depth == 0 || ALWAYS_PRINT {
+                    println!("Trying splitting with {index} on stem {stem} | depth {depth}");
+                }
+                let mut data = data.clone();
+                
+                
+                // Apply possible solution to torsion on E_1 page
+                for j in &x.0 {
+                    data.model.get_mut(j.0).torsion = j.1;
+                }
+                
+                let res = ahss_iterate(data, alg_ahss, alg_data, e1_issues, g.clone(), log.clone(), stem, top_trunc, bot_trunc, depth + 1);
+                if depth == 0 || ALWAYS_PRINT {
+                    println!("Finish splitting with {index} on stem {stem} by {res:?}");
+                }
+                res
+            }).collect()
+        } else {
+            e1_issues[stem as usize].iter().enumerate().map(|(index, x)| {
+                if depth == 0 || ALWAYS_PRINT {
+                    println!("Trying splitting with {index} on stem {stem} | depth {depth}");
+                }
+                let mut data = data.clone();
+                
+                // Apply possible solution to torsion on E_1 page
+                for j in &x.0 {
+                    data.model.get_mut(j.0).torsion = j.1;
+                }
+                
+                let res = ahss_iterate(data, alg_ahss, alg_data, e1_issues, getout.clone(), log.clone(), stem, top_trunc, bot_trunc, depth + 1);
+                if depth == 0 || ALWAYS_PRINT {
+                    println!("Finish splitting with {index} on stem {stem} by {res:?}");
+                }
+                res
+            }).collect()
+        };
+
+        if depth == 0 || ALWAYS_PRINT {
+            println!("{outcomes:?}");
+        }
+
+        let positives = outcomes.iter().fold(0, |acc, r| {
+            if let BranchResult::Contradiction(_) = r {
+                acc
+            } else {
+                acc + 1
+            }
+        });
+        
+
+        let opens = outcomes.iter().fold(0, |acc, r| {
+            if let BranchResult::Open = r {
+                acc + 1
+            } else {
+                acc
+            }
+        });
 
 
-    //     let outcomes: Vec<_> = e1_issues[stem as usize].par_iter().map(|x| {
-    //         let mut data = data.clone();
+        if check_getout(&getout) {
+            return Some(BranchResult::Cancelled);
+        }
 
-    //         // Apply possible solution to torsion on E_1 page
-    //         for j in x {
-    //             data.model.get_mut(j.0).torsion = j.1;
-    //         }
+        if positives == 1 {
+            for (index, r) in outcomes.into_iter().enumerate() {
+                if let BranchResult::Contradiction(_) = r {
 
-    //         ahss_iterate(data, alg_ahss, alg_data, e1_issues, g.clone(), log.clone(), stem, top_trunc, bot_trunc, depth + 1)
-    //     }).collect();
+                }  else {
+                    if depth == 0 {
+                        let actions = e1_issues[stem as usize][index].1.clone();
+                        for a in actions {
+                            if depth == 0 || ALWAYS_PRINT {
+                                if let Action::SetE1 { tag, torsion, proof } = &a {
+                                    println!("Set E1 torsion: {} | {:?}", tag, torsion);
+                                }
+                            }
+                            log.lock().unwrap().push(a);
+                        }
+                    }
 
-    //     let positives = outcomes.iter().fold(0, |acc, r| {
-    //         if let BranchResult::Contradiction(_) = r {
-    //             acc
-    //         } else {
-    //             acc + 1
-    //         }
-    //     });
+                    for j in &e1_issues[stem as usize][index].0 {
+                        if (depth == 0 || ALWAYS_PRINT) && data.model.get(j.0).y == 1 {
+                            println!("Set E1 torsion: {} | {:?}", data.model.get(j.0).name, j.1);
+                        }
+                        data.model.get_mut(j.0).torsion = j.1;
+                    }
+                    return None;
+                }
+            }
+        } else if opens >= 2 {
+            if depth == 0 || ALWAYS_PRINT {
+                println!("We have {opens} opens");
 
+                for (index, j) in outcomes.iter().enumerate() {
+                    if let BranchResult::Open = j { 
+                        println!("{index} | {:?}", e1_issues[stem as usize][index].1)
+                    }
+                }
+            }
+            return Some(BranchResult::Open)
+        }
 
-
-    //     if check_getout(&getout) {
-    //         return BranchResult::Cancelled;
-    //     }
-
-    //     if positives == 1 {
-    //         for (index, r) in outcomes.into_iter().enumerate() {
-    //             if let BranchResult::Contradiction(_) = r {
-
-    //             }  else {
-    //                 for j in &e1_issues[stem as usize][index] {
-    //                     data.model.get_mut(j.0).torsion = j.1;
-    //                 }
-    //                 return BranchResult::Open
-    //             }
-    //         }
-    //     } 
-
-    //     return BranchResult::Contradiction(
-    //         format!(
-    //             "We have {positives} positives. Which means we can't decide on E1 stuff :("
-    //         )
-    //     );
-    // }
+        signal_parent_getout(getout, depth);
+        return Some(BranchResult::Contradiction(
+            format!(
+                "We have {positives} positives and {opens} opens. Which means we can't decide on E1 stuff :("
+            )
+        ));
+    }
 }
 
 fn ahss_iterate(
     mut data: SyntheticSS,
     alg_ahss: &SyntheticSS,
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
-    e1_issues: &Vec<Vec<Vec<(usize, Torsion)>>>,
+    e1_issues: &Vec<Vec<(Vec<(usize, Torsion)>, Vec<Action>)>>,
     mut getout: GetOut,
     log: Arc<Mutex<Vec<Action>>>,
     mut stem: i32,
@@ -323,29 +419,42 @@ fn ahss_iterate(
     depth: i32,
 ) -> BranchResult {
     loop {
+        if depth == 0 && stem >= 47 {
+            return BranchResult::Open;
+        }
+
+        if depth > MAX_DEPTH || stem >= 48 {
+            if ALWAYS_PRINT {
+                println!("DEPTH REACHED");
+            }
+            return BranchResult::Open;
+        }
+        
         if check_getout(&getout) {
             return BranchResult::Cancelled;
         }
 
-        let option = get_a_diff(&data, top_trunc, bot_trunc, stem);
-
-        if let Some(d) = option {
-            match try_diff(
-                &mut data,
-                alg_ahss,
-                alg_data,
-                e1_issues,
-                &getout,
-                &log,
-                stem,
-                top_trunc,
-                bot_trunc,
-                depth,
-                d,
-            ) {
-                ChoiceResult::Chosen => continue,
-                ChoiceResult::Open => return BranchResult::Open,
-                ChoiceResult::Cancelled => return BranchResult::Cancelled,
+        if bot_trunc <= D_R_REPEATS[(top_trunc - bot_trunc) as usize] as i32 {
+            let option = get_a_diff(&data, top_trunc, bot_trunc, stem);
+    
+            if let Some(d) = option {
+                match try_diff(
+                    &mut data,
+                    alg_ahss,
+                    alg_data,
+                    e1_issues,
+                    &getout,
+                    &log,
+                    stem,
+                    top_trunc,
+                    bot_trunc,
+                    depth,
+                    d,
+                ) {
+                    ChoiceResult::Chosen => continue,
+                    ChoiceResult::Open => return BranchResult::Open,
+                    ChoiceResult::Cancelled => return BranchResult::Cancelled,
+                }
             }
         }
 
@@ -422,21 +531,19 @@ fn ahss_iterate(
             top_trunc = 2;
             bot_trunc = top_trunc - 1;
 
-            match iterate_e1_issues(
+            if let Some(r) = iterate_e1_issues(
                 &mut data,
                 alg_ahss,
                 alg_data,
                 e1_issues,
-                &getout,
+                &mut getout,
                 &log,
                 stem,
                 top_trunc,
                 bot_trunc,
                 depth,
             ) {
-                BranchResult::Open => {},
-                BranchResult::Contradiction(e) => return BranchResult::Contradiction(e),
-                BranchResult::Cancelled => return BranchResult::Cancelled,
+                return r;
             }
         } else {
             top_trunc += 1;
@@ -454,7 +561,7 @@ fn try_diff(
     data: &mut SyntheticSS,
     alg_ahss: &SyntheticSS,
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
-    e1_issues: &Vec<Vec<Vec<(usize, Torsion)>>>,
+    e1_issues: &Vec<Vec<(Vec<(usize, Torsion)>, Vec<Action>)>>,
     getout: &GetOut,
     log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
@@ -494,7 +601,20 @@ fn try_diff(
 
     let with = || {
         let mut with_data = data.clone();
-        with_data.add_diff(d.from, d.to, Some("".to_string()), Kind::Real);
+
+        // This should be more complicated for AHSS
+        // with_data.add_diff(d.from, d.to, Some("".to_string()), Kind::Real);
+        
+        
+        let action = Action::AddDiff { 
+            from: data.model.name(d.from).to_string(), 
+            to: data.model.name(d.to).to_string(), 
+            kind: Kind::Real, 
+            proof: Some("".to_string()) 
+        };
+        
+        let res = process_action(&mut with_data, &action, true);
+
         ahss_iterate(
             with_data,
             alg_ahss,
@@ -606,7 +726,7 @@ fn try_tau(
     data: &mut SyntheticSS,
     alg_ahss: &SyntheticSS,
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
-    e1_issues: &Vec<Vec<Vec<(usize, Torsion)>>>,
+    e1_issues: &Vec<Vec<(Vec<(usize, Torsion)>, Vec<Action>)>>,
     getout: &GetOut,
     log: &Arc<Mutex<Vec<Action>>>,
     stem: i32,
@@ -628,7 +748,21 @@ fn try_tau(
 
     let with = || {
         let mut with_data = data.clone();
-        with_data.add_ext_tau(d.from, d.to, d.af, Some("".to_string()), Kind::Real);
+        
+        // More complicated for AHSS
+        // with_data.add_ext_tau(d.from, d.to, d.af, Some("".to_string()), Kind::Real);
+        
+        let action = Action::AddExt { 
+            from: data.model.name(d.from).to_string(), 
+            to: data.model.name(d.to).to_string(), 
+            af: d.af,
+            kind: Kind::Real, 
+            proof: "".to_string() 
+        };
+
+        let _ = process_action(&mut with_data, &action, true);
+
+
         ahss_iterate(
             with_data,
             alg_ahss,
@@ -644,7 +778,22 @@ fn try_tau(
     };
     let without = || {
         let mut without_data = data.clone();
-        without_data.add_ext_tau(d.from, d.to, d.af, Some("".to_string()), Kind::Fake);
+        
+        // without_data.add_ext_tau(d.from, d.to, d.af, Some("".to_string()), Kind::Fake);
+        
+                
+        let action = Action::AddExt { 
+            from: data.model.name(d.from).to_string(), 
+            to: data.model.name(d.to).to_string(), 
+            af: d.af,
+            kind: Kind::Fake, 
+            proof: "".to_string() 
+        };
+
+        let res = process_action(&mut without_data, &action, true);
+
+
+
         ahss_iterate(
             without_data,
             alg_ahss,
@@ -669,7 +818,9 @@ fn try_tau(
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::BothOpen => {
-            // commit_tau_choice(data, log, depth, d, Commitment::Unknown);
+            if ALWAYS_PRINT || depth == 0 {
+                println!("BothOpen: {from_name} | {to_name} tau multiple");
+            }
             ChoiceResult::Open
         }
         SpeculativeBranchOutcome::Cancelled => ChoiceResult::Cancelled,
@@ -777,7 +928,7 @@ fn try_tau(
 // }
 
 
-pub fn ahss_solve_e1_issues(ahss: &SyntheticSS, log: &mut Vec<Action>) -> Vec<Vec<Vec<(usize, Torsion)>>> {    
+pub fn ahss_solve_e1_issues(ahss: &SyntheticSS, log: &mut Vec<Action>) -> Vec<Vec<(Vec<(usize, Torsion)>, Vec<Action>)>> {    
     let mut stem_sols = vec![vec![]; (MAX_STEM + 1) as usize];
     
     for stem in 2..=MAX_STEM {
@@ -796,16 +947,20 @@ pub fn ahss_solve_e1_issues(ahss: &SyntheticSS, log: &mut Vec<Action>) -> Vec<Ve
                 }
             }
         }
-        
+
+        if proper_issues.len() == 0 {
+            continue;
+        }
+
         let proper_sols = get_all_e1_solutions(ahss, &proper_issues);
         
-        let l: Vec<_> = proper_sols.into_iter().flat_map(|x|  {
-            x.into_iter().map(|y| {
+        let l: Vec<_> = proper_sols.iter().map(|x|  {
+            let ids: Vec<_> = x.into_iter().flat_map(|y| {
                 if let Action::SetE1 { tag, torsion, proof }  = y {
                     let mut ids = vec![];
-                    for g in generate_names_from_tag_special(&tag, 1, 1){
+                    for g in generate_names_from_tag(&tag, 1, 1) {
                         if let Some(id) = ahss.model.try_index(&g) {
-                            ids.push((id, torsion));
+                            ids.push((id, *torsion));
                         } else {
                             break;
                         }
@@ -814,9 +969,11 @@ pub fn ahss_solve_e1_issues(ahss: &SyntheticSS, log: &mut Vec<Action>) -> Vec<Ve
                 } else {
                     unreachable!()
                 }
-            })
+            }).collect();
+            
+            (ids, x.clone())
         }).collect();
-
+        
         stem_sols[stem as usize] = l;
     }  
 
@@ -848,11 +1005,14 @@ pub fn ahss_solver(log: Option<Vec<Action>>) -> (Vec<Action>, SyntheticSS) {
 
     let mut log = log.unwrap_or(vec![]);
     
-    let e1_issues = ahss_solve_e1_issues(&partial_ahss, &mut log);
-
+    
+    // Set E1 actions should already have happened here
     let ahss = revert_log_and_remake(0, &mut log, &partial_ahss, true);
+    let e1_issues = ahss_solve_e1_issues(&ahss, &mut log);
+    
+    
+    let ahss = revert_log_and_remake(0, &mut log, &ahss, true);
     let log = Arc::new(Mutex::new(log));
-
 
     let res = ahss_iterate(ahss, &alg_ahss, &alg_data, &e1_issues, empty_getout(), log.clone(), 
     2, 2, 1, 0);
