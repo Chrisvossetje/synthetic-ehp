@@ -57,9 +57,7 @@ pub fn get_a_diff(data: &SyntheticSS, top_trunc: i32, bot_trunc: i32, stem: i32)
                             }
                         }
 
-                        if !data.disproven_from_to.contains_key(&(s_id, t_id))
-                            && !data.proven_from_to.contains_key(&(s_id, t_id))
-                        {
+                        if !data.from_to.contains_key(&(s_id, t_id)) {
                             if t_torsion.can_map_with_coeff(&s_torsion, coeff) {
                                 return Some(Diff {
                                     from: s_id,
@@ -95,8 +93,7 @@ pub fn get_a_tau(
                     if let Some((t_af, t_torsion)) = elements.try_element_final(t_id)
                         && t_torsion.alive()
                     {
-                        if !data.proven_from_to.contains_key(&(s_id, t_id))
-                            && !data.disproven_from_to.contains_key(&(s_id, t_id))
+                        if !data.from_to.contains_key(&(s_id, t_id))
                         {
                             let y = data.model.y(t_id);
                             if !data.out_taus[s_id].iter().any(|to| data.model.y(*to) == y) {
@@ -125,9 +122,9 @@ pub fn get_a_tau_for_t_ids(
     data: &SyntheticSS,
     elements: &SSPages,
     target_ids: &Vec<usize>,
-    stem: i32,
 ) -> Option<ExtTauMult> {
     for &t_id in target_ids {
+        let stem = data.model.stem(t_id);
         if let Some((t_af, t_torsion)) = elements.try_element_final(t_id)
             && t_torsion.alive()
         {
@@ -138,8 +135,7 @@ pub fn get_a_tau_for_t_ids(
                     if let Some(s_torsion) = s_torsion.0 {
                         let (from_name, to_name) = data.get_names(s_id, t_id);
 
-                        if !data.proven_from_to.contains_key(&(s_id, t_id))
-                            && !data.disproven_from_to.contains_key(&(s_id, t_id))
+                        if !data.from_to.contains_key(&(s_id, t_id))
                         {
                             let y = data.model.y(t_id);
                             if !data.out_taus[s_id].iter().any(|to| {
@@ -171,7 +167,6 @@ pub fn get_a_tau_for_t_ids_s_ids(
     elements: &SSPages,
     target_ids: &Vec<usize>,
     source_ids: &Vec<usize>,
-    stem: i32,
 ) -> Option<ExtTauMult> {
     for &t_id in target_ids {
         if let Some((t_af, t_torsion)) = elements.try_element_final(t_id)
@@ -182,10 +177,7 @@ pub fn get_a_tau_for_t_ids_s_ids(
                     && s_torsion.alive()
                 {
                     if let Some(s_torsion) = s_torsion.0 {
-                        let (from_name, to_name) = data.get_names(s_id, t_id);
-                        if !data.proven_from_to.contains_key(&(s_id, t_id))
-                            && !data.disproven_from_to.contains_key(&(s_id, t_id))
-                        {
+                        if !data.from_to.contains_key(&(s_id, t_id)) {
                             let y = data.model.y(t_id);
                             if !data.out_taus[s_id].iter().any(|to| data.model.y(*to) == y) {
                                 let d_y = data.model.y(s_id) - data.model.y(t_id);

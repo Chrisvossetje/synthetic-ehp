@@ -3,7 +3,7 @@ use crate::{
     data::naming::{add_sphere_to_tag, generating_tag},
     domain::{model::SyntheticSS, ss::SSPages},
     solve::issues::Issue,
-    types::Torsion,
+    types::{Kind, Torsion},
 };
 
 fn instantiate_pages(
@@ -48,14 +48,11 @@ fn apply_diff(
     let from_g = pages.element_final(from);
     let to_g = pages.element_final(to);
 
-    #[allow(unused)]
-    let (from_name, to_name) = data.get_names(from, to);
-
     let stem = data.model.stem(from);
 
     let (new_from_g, new_to_g) = if from_g.1.alive() {
         if !to_g.1.alive() {
-            if data.proven_from_to[&(from, to)].is_some() {
+            if data.from_to[&(from, to)].0 != Kind::Algebraic {
                 let (from_name, to_name) = data.get_names(from, to);
                 return Err(Issue::UselessDifferential {
                     from,
@@ -119,7 +116,7 @@ fn apply_diff(
                         }
                     }
                 } else {
-                    if data.proven_from_to[&(from, to)].is_some() {
+                    if data.from_to[&(from, to)].0 != Kind::Algebraic {
                         // Useless
                         let (from_name, to_name) = data.get_names(from, to);
                         return Err(Issue::UselessDifferential {
@@ -156,7 +153,7 @@ fn apply_diff(
             },
         }
     } else {
-        if to_g.1.alive() && data.proven_from_to[&(from, to)].is_some() {
+        if to_g.1.alive() && data.from_to[&(from, to)].0 != Kind::Algebraic {
             let (from_name, to_name) = data.get_names(from, to);
             return Err(Issue::UselessDifferential {
                 from,
@@ -209,7 +206,7 @@ fn apply_tau(
                 None => (Torsion::default(), Torsion::new(from_torsion - af_diff)),
             };
 
-            if from_g.0 - from_torsion <= to_g.0 && af_diff >= 0 {
+            if from_g.0 - from_torsion <= to_g.0 && af_diff > 0 {
                 pages.push(from, page, (from_g.0, new_from_torsion));
                 pages.push(to, page, (to_g.0, new_to_torsion));
             } else if from_g.0 - from_torsion > to_g.0 {

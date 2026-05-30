@@ -1,4 +1,4 @@
-import { Differential, ExternalTauMult, Generators, InternalTauMult, SyntheticEHP } from "./types";
+import { Differential, ExternalTauMult, Generators, InternalTauMult, Kind, SyntheticEHP } from "./types";
 import { MAX_STEM } from "./data";
 
 // Track which data is active
@@ -206,8 +206,8 @@ function buildYByName(data: SyntheticEHP): Record<string, number> {
     return yByName;
 }
 
-function shouldIncludeKind(kind: "Real" | "Fake" | "Unknown", data: SyntheticEHP): boolean {
-    return viewSettings.showFakeData || kind !== "Fake";
+function shouldIncludeKind(kind: Kind, data: SyntheticEHP): boolean {
+    return (viewSettings.showFakeData && kind === "Fake") || (kind === "Real" || kind === "Unknown" || kind === "Algebraic");
 }
 
 function getDiffPage(diff: Differential, yByName: Record<string, number>): number | undefined {
@@ -319,7 +319,7 @@ function buildSyntheticCache(
                 continue;
             }
 
-            if (diff.kind == "Real") {
+            if (diff.kind == "Real" || diff.kind == "Algebraic") {
                 currentState[diff.from] = mapped.from;
                 currentState[diff.to] = mapped.to;
                 pagesByGenerator[diff.from]?.push({ page: p + 1, state: mapped.from });
@@ -571,7 +571,7 @@ export function get_filtered_data(
 
     // Find all generators killed by differentials before this page
     for (const diff of data.differentials) {
-        if (diff.kind !== "Real") {
+        if (diff.kind !== "Real" && diff.kind !== "Algebraic") {
             continue;
         }
         const diffPage = getDiffPage(diff, yByName);
@@ -587,7 +587,7 @@ export function get_filtered_data(
             if (diffPage < page) {
                 // Algebraic
                 if (category == Category.Algebraic) { 
-                    if (coeff == 0 && diff.proof === undefined) {
+                    if (diff.kind === "Algebraic") {
                         torsion[diff.from][0] = 0;
                         torsion[diff.to][0] = 0;
                         diffs.push({ ...diff, d: diffPage, coeff });              
@@ -595,20 +595,16 @@ export function get_filtered_data(
                     
                     
                     
-                    // Geometric
+                // Geometric
                 } else { 
-                    if (diff.kind == "Real") {
-                        if (torsion[diff.to][0] || torsion[diff.to][0] != 0) {
-                            torsion[diff.from][0] = 0;
-                            torsion[diff.to][0] = 0;  
-                            diffs.push({ ...diff, d: diffPage, coeff });                  
-                        } else {
-                            // Element had already been killed 
-                            // This can occur in geometric !
-                        }               
-                    } else {
+                    if (torsion[diff.to][0] || torsion[diff.to][0] != 0) {
+                        torsion[diff.from][0] = 0;
+                        torsion[diff.to][0] = 0;  
                         diffs.push({ ...diff, d: diffPage, coeff });                  
-                    }
+                    } else {
+                        // Element had already been killed 
+                        // This can occur in geometric !
+                    }               
                 }
             }
         }

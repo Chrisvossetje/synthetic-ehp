@@ -143,7 +143,7 @@ pub fn suggest_tau_solution_algebraic(
                 .map(|x| *x)
                 .collect();
 
-            let d = get_a_tau_for_t_ids(data, &elements, &t_ids, *stem);
+            let d = get_a_tau_for_t_ids(data, &elements, &t_ids);
             if d.is_some() {
                 return d;
             }
@@ -208,7 +208,7 @@ pub fn suggest_tau_solution_generator_synthetic(
         }
     }
 
-    get_a_tau_for_t_ids_s_ids(data, &elements, &t_ids, &t_ids, stem)
+    get_a_tau_for_t_ids_s_ids(data, &elements, &t_ids, &t_ids)
 }
 
 pub fn suggest_tau_solution_module_synthetic(

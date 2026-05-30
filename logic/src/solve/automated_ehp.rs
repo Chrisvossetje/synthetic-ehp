@@ -231,46 +231,30 @@ fn filter_diff(
     bot_trunc: i32,
     top_trunc: i32,
     d: Diff,
-) -> Option<(Kind, String)> {
+) -> Option<Kind> {
     let stem = data.model.stem(d.to);
     let y = data.model.y(d.from);
 
     if y - data.model.y(d.to) < RADON_HURWITZ_NUMBERS[y as usize] {
-        Some((
-            Kind::MinimalLength,
-            format!(
-                "The differential of the fundamental class is longer than this differential or zero."
-            )
-        ))
+        Some(Kind::MinimalLength)
     } else if data.in_diffs[d.to]
         .iter()
         .any(|from| data.model.y(*from) == top_trunc && data.model.original_torsion(*from).alive())
     {
-        Some((
-            Kind::AdditiveStructure,
-            format!(
-                "As we are only interested in the module structure, we won't consider the case where two differentials target the same generator."
-            ),
-        ))
+        Some(Kind::AdditiveStructure)
     } else if bot_trunc & 1 == 0
         && let Some(alg_to) = alg_ehp.out_diffs[d.from].first()
         && data.model.original_torsion(*alg_to).alive()
         && data.model.y(*alg_to) + 1 == bot_trunc
     {
-        Some((
-            Kind::Invisible,
-            format!("Invisible differential."),
-        ))
+        Some(Kind::Invisible)
     } else if top_trunc & 1 == 1
         && let Some(dies) = data.model.get(d.to).dies
         && let Some(source) = alg_ehp.in_diffs[d.to].first()
         && data.model.original_torsion(*source).free()
         && top_trunc + 2 == dies
     {
-        Some((
-            Kind::Unneccessary,
-            format!("Unneccessary differrential."),
-        ))
+        Some(Kind::Unnecessary)
         // TODO: Is this necc. ?
     // } else if data.out_diffs[d.from]
     //     .last()
@@ -778,12 +762,12 @@ fn try_diff(
 
     let filter = filter_diff(&data, alg_ehp, bot_trunc, top_trunc, d);
 
-    if let Some((kind, reason)) = filter {
+    if let Some(kind) = filter {
         if depth == 0 {
             log.lock().unwrap().push(Action::AddDiff {
                 from: from_name,
                 to: to_name,
-                proof: Some(reason.clone()),
+                proof: None,
                 kind,
             });
         }
@@ -792,11 +776,11 @@ fn try_diff(
 
         if ALWAYS_PRINT || depth == 0 {
             println!(
-                "Finished diff by: {} | {} -> {kind:?} + {reason}",
+                "Finished diff by: {} | {} -> {kind:?}",
                 from_name, to_name
             );
         }
-        data.add_diff(d.from, d.to, Some(reason), kind);
+        data.add_diff(d.from, d.to, None, kind);
         return ChoiceResult::Chosen;
     }
 
@@ -1090,7 +1074,7 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
     let mut log = log.unwrap_or(vec![]);
 
     // Add EHP Algebraic Diffs
-    for (&(from, to), _) in &alg_ehp.proven_from_to {
+    for (&(from, to), _) in &alg_ehp.from_to {
         let d_y = alg_ehp.model.y(from) - alg_ehp.model.y(to);
         // Exclude metastable ones, as they have already been added
         if !in_metastable_range(alg_ehp.model.y(to), alg_ehp.model.stem(to)) {
@@ -1109,118 +1093,118 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
         }
     }
 
-    // Add compatible AHSS diffs
-    for (&(from, to), proof) in &ahss.proven_from_to {
-        let d_y = ahss.model.y(from) - ahss.model.y(to);
-        if let Some(from_id) = alg_ehp.model.try_index(ahss.model.name(from)) {
-            if let Some(to_id) = alg_ehp.model.try_index(ahss.model.name(to)) {
-                // Differentials
-                if ahss.model.stem(from) != ahss.model.stem(to) {
-                    // Exclude metastable ones, as they have already been added
-                    if !in_metastable_range(ahss.model.y(to), ahss.model.stem(to)) {
-                        // if in_metastable_range(ahss.model.y(to) + 1, ahss.model.stem(to)) {
-                        //     if let Some(p) = proof {
-                        //         partial_ehp.add_diff(
-                        //             from_id,
-                        //             to_id,
-                        //             Some(format!("Lifted from Stable EHP")),
-                        //             Kind::Real,
-                        //         );
-                        //     }
-                        // } else {
-                        // Don't include the Algebraic diffs of AHSS
-                        if let Some(p) = proof
-                            && ahss.model.name(from) != "5 6 5 2 3 5 7 7[4]"
-                        {
-                            if d_y == 1 {
-                                let (from_name, to_name) = alg_ehp.get_names(from_id, to_id);
-                                log.push(Action::AddDiff {
-                                    from: from_name,
-                                    to: to_name,
-                                    kind: Kind::Real,
-                                    proof: Some(format!("(Lifted from AHSS) - {:?}", p)),
-                                });
-                            } else {
-                                let stem = alg_ehp.model.stem(to_id);
-                                let top_trunc = alg_ehp.model.y(from_id);
-                                ahss_and_alg_data[stem as usize][d_y as usize][top_trunc as usize]
-                                    .push((
-                                        from_id,
-                                        to_id,
-                                        Kind::Real,
-                                        Some(format!("(Lifted from AHSS) - {:?}", p)),
-                                    ));
-                            }
-                        }
-                        // }
-                    }
-                }
-            }
-        }
-    }
+    // // Add compatible AHSS diffs
+    // for (&(from, to), proof) in &ahss.proven_from_to {
+    //     let d_y = ahss.model.y(from) - ahss.model.y(to);
+    //     if let Some(from_id) = alg_ehp.model.try_index(ahss.model.name(from)) {
+    //         if let Some(to_id) = alg_ehp.model.try_index(ahss.model.name(to)) {
+    //             // Differentials
+    //             if ahss.model.stem(from) != ahss.model.stem(to) {
+    //                 // Exclude metastable ones, as they have already been added
+    //                 if !in_metastable_range(ahss.model.y(to), ahss.model.stem(to)) {
+    //                     // if in_metastable_range(ahss.model.y(to) + 1, ahss.model.stem(to)) {
+    //                     //     if let Some(p) = proof {
+    //                     //         partial_ehp.add_diff(
+    //                     //             from_id,
+    //                     //             to_id,
+    //                     //             Some(format!("Lifted from Stable EHP")),
+    //                     //             Kind::Real,
+    //                     //         );
+    //                     //     }
+    //                     // } else {
+    //                     // Don't include the Algebraic diffs of AHSS
+    //                     if let Some(p) = proof
+    //                         && ahss.model.name(from) != "5 6 5 2 3 5 7 7[4]"
+    //                     {
+    //                         if d_y == 1 {
+    //                             let (from_name, to_name) = alg_ehp.get_names(from_id, to_id);
+    //                             log.push(Action::AddDiff {
+    //                                 from: from_name,
+    //                                 to: to_name,
+    //                                 kind: Kind::Real,
+    //                                 proof: Some(format!("(Lifted from AHSS) - {:?}", p)),
+    //                             });
+    //                         } else {
+    //                             let stem = alg_ehp.model.stem(to_id);
+    //                             let top_trunc = alg_ehp.model.y(from_id);
+    //                             ahss_and_alg_data[stem as usize][d_y as usize][top_trunc as usize]
+    //                                 .push((
+    //                                     from_id,
+    //                                     to_id,
+    //                                     Kind::Real,
+    //                                     Some(format!("(Lifted from AHSS) - {:?}", p)),
+    //                                 ));
+    //                         }
+    //                     }
+    //                     // }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    // Add disproven compatible AHSS diffs
-    for (&(from, to), proof) in &ahss.disproven_from_to {
-        let d_y = ahss.model.y(from) - ahss.model.y(to);
+    // // Add disproven compatible AHSS diffs
+    // for (&(from, to), proof) in &ahss.disproven_from_to {
+    //     let d_y = ahss.model.y(from) - ahss.model.y(to);
 
-        // Only add differentials here
-        if ahss.model.stem(from) != ahss.model.stem(to) {
-            if let Some(from_id) = alg_ehp.model.try_index(ahss.model.name(from)) {
-                if let Some(to_id) = alg_ehp.model.try_index(ahss.model.name(to)) {
-                    // Don't include the Unknown differentials
-                    if let Some(p) = proof {
-                        let (from_name, to_name) = alg_ehp.get_names(from_id, to_id);
-                        log.push(Action::AddDiff {
-                            from: from_name,
-                            to: to_name,
-                            kind: Kind::Fake,
-                            proof: Some(format!("(Lifted from AHSS) - {:?}", p)),
-                        });
-                        // partial_ehp.add_diff(
-                        //     from_id,
-                        //     to_id,
-                        //     Some(format!("Lifted from Stable EHP")),
-                        //     Kind::Fake,
-                        // );
-                    }
-                }
-            }
-        }
-    }
+    //     // Only add differentials here
+    //     if ahss.model.stem(from) != ahss.model.stem(to) {
+    //         if let Some(from_id) = alg_ehp.model.try_index(ahss.model.name(from)) {
+    //             if let Some(to_id) = alg_ehp.model.try_index(ahss.model.name(to)) {
+    //                 // Don't include the Unknown differentials
+    //                 if let Some(p) = proof {
+    //                     let (from_name, to_name) = alg_ehp.get_names(from_id, to_id);
+    //                     log.push(Action::AddDiff {
+    //                         from: from_name,
+    //                         to: to_name,
+    //                         kind: Kind::Fake,
+    //                         proof: Some(format!("(Lifted from AHSS) - {:?}", p)),
+    //                     });
+    //                     // partial_ehp.add_diff(
+    //                     //     from_id,
+    //                     //     to_id,
+    //                     //     Some(format!("Lifted from Stable EHP")),
+    //                     //     Kind::Fake,
+    //                     // );
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    // let mut fakes = vec![];
+    // // let mut fakes = vec![];
 
-    // Add all external tau's
-    // We won't worry about the fake ones
-    for esss in &ahss.external_tau_page {
-        for ess in esss {
-            for es in ess {
-                for e in es {
-                    if let Some(from_id) = alg_ehp.model.try_index(ahss.model.name(e.from)) {
-                        if let Some(to_id) = alg_ehp.model.try_index(ahss.model.name(e.to)) {
-                            let p = ahss
-                                .proven_from_to
-                                .get(&(e.from, e.to))
-                                .unwrap()
-                                .as_ref()
-                                .unwrap();
-                            log.push(Action::AddExt {
-                                from: ahss.model.name(e.from).to_string(),
-                                to: ahss.model.name(e.to).to_string(),
-                                af: e.af,
-                                kind: Kind::Real,
-                                proof: format!("(Lifted from AHSS) - {:?}", p),
-                            });
-                            // } else {
-                            //     if ahss.out_diffs[e.to].len() > 0 {
-                            //         fakes.push((ahss.model.stem(e.from), ahss.model.name(e.from), ahss.model.name(e.to)));
-                            //     }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // // Add all external tau's
+    // // We won't worry about the fake ones
+    // for esss in &ahss.external_tau_page {
+    //     for ess in esss {
+    //         for es in ess {
+    //             for e in es {
+    //                 if let Some(from_id) = alg_ehp.model.try_index(ahss.model.name(e.from)) {
+    //                     if let Some(to_id) = alg_ehp.model.try_index(ahss.model.name(e.to)) {
+    //                         let (kind, p) = ahss
+    //                             .from_to
+    //                             .get(&(e.from, e.to))
+    //                             .unwrap()
+    //                             .as_ref()
+    //                             .unwrap();
+    //                         log.push(Action::AddExt {
+    //                             from: ahss.model.name(e.from).to_string(),
+    //                             to: ahss.model.name(e.to).to_string(),
+    //                             af: e.af,
+    //                             kind: Kind::Real,
+    //                             proof: format!("(Lifted from AHSS) - {:?}", p),
+    //                         });
+    //                         // } else {
+    //                         //     if ahss.out_diffs[e.to].len() > 0 {
+    //                         //         fakes.push((ahss.model.stem(e.from), ahss.model.name(e.from), ahss.model.name(e.to)));
+    //                         //     }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     // fakes.sort();
     // for f in fakes {
@@ -1248,7 +1232,7 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
     );
 
     // Add EHP Algebraic Diffs
-    for (&(from, to), _) in &alg_ehp.proven_from_to {
+    for (&(from, to), _) in &alg_ehp.from_to {
         partial_ehp.add_diff(from, to, None, Kind::Real);
     }
 

@@ -236,7 +236,7 @@ pub fn interactive_ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
     // THIS CAN BE VERIFIED BY JUST NOT ALLOWING DIFF / THINGS FROM y = 3 / 7
 
     for i in 2..=MAX_STEM {
-        apply_ehp_recursively(&mut data, i, false);
+        let _ = apply_ehp_recursively(&mut data, i, false);
     }
 
     // add_final_diagonal(&mut data);
@@ -253,12 +253,20 @@ pub fn automated_ahss() {
     };
 
     let (ahss_log, ahss) = ahss_solver(ahss_log);
+    write_all(&ahss, &ahss_log, true);
 
     println!("\nProgram took: {:.2?}\n", start.elapsed());
 }
 
-pub fn automated_ehp(ahss: &SyntheticSS) -> SyntheticSS {
+pub fn automated_ehp() -> SyntheticSS {
     let start = Instant::now();
+
+    let mut ahss_log = match get_log(false, true) {
+        Ok(log) => log,
+        Err(_) => vec![],
+    };
+
+    let ahss = revert_log_and_remake(0, &mut ahss_log, &STABLE_DATA, true);
 
     let ehp_log = match get_log(true, false) {
         Ok(log) => log,
@@ -273,9 +281,6 @@ pub fn automated_ehp(ahss: &SyntheticSS) -> SyntheticSS {
     
     // verify_geometric(&ehp);
     // export_order_table(&ehp);
-
-
-    println!("Program took: {:.2?}", start.elapsed());
 
     println!("\nProgram took: {:.2?}\n", start.elapsed());
     

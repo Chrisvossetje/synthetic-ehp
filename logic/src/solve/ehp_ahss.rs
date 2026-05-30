@@ -22,34 +22,12 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
             let g_from = ahss.model.get(d.from);
             let g_to = ahss.model.get(d.to);
             if in_metastable_range(g_to.y, g_to.stem) {
-                let proof = ahss.proven_from_to.get(&(d.from, d.to)).expect("If there is no reference to a proof here (note that the string can still be empty), then inserting differentials not done carefully enough.");
+                let (kind, proof) = ahss.from_to.get(&(d.from, d.to)).expect("If there is no reference to a proof here (note that the string can still be empty), then inserting differentials not done carefully enough.");
                 ehp.add_diff_name(
                     g_from.name.clone(),
                     g_to.name.clone(),
                     proof.clone().map(|x| format!("(Metastable) - {x} ")),
-                    Kind::Real,
-                )?;
-            }
-        }
-    }
-
-    for (&(from, to), proof) in &ahss.disproven_from_to {
-        let g_from = ahss.model.get(from);
-        let g_to = ahss.model.get(to);
-        if in_metastable_range(g_to.y, g_to.stem) {
-            let (from_name, to_name) = ahss.get_names(from, to);
-
-            if ahss.model.stem(from) - ahss.model.stem(to) == 1 {
-                let kind = if proof.is_some() {
-                    Kind::Fake
-                } else {
-                    Kind::Unknown
-                };
-                ehp.add_diff_name(
-                    g_from.name.clone(),
-                    g_to.name.clone(),
-                    proof.clone().map(|x| format!("(Metastable) - {x}")),
-                    kind,
+                    *kind,
                 )?;
             }
         }
@@ -60,13 +38,13 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
             let g_from = ahss.model.get(t.from);
             let g_to = ahss.model.get(t.to);
             if in_metastable_range(g_to.y, g_to.stem) {
-                let proof = ahss.proven_from_to.get(&(t.from, t.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting internal tau's not done carefully enough.");
+                let (kind, proof) = ahss.from_to.get(&(t.from, t.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting internal tau's not done carefully enough.");
                 ehp.add_int_tau_name(
                     g_from.name.clone(),
                     g_to.name.clone(),
                     page as i32,
                     proof.clone().map(|x| format!("(Metastable) - {x}")),
-                    Kind::Real, // TODO! <<
+                    *kind, // TODO! <<
                 )?;
             }
         }
@@ -79,13 +57,13 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
                     let g_from = ahss.model.get(e.from);
                     let g_to = ahss.model.get(e.to);
                     if in_metastable_range(g_to.y, g_to.stem) {
-                        let proof = ahss.proven_from_to.get(&(e.from, e.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting external tau's not done carefully enough.");
+                        let (kind, proof) = ahss.from_to.get(&(e.from, e.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting external tau's not done carefully enough.");
                         ehp.add_ext_tau_name(
                             g_from.name.clone(),
                             g_to.name.clone(),
                             e.af,
-                            proof.clone().map(|x| format!("{x} (Metastable)")),
-                            Kind::Real, // TODO! <<
+                            proof.clone().map(|x| format!("(Metastable) - {x}")),
+                            *kind, // TODO! <<
                         )?;
                     }
                 }
@@ -125,11 +103,11 @@ fn check(
     let mut issues = vec![];
 
     // We check if every AHSS diff between known generators also exists on EHP
-    for (&(from, to), p) in &a.proven_from_to {
+    for (&(from, to), (kind, p)) in &a.from_to {
         // Skip Algebraic things
         // This must already have been commutative
         // Else the algebraic data was wrong, which i don't assume
-        if p.is_none() {
+        if *kind != Kind::Real  {
             continue;
         }
 
@@ -166,7 +144,7 @@ fn check(
                         let to_g_b = b_p.element_at_page(d_y + 1, b_to);
 
                         if from_g_b.1.alive() && to_g_b.1.alive() {
-                            if !b.proven_from_to.contains_key(&(b_from, b_to)) {
+                            if let Some((kind, _)) = b.from_to.get(&(b_from, b_to)) && (*kind == Kind::Algebraic || *kind == Kind::Real) {
                                 issues.push(Issue::InvalidEHPAHSSMap {
                                     name: from_name,
                                     from_torsion: from_g_b.1,

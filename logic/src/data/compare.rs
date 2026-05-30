@@ -245,7 +245,7 @@ fn read_csv(
 
             // TODO: This is not fully correct for diffs in Lin's program hitting multiple basis elements.
             // In stem < 50 it goes well, but it might still be correct for higher, i need to investigate the datastructure better
-            if stem <= MAX_VERIFY_STEM {
+            if stem <= MAX_STEM {
                 if dr == 9000 || s.contains("NULL") {
                     m.entry((stem, af))
                         .or_insert(vec![])

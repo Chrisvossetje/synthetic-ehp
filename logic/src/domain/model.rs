@@ -6,7 +6,7 @@ use crate::{
     MAX_STEM,
     data::naming::name_get_tag,
     domain::e1::E1,
-    types::{Kind, Torsion},
+    types::{Generator, Kind, Torsion},
 };
 
 pub type FromTo = (usize, usize);
@@ -51,9 +51,7 @@ pub struct SyntheticSS {
     // Third is by the AF thing (Meaning, the "better" the element fits onto the other the earlier it should be applied)
     pub external_tau_page: Vec<Vec<Vec<Vec<ExtTauMult>>>>,
 
-    // Index on the two generors, then a potential proof / disproof ?
-    pub proven_from_to: HashMap<FromTo, Option<String>>,
-    pub disproven_from_to: HashMap<FromTo, Option<String>>,
+    pub from_to: HashMap<FromTo, (Kind, Option<String>)>,
 
     // Remember incoming/outgoing stuff
     pub in_diffs: Vec<Vec<usize>>,
@@ -76,8 +74,7 @@ impl SyntheticSS {
                 ];
                 (MAX_STEM + 1) as usize
             ],
-            proven_from_to: HashMap::default(),
-            disproven_from_to: HashMap::default(),
+            from_to: HashMap::default(),
             in_diffs: vec![vec![]; len],
             out_diffs: vec![vec![]; len],
             out_taus: vec![vec![]; len],
@@ -87,19 +84,15 @@ impl SyntheticSS {
     pub fn add_diff(&mut self, from: usize, to: usize, proof: Option<String>, kind: Kind) {
         let d_y = self.model.y(from) - self.model.y(to);
 
-        if !self.proven_from_to.contains_key(&(from, to))
-            && !self.disproven_from_to.contains_key(&(from, to))
-        {
+        if !self.from_to.contains_key(&(from, to)) {
+            self.from_to.insert((from, to), (kind, proof));
             match kind {
-                Kind::Real => {
+                Kind::Real | Kind::Algebraic => {
                     self.diffs_page[d_y as usize].push(Diff { from, to });
                     self.in_diffs[to].push(from);
                     self.out_diffs[from].push(to);
-                    self.proven_from_to.insert((from, to), proof);
-                }
-                _ => {
-                    self.disproven_from_to.insert((from, to), proof);
-                }
+                },
+                _ => {}
             }
         }
     }
@@ -112,17 +105,13 @@ impl SyntheticSS {
         proof: Option<String>,
         kind: Kind,
     ) {
-        if !self.proven_from_to.contains_key(&(from, to))
-            && !self.disproven_from_to.contains_key(&(from, to))
-        {
+        if !self.from_to.contains_key(&(from, to)) {
+            self.from_to.insert((from, to), (kind, proof));
             match kind {
                 Kind::Real => {
                     self.internal_tau_page[page as usize].push(IntTauMult { from, to });
-                    self.proven_from_to.insert((from, to), proof);
                 }
-                _ => {
-                    self.disproven_from_to.insert((from, to), proof);
-                }
+                _ => {}
             }
         }
     }
@@ -135,9 +124,8 @@ impl SyntheticSS {
         proof: Option<String>,
         kind: Kind,
     ) {
-        if !self.proven_from_to.contains_key(&(from, to))
-            && !self.disproven_from_to.contains_key(&(from, to))
-        {
+        if !self.from_to.contains_key(&(from, to)) {
+            self.from_to.insert((from, to), (kind, proof));
             match kind {
                 Kind::Real => {
                     let y_from = self.model.y(from);
@@ -145,11 +133,8 @@ impl SyntheticSS {
                     self.external_tau_page[y_from as usize][(y_from - y_to) as usize][af as usize]
                         .push(ExtTauMult { from, to, af });
                     self.out_taus[from].push(to);
-                    self.proven_from_to.insert((from, to), proof);
                 }
-                _ => {
-                    self.disproven_from_to.insert((from, to), proof);
-                }
+                _ => {}
             }
         }
     }

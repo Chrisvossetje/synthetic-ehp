@@ -1,14 +1,12 @@
 use std::{
-    fs::File,
-    io::{self, Write},
-    path::{Path, PathBuf},
+    fs::File, io::{self, Write}, os::unix::raw::mode_t, path::{Path, PathBuf}
 };
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    MAX_STEM, domain::model::SyntheticSS, solve::action::Action, types::Kind
+    MAX_STEM, domain::model::SyntheticSS, solve::action::Action, types::{Generator, Kind}
 };
 
 pub fn write_vec_to_file<T: std::fmt::Debug>(vec: &[T], path: &str) -> io::Result<()> {
@@ -106,6 +104,9 @@ pub fn write_typescript_file(
 ) -> Result<(), std::io::Error> {
     let mut file = File::create(output_path)?;
 
+    let mut data = data.clone();
+    add_final_diagonal(&mut data);
+
     // Serialize generators to JSON strings
     let gens: Vec<String> = data
         .model
@@ -115,96 +116,91 @@ pub fn write_typescript_file(
         .collect();
 
     let mut differentials = vec![];
-    for ds in &data.diffs_page {
-        for d in ds {
-            let from_name = data.model.name(d.from).to_string();
-            let to_name = data.model.name(d.to).to_string();
+    // for ds in &data.diffs_page {
+    //     for d in ds {
+    //         let from_name = data.model.name(d.from).to_string();
+    //         let to_name = data.model.name(d.to).to_string();
 
-            let proof = data.proven_from_to.get(&(d.from, d.to)).unwrap().clone();
+    //         let (kind, proof)= data.from_to.get(&(d.from, d.to)).unwrap().clone();
 
-            let diff = Differential {
-                from: from_name,
-                to: to_name,
-                proof,
-                kind: Kind::Real,
-            };
-            differentials.push(diff);
-        }
-    }
+    //         let diff = Differential {
+    //             from: from_name,
+    //             to: to_name,
+    //             proof,
+    //             kind,
+    //         };
+    //         differentials.push(diff);
+    //     }
+    // }
 
     let mut int_tau_mults = vec![];
-    for (page, its) in data.internal_tau_page.iter().enumerate() {
-        for i_t in its {
-            let from = data.model.name(i_t.from);
-            let to = data.model.name(i_t.to);
-            let proof = data
-                .proven_from_to
-                .get(&(i_t.from, i_t.to))
-                .unwrap_or(&None)
-                .clone();
-            int_tau_mults.push(InternalTauMult {
-                from: from.to_string(),
-                to: to.to_string(),
-                page: page as i32,
-                proof,
-                kind: Kind::Real,
-            });
-        }
-    }
+    // for (page, its) in data.internal_tau_page.iter().enumerate() {
+    //     for i_t in its {
+    //         let from = data.model.name(i_t.from);
+    //         let to = data.model.name(i_t.to);
+    //         let (kind, proof) = data
+    //             .from_to
+    //             .get(&(i_t.from, i_t.to))
+    //             .unwrap_or(&(Kind::Real, None))
+    //             .clone();
+    //         int_tau_mults.push(InternalTauMult {
+    //             from: from.to_string(),
+    //             to: to.to_string(),
+    //             page: page as i32,
+    //             proof,
+    //             kind,
+    //         });
+    //     }
+    // }
 
     let mut ext_tau_mults = vec![];
-    for e_tsss in &data.external_tau_page {
-        for e_tss in e_tsss {
-            for e_ts in e_tss {
-                for e_t in e_ts {
-                    let from = data.model.name(e_t.from);
-                    let to = data.model.name(e_t.to);
-                    let proof = data
-                        .proven_from_to
-                        .get(&(e_t.from, e_t.to))
-                        .unwrap_or(&None)
-                        .clone();
-                    ext_tau_mults.push(ExternalTauMult {
-                        from: from.to_string(),
-                        to: to.to_string(),
-                        af: e_t.af,
-                        proof,
-                        kind: Kind::Real,
-                    });
-                }
-            }
-        }
-    }
+    // for e_tsss in &data.external_tau_page {
+    //     for e_tss in e_tsss {
+    //         for e_ts in e_tss {
+    //             for e_t in e_ts {
+    //                 let from = data.model.name(e_t.from);
+    //                 let to = data.model.name(e_t.to);
+    //                 let proof = data
+    //                     .from_to
+    //                     .get(&(e_t.from, e_t.to))
+    //                     .unwrap_or(&None)
+    //                     .clone();
+    //                 ext_tau_mults.push(ExternalTauMult {
+    //                     from: from.to_string(),
+    //                     to: to.to_string(),
+    //                     af: e_t.af,
+    //                     proof,
+    //                     kind: Kind::Real,
+    //                 });
+    //             }
+    //         }
+    //     }
+    // }
 
-    for ((from, to), p) in &data.disproven_from_to {
+    for ((from, to), (kind, p)) in &data.from_to {
         let d_y = data.model.y(*from) - data.model.y(*to);
         let d_stem = data.model.stem(*from) - data.model.stem(*to);
-        let kind = if p.is_some() {
-            Kind::Fake
-        } else {
-            Kind::Unknown
-        };
         if d_y == 0 {
             int_tau_mults.push(InternalTauMult {
                 from: data.model.name(*from).to_string(),
                 to: data.model.name(*to).to_string(),
-                kind,
+                kind: *kind,
                 proof: p.clone(),
-                page: 500,
+                page: 2, // TODO : This is not generic enough but good enough for our range
             });
         } else if d_stem == 0 {
             ext_tau_mults.push(ExternalTauMult {
                 from: data.model.name(*from).to_string(),
                 to: data.model.name(*to).to_string(),
                 af: 0,
-                kind,
+                kind: *kind,
                 proof: p.clone(),
             });
         } else {
             differentials.push(Differential {
                 from: data.model.name(*from).to_string(),
                 to: data.model.name(*to).to_string(),
-                kind,
+                kind: *kind,
                 proof: p.clone(),
             });
         }
@@ -325,4 +321,30 @@ fn export_table() {
     // for l in joined {
     //     println!("{l}");
     // }
+}
+
+
+fn add_final_diagonal(data: &mut SyntheticSS) {
+    // Generate the degree zero parts 
+    for n in (1..=MAX_STEM).step_by(2) {
+        let to_name = format!("2(∞)[{}]", n);
+        let from_name = format!("1(∞)[{}]", n + 1);
+        
+        let size = data.model.gens().len();
+        
+        data.model.push(Generator::new(from_name.clone(), n + 1, n + 1, 1, 0, None));
+        
+        data.model.push(Generator::new(to_name.clone(), n, n, 2, 0, None));
+        
+        data.in_diffs.push(vec![]);
+        data.in_diffs.push(vec![]);
+        
+        data.out_diffs.push(vec![]);
+        data.out_diffs.push(vec![]);
+        
+        data.out_taus.push(vec![]);
+        data.out_taus.push(vec![]);
+        
+        data.add_diff(size, size+1, None, Kind::Algebraic);
+    }
 }

@@ -2,19 +2,16 @@ use std::sync::{
     Arc, Mutex,
 };
 
-use rayon::iter::{ParallelBridge, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 
 use crate::{
-    MAX_STEM,
-    data::{
+    MAX_STEM, MAX_VERIFY_STEM, data::{
         compare::{RADON_HURWITZ_NUMBERS, algebraic_rp, rp_truncations, synthetic_rp},
         curtis::STABLE_DATA, naming::generate_names_from_tag,
-    },
-    domain::{
+    }, domain::{
         model::{Diff, ExtTauMult, SyntheticSS},
         process::compute_pages,
-    },
-    solve::{
+    }, solve::{
         action::{Action, D_R_REPEATS, process_action, revert_log_and_remake},
         ahss::ahss_synthetic_e1_issue,
         ahss_e1::get_all_e1_solutions,
@@ -30,13 +27,12 @@ use crate::{
         solve::{
             auto_deduce, suggest_tau_solution_algebraic, suggest_tau_solution_generator_synthetic,
         },
-    },
-    types::{Kind, Torsion},
+    }, types::{Kind, Torsion}
 };
 
-pub const PARALLEL_DEPTH: i32 = 0;
-pub const ALWAYS_PRINT: bool = true;
-pub const MAX_DEPTH: i32 = 6;
+pub const PARALLEL_DEPTH: i32 = 5;
+pub const ALWAYS_PRINT: bool = false;
+pub const MAX_DEPTH: i32 = 14;
 
 enum Commitment {
     Real(String),
@@ -226,36 +222,23 @@ fn filter_diff(
     bot_trunc: i32,
     top_trunc: i32,
     d: Diff,
-) -> Option<(Kind, String)> {
+) -> Option<Kind> {
     let stem = data.model.stem(d.to);
     let y = data.model.y(d.from);
 
     if y - data.model.y(d.to) < RADON_HURWITZ_NUMBERS[y as usize] {
-        Some((
-            Kind::MinimalLength,
-            format!(
-                "The differential of the fundamental class is longer than this differential or zero."
-            )
-        ))
+        Some(Kind::MinimalLength)
     } else if data.in_diffs[d.to]
         .iter()
         .any(|from| data.model.y(*from) == top_trunc && data.model.original_torsion(*from).alive())
     {
-        Some((
-            Kind::AdditiveStructure,
-            format!(
-                "As we are only interested in the module structure, we won't consider the case where two differentials target the same generator."
-            ),
-        ))
+        Some(Kind::AdditiveStructure)
     } else if bot_trunc & 1 == 0
         && let Some(alg_to) = alg_ahss.out_diffs[d.from].first()
         && data.model.original_torsion(*alg_to).alive()
         && data.model.y(*alg_to) + 1 == bot_trunc
     {
-        Some((
-            Kind::Invisible,
-            format!("Invisible differential."),
-        ))
+        Some(Kind::Invisible)
     } else if top_trunc & 1 == 1
         && !(top_trunc == 5 && bot_trunc == 3)
         && let Some(dies) = data.model.get(d.to).dies
@@ -263,10 +246,7 @@ fn filter_diff(
         && data.model.original_torsion(*source).free()
         && top_trunc + 2 == dies
     {
-        Some((
-            Kind::Unneccessary,
-            format!("Unneccessary differrential."),
-        ))
+        Some(Kind::Unnecessary)
     } else {
         None
     }
@@ -287,14 +267,14 @@ fn iterate_e1_issues(
     if e1_issues[stem as usize].len() == 0 {
         None
     } else {
-        if depth >= (MAX_DEPTH - 1) {
+        if depth >= MAX_DEPTH {
             return Some(BranchResult::Open);
         }
 
         let outcomes: Vec<_> = if depth < PARALLEL_DEPTH {
             let g = create_getout(&getout, e1_issues[stem as usize].len() as i32, depth);
             
-            e1_issues[stem as usize].iter().enumerate().par_bridge().map(|(index, x)| {
+            e1_issues[stem as usize].par_iter().enumerate().map(|(index, x)| {
                 if depth == 0 || ALWAYS_PRINT {
                     println!("Trying splitting with {index} on stem {stem} | depth {depth}");
                 }
@@ -368,7 +348,7 @@ fn iterate_e1_issues(
                         for a in actions {
                             if depth == 0 || ALWAYS_PRINT {
                                 if let Action::SetE1 { tag, torsion, proof } = &a {
-                                    println!("Set E1 torsion: {} | {:?}", tag, torsion);
+                                    println!("Set E1 torsion {index}: {} | {:?}", tag, torsion);
                                 }
                             }
                             log.lock().unwrap().push(a);
@@ -377,7 +357,7 @@ fn iterate_e1_issues(
 
                     for j in &e1_issues[stem as usize][index].0 {
                         if (depth == 0 || ALWAYS_PRINT) && data.model.get(j.0).y == 1 {
-                            println!("Set E1 torsion: {} | {:?}", data.model.get(j.0).name, j.1);
+                            println!("Set E1 torsion {index}: {} | {:?}", data.model.get(j.0).name, j.1);
                         }
                         data.model.get_mut(j.0).torsion = j.1;
                     }
@@ -397,7 +377,7 @@ fn iterate_e1_issues(
             return Some(BranchResult::Open)
         }
 
-        signal_parent_getout(getout, depth);
+        // signal_parent_getout(getout, depth);
         return Some(BranchResult::Contradiction(
             format!(
                 "We have {positives} positives and {opens} opens. Which means we can't decide on E1 stuff :("
@@ -419,11 +399,11 @@ fn ahss_iterate(
     depth: i32,
 ) -> BranchResult {
     loop {
-        if depth == 0 && stem >= 47 {
+        if depth == 0 && stem >= MAX_VERIFY_STEM {
             return BranchResult::Open;
         }
 
-        if depth > MAX_DEPTH || stem >= 48 {
+        if depth > MAX_DEPTH || stem >= MAX_STEM {
             if ALWAYS_PRINT {
                 println!("DEPTH REACHED");
             }
@@ -438,6 +418,9 @@ fn ahss_iterate(
             let option = get_a_diff(&data, top_trunc, bot_trunc, stem);
     
             if let Some(d) = option {
+                if depth >= MAX_DEPTH {
+                    return BranchResult::Open;
+                }
                 match try_diff(
                     &mut data,
                     alg_ahss,
@@ -488,6 +471,9 @@ fn ahss_iterate(
             };
 
             if let Some(d) = option {
+                if depth >= MAX_DEPTH {
+                    return BranchResult::Open;
+                }
                 match try_tau(
                     &mut data,
                     alg_ahss,
@@ -520,7 +506,7 @@ fn ahss_iterate(
                     let (from_name, to_name) = data.get_names(from, to);
                     println!("Applying Algebraic diff {from_name} -> {to_name}");
                 }
-                data.add_diff(from, to, None, Kind::Real);
+                data.add_diff(from, to, None, Kind::Algebraic);
             }
             bot_trunc -= 1;
             continue;
@@ -574,10 +560,10 @@ fn try_diff(
 
     let filter = filter_diff(data, alg_ahss, bot_trunc, top_trunc, d);
 
-    if let Some((kind, reason)) = filter {
+    if let Some(kind) = filter {
         if ALWAYS_PRINT || depth == 0 {
             println!(
-                "Finished diff by: {} | {} -> {kind:?} + {reason}",
+                "Finished diff by: {} | {} -> {kind:?}",
                 from_name, to_name
             );
         }
@@ -585,11 +571,11 @@ fn try_diff(
             log.lock().unwrap().push(Action::AddDiff {
                 from: from_name,
                 to: to_name,
-                proof: Some(reason.clone()),
+                proof: None,
                 kind,
             });
         }
-        data.add_diff(d.from, d.to, Some(reason), kind);
+        data.add_diff(d.from, d.to, None, kind);
         return ChoiceResult::Chosen;
     }
 
@@ -818,6 +804,7 @@ fn try_tau(
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::BothOpen => {
+            commit_tau_choice(data, log, depth, d, Commitment::Unknown);
             if ALWAYS_PRINT || depth == 0 {
                 println!("BothOpen: {from_name} | {to_name} tau multiple");
             }
@@ -990,11 +977,11 @@ pub fn ahss_solver(log: Option<Vec<Action>>) -> (Vec<Action>, SyntheticSS) {
         (MAX_STEM + 1) as usize
     ];
 
-    for (&(from, to), _) in &alg_ahss.proven_from_to {
+    for (&(from, to), (kind, _)) in &alg_ahss.from_to {
         let d_y = alg_ahss.model.y(from) - alg_ahss.model.y(to);
         let repeats = D_R_REPEATS[d_y as usize];
         if d_y == 1 || alg_ahss.model.y(to) - (repeats as i32) >= 1 {
-            partial_ahss.add_diff(from, to, None, Kind::Real);
+            partial_ahss.add_diff(from, to, None, *kind);
         } else {
             let stem = alg_ahss.model.stem(to);
             let top_trunc = alg_ahss.model.y(from);
@@ -1017,9 +1004,9 @@ pub fn ahss_solver(log: Option<Vec<Action>>) -> (Vec<Action>, SyntheticSS) {
     let res = ahss_iterate(ahss, &alg_ahss, &alg_data, &e1_issues, empty_getout(), log.clone(), 
     2, 2, 1, 0);
 
-    // Add EHP Algebraic Diffs
-    for (&(from, to), _) in &alg_ahss.proven_from_to {
-        partial_ahss.add_diff(from, to, None, Kind::Real);
+    // Add AHSS Algebraic Diffs
+    for (&(from, to), (kind, _)) in &alg_ahss.from_to {
+        partial_ahss.add_diff(from, to, None, *kind);
     }
 
     println!("{res:?}");

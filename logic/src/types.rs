@@ -64,15 +64,16 @@ impl PartialOrd for Torsion {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Kind {
+    Algebraic,
     Real,
     Fake,
     Unknown,
     Lifted,
-    Uninteresting,
     Invisible,
-    Unneccessary,
+    Unnecessary,
     MinimalLength,
     AdditiveStructure,
+    Periodicity, // ??
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -115,13 +116,11 @@ impl Generator {
         }
     }
 
-    pub fn push_induced_name(&mut self, sphere: i32, name: String) -> Result<(), ()> {
+    pub fn push_induced_name(&mut self, sphere: i32, _name: String) -> Result<(), ()> {
         if let Some(_) = self.induced_name.iter().find(|x| x.0 == sphere) {
             return Err(());
         }
 
-        todo!();
-
-        Ok(())
+        todo!()
     }
 }

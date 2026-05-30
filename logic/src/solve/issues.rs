@@ -9,7 +9,7 @@ use crate::{
         curtis::{DATA_PAGES, STABLE_DATA_PAGES},
     },
     domain::{model::SyntheticSS, ss::SSPages},
-    types::Torsion,
+    types::{Kind, Torsion},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -229,7 +229,7 @@ pub fn compare_algebraic_spectral_sequence(
                 && data.model.y(from) <= top_trunc
             {
                 let (from_name, to_name) = data.get_names(from, to);
-                let alg = data.proven_from_to.get(&(from, to)).unwrap().is_none();
+                let alg = data.from_to.get(&(from, to)).unwrap().0 == Kind::Algebraic;
                 if alg {
                     if !data.model.original_torsion(to).alive()
                     && data.model.original_torsion(from).alive()

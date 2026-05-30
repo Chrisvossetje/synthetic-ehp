@@ -104,4 +104,8 @@ impl E1 {
     pub fn gens_id_in_stem_y(&self, stem: i32, y: i32) -> &Vec<usize> {
         &self.stem_y.get(&(stem, y)).unwrap_or(&EMPTY_LIST_USIZE)
     }
+
+    pub fn push(&mut self, g: Generator) {
+        self.generators.push(g);
+    }
 }

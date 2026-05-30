@@ -11,10 +11,12 @@ export type Generators = {
     "hom_name"?: string;
 }
 
+export type Kind = "Algebraic" | "Real" | "Fake" | "Unknown" | "Lifted" | "Invisible" | "Unneccessary" | "MinimalLength" | "AdditiveStructure" | "Periodicity";
+
 export type Differential = {
     "from": string,
     "to": string,
-    "kind": "Real" | "Fake" | "Unknown";
+    "kind": Kind;
     "d"?: number,
     "coeff"?: number,
     "proof"?: string,
