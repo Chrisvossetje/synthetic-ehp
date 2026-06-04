@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     MAX_STEM,
     data::naming::{generate_names_from_tag, name_to_sphere},
-    domain::{model::SyntheticSS, process::ehp_recursion},
+    domain::{e1::E1, model::SyntheticSS, process::ehp_recursion},
     types::{Kind, Torsion},
 };
 
@@ -45,7 +45,7 @@ pub enum Action {
         to: String,
         af: i32,
         kind: Kind,
-        proof: String,
+        proof: Option<String>,
     },
     SetE1 {
         tag: String,
@@ -63,7 +63,7 @@ pub enum Action {
     },
 }
 
-pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Result<i32, ()> {
+pub fn process_action(data: &mut SyntheticSS, model: &E1, action: &Action, ahss: bool) -> Result<i32, ()> {
     match action {
         Action::AddDiff {
             from,
@@ -71,18 +71,18 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
             proof,
             kind,
         } => {
-            let from_tag = data.try_name_tag(&from)?;
-            let to_tag = data.try_name_tag(&to)?;
+            let from_tag = model.try_name_tag(&from)?;
+            let to_tag = model.try_name_tag(&to)?;
 
-            let x_from = data.model.get_name(from).stem;
-            let x_to = data.model.get_name(to).stem;
+            let x_from = model.get_name(from).stem;
+            let x_to = model.get_name(to).stem;
 
             if x_from - x_to != 1 {
                 println!("Tried to add differential between two stems not 1 apart.");
                 return Err(());
             }
 
-            let d_y = data.model.get_name(&from).y - data.model.get_name(&to).y;
+            let d_y = model.get_name(&from).y - model.get_name(&to).y;
 
             if d_y <= 0 {
                 println!("Tried to add a diff on a non positive page");
@@ -110,13 +110,13 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                         ))
                     };
 
-                    if data.add_diff_name(f, t, p, *kind).is_err() {
+                    if data.add_diff_name(model, f, t, p, *kind).is_err() {
                         break;
                     }
                 }
                 Ok(to_start)
             } else {
-                data.add_diff_name(from.clone(), to.clone(), proof.clone(), *kind)?;
+                data.add_diff_name(model, from.clone(), to.clone(), proof.clone(), *kind)?;
                 Ok(2)
             }
         }
@@ -127,18 +127,18 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
             proof,
             kind,
         } => {
-            let from_tag = data.try_name_tag(&from)?;
-            let to_tag = data.try_name_tag(&to)?;
+            let from_tag = model.try_name_tag(&from)?;
+            let to_tag = model.try_name_tag(&to)?;
 
-            let x_from = data.model.get_name(from).stem;
-            let x_to = data.model.get_name(to).stem;
+            let x_from = model.get_name(from).stem;
+            let x_to = model.get_name(to).stem;
 
             if x_from != x_to {
                 println!("Tried to add an internal tau between different stems");
                 return Err(());
             }
 
-            let d_y = data.model.get_name(&from).y - data.model.get_name(&to).y;
+            let d_y = model.get_name(&from).y - model.get_name(&to).y;
 
             if d_y != 0 {
                 println!("Tried to add an internal tau between different filtrations");
@@ -166,13 +166,13 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                             "By James periodicity it follows from the internal tau from {from} to {to}"
                         )
                     };
-                    if data.add_int_tau_name(f, t, *page, Some(p), *kind).is_err() {
+                    if data.add_int_tau_name(model, f, t, *page, Some(p), *kind).is_err() {
                         break;
                     }
                 }
                 Ok(to_start)
             } else {
-                data.add_int_tau_name(from.clone(), to.clone(), *page, Some(proof.clone()), *kind)?;
+                data.add_int_tau_name(model, from.clone(), to.clone(), *page, Some(proof.clone()), *kind)?;
                 Ok(2)
             }
         }
@@ -183,18 +183,18 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
             proof,
             kind,
         } => {
-            let from_tag = data.try_name_tag(&from)?;
-            let to_tag = data.try_name_tag(&to)?;
+            let from_tag = model.try_name_tag(&from)?;
+            let to_tag = model.try_name_tag(&to)?;
 
-            let x_from = data.model.get_name(from).stem;
-            let x_to = data.model.get_name(to).stem;
+            let x_from = model.get_name(from).stem;
+            let x_to = model.get_name(to).stem;
 
             if x_from != x_to {
                 println!("Tried to add an external tau between different stems");
                 return Err(());
             }
 
-            let d_y = data.model.get_name(&from).y - data.model.get_name(&to).y;
+            let d_y = model.get_name(&from).y - model.get_name(&to).y;
 
             if d_y <= 0 {
                 println!("Tried to add an external tau between wrong filtrations");
@@ -204,30 +204,32 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
             // If on E1 these already have valid source and target torsion / af.
             // Then we apply James periodicity
             if ahss {
-                if let Some(source_torsion) = data.model.get_name(from).torsion.0 {
-                    if data.model.get_name(from).af - source_torsion == data.model.get_name(to).af {
+                let from_id = model.get_index(from);
+                if let Some(source_torsion) = data.generators[from_id].0 {
+                    if model.get_name(from).af - source_torsion == model.get_name(to).af {
                         let from_start = name_to_sphere(&from);
                         let to_start = name_to_sphere(&to);
-
+                        
                         let mut repeats = D_R_REPEATS[d_y as usize];
-
+                        
                         let a = (to_start - 1) / (repeats as i32);
                         if a > 0 {
                             repeats *= 2_usize.pow(a as u32);
                         }
-
+                        
                         for (f, t) in generate_names_from_tag(from_tag, from_start, repeats)
-                            .zip(generate_names_from_tag(to_tag, to_start, repeats))
+                        .zip(generate_names_from_tag(to_tag, to_start, repeats))
                         {
                             let p = if &f == from {
                                 proof.clone()
                             } else {
-                                format!(
+                                // TODO : Better words here + Change kind to Periodicity !
+                                Some(format!(
                                     "By James periodicity it follows from the external tau from {from} to {to}"
-                                )
+                                ))
                             };
-                            
-                            if data.add_ext_tau_name(f, t, *af, Some(p), *kind).is_err() {
+
+                            if data.add_ext_tau_name(model, f, t, *af, p, *kind).is_err() {
                                 break;
                             }
                         }
@@ -235,7 +237,7 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
                     }
                 }
             }
-            data.add_ext_tau_name(from.clone(), to.clone(), *af, Some(proof.clone()), *kind)?;
+            data.add_ext_tau_name(model, from.clone(), to.clone(), *af, proof.clone(), *kind)?;
             Ok(2)
         }
         Action::SetE1 {
@@ -248,10 +250,10 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
             }
             let mut to_start = 0;
             for g in generate_names_from_tag(tag, 1, 1) {
-                if data.set_generator(&g, *torsion).is_err() {
+                if data.set_generator(model, &g, *torsion).is_err() {
                     break;
                 }
-                to_start = to_start.min(data.model.get_name(&g).stem);
+                to_start = to_start.min(model.get_name(&g).stem);
             }
 
             Ok(to_start)
@@ -265,15 +267,12 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
             if ahss {
                 panic!("We have no induced names in AHSS mode")
             }
-            let original_id = data.model.try_index(name).ok_or(())?;
+            let original_id = model.try_index(name).ok_or(())?;
 
             // This is not completely necessary but we do want the induced thing to be valid
-            let _ = data.model.try_index(new_name).ok_or(())?;
+            let _ = model.try_index(new_name).ok_or(())?;
 
-            data.model
-                .get_mut(original_id)
-                .induced_name
-                .push((*sphere, new_name.clone()));
+            data.push_induced_name(model, original_id, *sphere, new_name.clone());
             Ok(2)
         }
         Action::Revert { times: _ } => Err(()),
@@ -283,6 +282,7 @@ pub fn process_action(data: &mut SyntheticSS, action: &Action, ahss: bool) -> Re
 pub fn revert_log_and_remake(
     times: i32,
     log: &mut Vec<Action>,
+    model: &E1,
     original_data: &SyntheticSS,
     ahss: bool,
 ) -> SyntheticSS {
@@ -295,19 +295,19 @@ pub fn revert_log_and_remake(
     let mut data = original_data.clone();
     // First do all SetE1's
     for action in log {
-        if let Action::SetE1 { tag, torsion, proof } = action {
-            process_action(&mut data, action, ahss).expect(&format!(
+        if let Action::SetE1 { tag: _, torsion: _, proof: _ } = action {
+            process_action(&mut data, model, action, ahss).expect(&format!(
                 "There was an invalid action in the log. That should not be possible :( {action:?}"
             ));
         }
     }
-    
+
     // Then do the rest
     for action in log {
-        if let Action::SetE1 { tag, torsion, proof } = action {
-            
+        if let Action::SetE1 { tag: _, torsion: _, proof: _ } = action {
+
         }  else {
-            process_action(&mut data, action, ahss).expect(&format!(
+            process_action(&mut data, model, action, ahss).expect(&format!(
                 "There was an invalid action in the log. That should not be possible :( {action:?}"
             ));
         }
@@ -319,7 +319,8 @@ pub fn revert_log_and_remake(
                 if uneven_sphere > stem + 1 {
                     break;
                 }
-                let _ = ehp_recursion(&mut data, uneven_sphere, stem);
+                let _ = ehp_recursion(&mut data, model, uneven_sphere, stem);
+
             }
         }
     }

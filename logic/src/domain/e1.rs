@@ -3,7 +3,7 @@ use std::{collections::HashMap, iter::Enumerate, slice::Iter};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    data::compare::EMPTY_LIST_USIZE,
+    data::{compare::EMPTY_LIST_USIZE, naming::name_get_tag},
     types::{Generator, Torsion},
 };
 
@@ -52,11 +52,11 @@ impl E1 {
         self.generators[elt].stem
     }
 
-    pub fn original_af(&self, elt: usize) -> i32 {
+    pub fn af(&self, elt: usize) -> i32 {
         self.generators[elt].af
     }
 
-    pub fn original_torsion(&self, elt: usize) -> Torsion {
+    pub fn torsion(&self, elt: usize) -> Torsion {
         self.generators[elt].torsion
     }
 
@@ -107,5 +107,17 @@ impl E1 {
 
     pub fn push(&mut self, g: Generator) {
         self.generators.push(g);
+    }
+
+    pub fn try_name_tag<'a>(&self, name: &'a str) -> Result<&'a str, ()> {
+        self.try_index(name).ok_or(())?;
+        Ok(name_get_tag(name))
+    }
+
+    pub fn get_names(&self, from: usize, to: usize) -> (String, String) {
+        (
+            self.name(from).to_string(),
+            self.name(to).to_string(),
+        )
     }
 }

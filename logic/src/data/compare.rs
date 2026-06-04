@@ -10,7 +10,7 @@ use itertools::{Itertools, chain};
 
 use crate::{
     MAX_STEM, MAX_VERIFY_STEM,
-    data::curtis::{DATA, STABLE_DATA},
+    data::curtis::{DATA, MODEL, STABLE_DATA, STABLE_MODEL},
     domain::{process::compute_pages, ss::SSPages},
     solve::action::D_R_REPEATS,
     types::Torsion,
@@ -83,20 +83,19 @@ pub static TRUNCS: LazyLock<Vec<(bool, i32, i32)>> = LazyLock::new(|| {
 });
 
 pub static EHP_TO_AHSS: LazyLock<Vec<Option<usize>>> = LazyLock::new(|| {
-    DATA.model
+    MODEL
         .gens()
         .iter()
-        .map(|g| STABLE_DATA.model.try_index(&g.name))
+        .map(|g| STABLE_MODEL.try_index(&g.name))
         .collect()
 });
 
 #[allow(unused)]
 pub static AHSS_TO_EHP: LazyLock<Vec<Option<usize>>> = LazyLock::new(|| {
-    STABLE_DATA
-        .model
+    STABLE_MODEL
         .gens()
         .iter()
-        .map(|g| DATA.model.try_index(&g.name))
+        .map(|g| MODEL.try_index(&g.name))
         .collect()
 });
 
@@ -139,9 +138,9 @@ pub static ALG_RP: LazyLock<HashMap<(i32, i32), ALGEBRAIC_COMPARE_DATA>> = LazyL
     let mut m = HashMap::new();
     for &(b, t) in algebraic_rp_truncations() {
         // Top truncated
-        let (pages, _) = compute_pages(&STABLE_DATA, b, t, 0, MAX_STEM, true);
+        let (pages, _) = compute_pages(&STABLE_DATA, &STABLE_MODEL, b, t, 0, MAX_STEM, true);
         let mut n = HashMap::new();
-        for (elt, g) in STABLE_DATA.model.enumerate() {
+        for (elt, g) in STABLE_MODEL.enumerate() {
             if let Some((af, torsion)) = pages.try_element_final(elt) {
                 if torsion.alive() {
                     *n.entry((g.stem, af)).or_insert(0) += 1;
@@ -157,9 +156,9 @@ pub static ALG_SPHERES: LazyLock<HashMap<i32, ALGEBRAIC_COMPARE_DATA>> = LazyLoc
     let mut m = HashMap::new();
     for sphere in 1..=MAX_STEM {
         // Top truncated
-        let (pages, _) = compute_pages(&DATA, 0, sphere - 1, 0, MAX_STEM, true);
+        let (pages, _) = compute_pages(&DATA, &MODEL, 0, sphere - 1, 0, MAX_STEM, true);
         let mut n = HashMap::new();
-        for (elt, g) in DATA.model.enumerate() {
+        for (elt, g) in MODEL.enumerate() {
             if let Some((af, torsion)) = pages.try_element_final(elt) {
                 if torsion.alive() {
                     *n.entry((g.stem, af)).or_insert(0) += 1;
@@ -192,7 +191,7 @@ pub fn algebraic_spheres(sphere: i32) -> &'static HashMap<(i32, i32), usize> {
 
 // TODO : Move this ?
 pub static ALGEBRAIC_SPHERE_PAGES: LazyLock<[SSPages; (MAX_STEM + 1) as usize]> = LazyLock::new(|| {
-    std::array::from_fn(|x| compute_pages(&DATA, 0, x as i32 - 1, 0, MAX_STEM + 5, false).0)
+    std::array::from_fn(|x| compute_pages(&DATA, &MODEL, 0, x as i32 - 1, 0, MAX_STEM + 5, false).0)
 });
 
 

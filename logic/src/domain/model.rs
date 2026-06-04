@@ -4,9 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     MAX_STEM,
-    data::naming::name_get_tag,
     domain::e1::E1,
-    types::{Generator, Kind, Torsion},
+    types::{Kind, Torsion},
 };
 
 pub type FromTo = (usize, usize);
@@ -37,7 +36,8 @@ pub struct ExtTauMult {
 // This should always implicitly reference some Model
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SyntheticSS {
-    pub model: E1,
+    pub generators: Vec<Torsion>,
+    pub induced_name: Option<Vec<Vec<(i32, String)>>>,
 
     // This should be indexed by page ??
     // Or should it be indexed by Gens
@@ -64,7 +64,8 @@ impl SyntheticSS {
     pub fn empty(e1: E1) -> Self {
         let len = e1.gens().len();
         Self {
-            model: e1,
+            generators: vec![ Torsion::default(); len],
+            induced_name: None,
             diffs_page: vec![vec![]; (MAX_STEM + 1) as usize],
             internal_tau_page: vec![vec![]; (MAX_STEM + 1) as usize],
             external_tau_page: vec![
@@ -81,8 +82,8 @@ impl SyntheticSS {
         }
     }
 
-    pub fn add_diff(&mut self, from: usize, to: usize, proof: Option<String>, kind: Kind) {
-        let d_y = self.model.y(from) - self.model.y(to);
+    pub fn add_diff(&mut self, model: &E1, from: usize, to: usize, proof: Option<String>, kind: Kind) {
+        let d_y = model.y(from) - model.y(to);
 
         if !self.from_to.contains_key(&(from, to)) {
             self.from_to.insert((from, to), (kind, proof));
@@ -118,6 +119,7 @@ impl SyntheticSS {
 
     pub fn add_ext_tau(
         &mut self,
+        model: &E1,
         from: usize,
         to: usize,
         af: i32,
@@ -128,9 +130,9 @@ impl SyntheticSS {
             self.from_to.insert((from, to), (kind, proof));
             match kind {
                 Kind::Real => {
-                    let y_from = self.model.y(from);
-                    let y_to = self.model.y(to);
-                    self.external_tau_page[y_from as usize][(y_from - y_to) as usize][af as usize]
+                    let y_from = model.y(from);
+                    let y_to = model.y(to);
+                    self.external_tau_page[y_from as usize][af as usize][(y_from - y_to) as usize]
                         .push(ExtTauMult { from, to, af });
                     self.out_taus[from].push(to);
                 }
@@ -141,58 +143,64 @@ impl SyntheticSS {
 
     pub fn add_diff_name(
         &mut self,
+        model: &E1,
         from: String,
         to: String,
         proof: Option<String>,
         kind: Kind,
     ) -> Result<(), ()> {
-        let from = self.model.try_index(&from).ok_or(())?;
-        let to = self.model.try_index(&to).ok_or(())?;
-        self.add_diff(from, to, proof, kind);
+        let from = model.try_index(&from).ok_or(())?;
+        let to = model.try_index(&to).ok_or(())?;
+        self.add_diff(model, from, to, proof, kind);
         Ok(())
     }
 
     pub fn add_int_tau_name(
         &mut self,
+        model: &E1,
         from: String,
         to: String,
         page: i32,
         proof: Option<String>,
         kind: Kind,
     ) -> Result<(), ()> {
-        let from = self.model.try_index(&from).ok_or(())?;
-        let to = self.model.try_index(&to).ok_or(())?;
+        let from = model.try_index(&from).ok_or(())?;
+        let to = model.try_index(&to).ok_or(())?;
         self.add_int_tau(from, to, page, proof, kind);
         Ok(())
     }
 
     pub fn add_ext_tau_name(
         &mut self,
+        model: &E1,
         from: String,
         to: String,
         af: i32,
         proof: Option<String>,
         kind: Kind,
     ) -> Result<(), ()> {
-        let from = self.model.try_index(&from).ok_or(())?;
-        let to = self.model.try_index(&to).ok_or(())?;
-        self.add_ext_tau(from, to, af, proof, kind);
+        let from = model.try_index(&from).ok_or(())?;
+        let to = model.try_index(&to).ok_or(())?;
+        self.add_ext_tau(model, from, to, af, proof, kind);
         Ok(())
     }
 
-    pub fn set_generator(&mut self, name: &String, torsion: Torsion) -> Result<(), ()> {
-        let id = self.model.try_index(name).ok_or(())?;
-        self.model.get_mut(id).torsion = torsion;
+    pub fn set_generator(&mut self, model: &E1, name: &String, torsion: Torsion) -> Result<(), ()> {
+        let id = model.try_index(name).ok_or(())?;
+        self.generators[id] = torsion;
         Ok(())
     }
 
-    pub fn try_name_tag<'a>(&self, name: &'a str) -> Result<&'a str, ()> {
-        self.model.try_index(name).ok_or(())?;
-        Ok(name_get_tag(name))
-    }
 
-    pub fn get_name_at_sphere(&self, elt: usize, sphere: i32) -> &str {
-        let l = &self.model.get(elt).induced_name;
+    pub fn get_name_at_sphere<'a>(&'a self, model: &'a E1, elt: usize, sphere: i32) -> &'a str {
+        let l: &Vec<(i32, String)> = if let Some(v) = &self.induced_name
+            && !v[elt].is_empty()
+        {
+            &v[elt]
+        } else {
+            &model.get(elt).induced_name
+        };
+
         let mut id = 0;
 
         loop {
@@ -206,10 +214,15 @@ impl SyntheticSS {
         }
     }
 
-    pub fn get_names(&self, from: usize, to: usize) -> (String, String) {
-        (
-            self.model.name(from).to_string(),
-            self.model.name(to).to_string(),
-        )
+    pub fn push_induced_name(&mut self, model: &E1, elt: usize, sphere: i32, new_name: String) {
+        let len = model.gens().len();
+        if self.induced_name.is_none() {
+            self.induced_name = Some(vec![vec![]; len]);
+        }
+        let map = self.induced_name.as_mut().unwrap();
+        if map[elt].is_empty() {
+            map[elt] = model.get(elt).induced_name.clone();
+        }
+        map[elt].push((sphere, new_name));
     }
 }

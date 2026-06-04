@@ -122,7 +122,7 @@ pub fn process_input(ahss: bool) -> Result<Action, ()> {
                     from,
                     to,
                     af,
-                    proof,
+                    proof: Some(proof),
                     kind: Kind::Real,
                 });
             }

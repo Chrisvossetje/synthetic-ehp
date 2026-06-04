@@ -1,12 +1,12 @@
 use std::{
-    fs::File, io::{self, Write}, os::unix::raw::mode_t, path::{Path, PathBuf}
+    fs::File, io::{self, Write}, path::{Path, PathBuf}
 };
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    MAX_STEM, domain::model::SyntheticSS, solve::action::Action, types::{Generator, Kind}
+    MAX_STEM, domain::{e1::E1, model::SyntheticSS}, solve::action::Action, types::{Generator, Kind, Torsion}
 };
 
 pub fn write_vec_to_file<T: std::fmt::Debug>(vec: &[T], path: &str) -> io::Result<()> {
@@ -29,6 +29,8 @@ pub fn repo_root_path(file_name: &str) -> PathBuf {
 pub struct Differential {
     pub from: String,
     pub to: String,
+
+    pub d: i32,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<String>,
@@ -101,15 +103,22 @@ pub fn write_typescript_file(
     output_path: &str,
     data_name: &str,
     data: &SyntheticSS,
+    model: &E1,
 ) -> Result<(), std::io::Error> {
     let mut file = File::create(output_path)?;
 
     let mut data = data.clone();
-    add_final_diagonal(&mut data);
+    // add_final_diagonal would mutate the model too; skipped under new design
+    let mut model = model.clone();
+
+    for (index, torsion) in data.generators.iter().enumerate() {
+        model.get_mut(index).torsion = *torsion;
+    }
+
+    add_final_diagonal(&mut model, &mut data);
 
     // Serialize generators to JSON strings
-    let gens: Vec<String> = data
-        .model
+    let gens: Vec<String> = model
         .gens()
         .iter()
         .map(|g| serde_json::to_string(g).unwrap())
@@ -178,28 +187,29 @@ pub fn write_typescript_file(
     // }
 
     for ((from, to), (kind, p)) in &data.from_to {
-        let d_y = data.model.y(*from) - data.model.y(*to);
-        let d_stem = data.model.stem(*from) - data.model.stem(*to);
+        let d_y = model.y(*from) - model.y(*to);
+        let d_stem = model.stem(*from) - model.stem(*to);
         if d_y == 0 {
             int_tau_mults.push(InternalTauMult {
-                from: data.model.name(*from).to_string(),
-                to: data.model.name(*to).to_string(),
+                from: model.name(*from).to_string(),
+                to: model.name(*to).to_string(),
                 kind: *kind,
                 proof: p.clone(),
                 page: 2, // TODO : This is not generic enough but good enough for our range
             });
         } else if d_stem == 0 {
             ext_tau_mults.push(ExternalTauMult {
-                from: data.model.name(*from).to_string(),
-                to: data.model.name(*to).to_string(),
+                from: model.name(*from).to_string(),
+                to: model.name(*to).to_string(),
                 af: 0,
                 kind: *kind,
                 proof: p.clone(),
             });
         } else {
             differentials.push(Differential {
-                from: data.model.name(*from).to_string(),
-                to: data.model.name(*to).to_string(),
+                from: model.name(*from).to_string(),
+                to: model.name(*to).to_string(),
+                d: model.y(*from) - model.y(*to),
                 kind: *kind,
                 proof: p.clone(),
             });
@@ -258,13 +268,13 @@ pub fn write_typescript_file(
     Ok(())
 }
 
-pub fn write_all(data: &SyntheticSS, log: &Vec<Action>, ahss: bool) {
+pub fn write_all(data: &SyntheticSS, model: &E1, log: &Vec<Action>, ahss: bool) {
     let log = log.iter().unique().map(|x| x.clone()).collect();
     if ahss {
-        write_typescript_file("../site/src/data_stable.ts", "_stable", &data).unwrap();
+        write_typescript_file("../site/src/data_stable.ts", "_stable", &data, model).unwrap();
         write_log(&log, ahss).unwrap();
     } else {
-        write_typescript_file("../site/src/data.ts", "", &data).unwrap();
+        write_typescript_file("../site/src/data.ts", "", &data, model).unwrap();
         write_log(&log, ahss).unwrap();
     }
 }
@@ -324,18 +334,20 @@ fn export_table() {
 }
 
 
-fn add_final_diagonal(data: &mut SyntheticSS) {
+fn add_final_diagonal(model: &mut E1, data: &mut SyntheticSS ) {
     // Generate the degree zero parts 
     for n in (1..=MAX_STEM).step_by(2) {
         let to_name = format!("2(∞)[{}]", n);
         let from_name = format!("1(∞)[{}]", n + 1);
         
-        let size = data.model.gens().len();
+        let size = model.gens().len();
         
-        data.model.push(Generator::new(from_name.clone(), n + 1, n + 1, 1, 0, None));
+        model.push(Generator::new(from_name.clone(), n + 1, n + 1, 1, 0, None));
+        model.push(Generator::new(to_name.clone(), n, n, 2, 0, None));
         
-        data.model.push(Generator::new(to_name.clone(), n, n, 2, 0, None));
-        
+        data.generators.push(Torsion::default());
+        data.generators.push(Torsion::default());
+
         data.in_diffs.push(vec![]);
         data.in_diffs.push(vec![]);
         
@@ -345,6 +357,6 @@ fn add_final_diagonal(data: &mut SyntheticSS) {
         data.out_taus.push(vec![]);
         data.out_taus.push(vec![]);
         
-        data.add_diff(size, size+1, None, Kind::Algebraic);
+        data.add_diff(model, size, size+1, None, Kind::Algebraic);
     }
 }

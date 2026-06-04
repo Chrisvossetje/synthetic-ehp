@@ -1,13 +1,14 @@
 use crate::{
     MAX_STEM,
-    data::naming::{add_sphere_to_tag, generating_tag},
-    domain::{model::SyntheticSS, ss::SSPages},
+    data::{curtis::MODEL, naming::{add_sphere_to_tag, generating_tag}},
+    domain::{e1::E1, model::SyntheticSS, ss::SSPages},
     solve::issues::Issue,
     types::{Kind, Torsion},
 };
 
 fn instantiate_pages(
     data: &SyntheticSS,
+    model: &E1,
     bot_trunc: i32,
     top_trunc: i32,
     from_stem: i32,
@@ -17,12 +18,13 @@ fn instantiate_pages(
 
     let mut max_stem = 0;
 
-    for (_, g) in data.model.enumerate() {
+    for (index, torsion) in data.generators.iter().enumerate() {
+        let g = model.get(index);
         max_stem = max_stem.max(g.stem);
 
         if from_stem - 1 <= g.stem && g.stem <= to_stem + 1 {
-            if bot_trunc <= g.y && g.y <= top_trunc && g.torsion.alive() {
-                gens.push(Some(vec![(1, (g.af, g.torsion))]));
+            if bot_trunc <= g.y && g.y <= top_trunc && torsion.alive() {
+                gens.push(Some(vec![(1, (g.af, *torsion))]));
                 continue;
             }
         }
@@ -40,6 +42,7 @@ fn instantiate_pages(
 // Assume differentials are applied in correct order
 fn apply_diff(
     data: &SyntheticSS,
+    model: &E1,
     pages: &mut SSPages,
     page: i32,
     from: usize,
@@ -48,12 +51,12 @@ fn apply_diff(
     let from_g = pages.element_final(from);
     let to_g = pages.element_final(to);
 
-    let stem = data.model.stem(from);
+    let stem = model.stem(from);
 
     let (new_from_g, new_to_g) = if from_g.1.alive() {
         if !to_g.1.alive() {
             if data.from_to[&(from, to)].0 != Kind::Algebraic {
-                let (from_name, to_name) = data.get_names(from, to);
+                let (from_name, to_name) = model.get_names(from, to);
                 return Err(Issue::UselessDifferential {
                     from,
                     to,
@@ -72,7 +75,7 @@ fn apply_diff(
         if coeff < 0 {
             // TODO: Figure out if this should be branching or not ?
             // panic!("We encountered a negative coefficient, such a differential can not exist? And is unfixable ?");
-            let (from_name, to_name) = data.get_names(from, to);
+            let (from_name, to_name) = model.get_names(from, to);
             return Err(Issue::InvalidCoeff {
                 from,
                 to,
@@ -91,7 +94,7 @@ fn apply_diff(
                     match from_g.1.0 {
                         Some(from_t) => {
                             if delta > from_t {
-                                let (from_name, to_name) = data.get_names(from, to);
+                                let (from_name, to_name) = model.get_names(from, to);
                                 return Err(Issue::InvalidTorsion {
                                     from,
                                     to,
@@ -118,7 +121,7 @@ fn apply_diff(
                 } else {
                     if data.from_to[&(from, to)].0 != Kind::Algebraic {
                         // Useless
-                        let (from_name, to_name) = data.get_names(from, to);
+                        let (from_name, to_name) = model.get_names(from, to);
                         return Err(Issue::UselessDifferential {
                             from,
                             to,
@@ -135,7 +138,7 @@ fn apply_diff(
             }
             None => match from_g.1.0 {
                 Some(t) => {
-                    let (from_name, to_name) = data.get_names(from, to);
+                    let (from_name, to_name) = model.get_names(from, to);
                     return Err(Issue::InvalidTorsion {
                         from,
                         to,
@@ -154,7 +157,7 @@ fn apply_diff(
         }
     } else {
         if to_g.1.alive() && data.from_to[&(from, to)].0 != Kind::Algebraic {
-            let (from_name, to_name) = data.get_names(from, to);
+            let (from_name, to_name) = model.get_names(from, to);
             return Err(Issue::UselessDifferential {
                 from,
                 to,
@@ -176,7 +179,7 @@ fn apply_diff(
 }
 
 fn apply_tau(
-    data: &SyntheticSS,
+    model: &E1,
     pages: &mut SSPages,
     page: i32,
     af: i32,
@@ -210,7 +213,7 @@ fn apply_tau(
                 pages.push(from, page, (from_g.0, new_from_torsion));
                 pages.push(to, page, (to_g.0, new_to_torsion));
             } else if from_g.0 - from_torsion > to_g.0 {
-                let (from_name, to_name) = data.get_names(from, to);
+                let (from_name, to_name) = model.get_names(from, to);
                 return Err(Issue::InvalidTauMult {
                     from,
                     to,
@@ -228,6 +231,7 @@ fn apply_tau(
 
 pub fn try_compute_pages(
     data: &SyntheticSS,
+    model: &E1,
     bot_trunc: i32,
     top_trunc: i32,
     from_stem: i32,
@@ -235,7 +239,7 @@ pub fn try_compute_pages(
     include_tau: bool,
 ) -> Result<SSPages, Vec<Issue>> {
     let (pages, issues) =
-        compute_pages(data, bot_trunc, top_trunc, from_stem, to_stem, include_tau);
+        compute_pages(data, model, bot_trunc, top_trunc, from_stem, to_stem, include_tau);
 
     if issues.len() != 0 {
         return Err(issues);
@@ -244,22 +248,23 @@ pub fn try_compute_pages(
     }
 }
 
-pub fn compute_pages(
+
+pub fn compute_diffs_int_taus(
     data: &SyntheticSS,
+    model: &E1,
     bot_trunc: i32,
     top_trunc: i32,
     from_stem: i32,
     to_stem: i32,
-    include_tau: bool,
 ) -> (SSPages, Vec<Issue>) {
-    let mut pages = instantiate_pages(data, bot_trunc, top_trunc, from_stem, to_stem);
+    let mut pages = instantiate_pages(data, model, bot_trunc, top_trunc, from_stem, to_stem);
 
     let mut issues = vec![];
 
     for page in 0..=MAX_STEM as usize {
         for t in &data.internal_tau_page[page] {
-            if pages.element_in_pages(t.from) && pages.element_in_pages(t.from) {
-                if let Err(i) = apply_tau(data, &mut pages, page as i32, 0, t.from, t.to) {
+            if pages.element_in_pages(t.from) && pages.element_in_pages(t.to) {
+                if let Err(i) = apply_tau(model, &mut pages, page as i32, 0, t.from, t.to) {
                     issues.push(i);
                 }
             }
@@ -267,28 +272,8 @@ pub fn compute_pages(
 
         for d in &data.diffs_page[page] {
             if pages.element_in_pages(d.from) && pages.element_in_pages(d.to) {
-                if let Err(i) = apply_diff(data, &mut pages, page as i32, d.from, d.to) {
+                if let Err(i) = apply_diff(data, model, &mut pages, page as i32, d.from, d.to) {
                     issues.push(i);
-                }
-            }
-        }
-    }
-
-    if include_tau {
-        for esss in &data.external_tau_page {
-            for ess in esss {
-                for es in ess {
-                    for e in es {
-                        if pages.element_in_pages(e.from)
-                            && pages.element_in_pages(e.to)
-                            && from_stem <= data.model.stem(e.from)
-                            && data.model.stem(e.from) <= to_stem
-                        {
-                            if let Err(i) = apply_tau(data, &mut pages, 500, e.af, e.from, e.to) {
-                                issues.push(i);
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -297,38 +282,89 @@ pub fn compute_pages(
     (pages, issues)
 }
 
-pub fn ehp_recursion(ehp: &mut SyntheticSS, sphere: i32, stem: i32) -> Result<(), Vec<Issue>> {
+pub fn compute_ext_taus(
+    pages: &mut SSPages,
+    model: &E1,
+    data: &SyntheticSS,
+    bot_trunc: i32,
+    top_trunc: i32,
+    from_stem: i32,
+    to_stem: i32,
+) -> Vec<Issue> {
+    let mut issues = vec![];
+    for esss in &data.external_tau_page {
+        for ess in esss {
+            for es in ess {
+                for e in es {
+                    if pages.element_in_pages(e.from)
+                        && pages.element_in_pages(e.to)
+                        && from_stem <= model.stem(e.from)
+                        && model.stem(e.from) <= to_stem
+                    {
+                        if let Err(i) = apply_tau(model, pages, 500, e.af, e.from, e.to) {
+                            issues.push(i);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    issues
+}
+
+pub fn compute_pages(
+    data: &SyntheticSS,
+    model: &E1,
+    bot_trunc: i32,
+    top_trunc: i32,
+    from_stem: i32,
+    to_stem: i32,
+    include_tau: bool,
+) -> (SSPages, Vec<Issue>) {
+
+
+    let (mut pages, mut issues) = compute_diffs_int_taus(data, model, bot_trunc, top_trunc, from_stem, to_stem);
+
+    if include_tau {
+        let mut issues2 = compute_ext_taus(&mut pages, model, data, bot_trunc, top_trunc, from_stem, to_stem);
+        issues.append(&mut issues2);
+    }
+
+    (pages, issues)
+}
+
+pub fn ehp_recursion(ehp: &mut SyntheticSS, model: &E1, sphere: i32, stem: i32) -> Result<(), Vec<Issue>> {
     if sphere % 2 == 0 {
         panic!("Can't call this on even spheres");
     }
 
-    let pages = try_compute_pages(ehp, 0, sphere - 1, stem, stem, true)?;
-
+    let pages = try_compute_pages(ehp, model, 0, sphere - 1, stem, stem, true)?;
+    
     // Set everything to zero
-    for id in ehp
-        .model
-        .gens_id_in_stem_y(stem + sphere / 2, sphere / 2)
-        .clone()
+    for id in model
+    .gens_id_in_stem_y(stem + sphere / 2, sphere / 2)
+    .clone()
     {
-        ehp.model.get_mut(id).torsion = Torsion::zero();
+        ehp.generators[id] = Torsion::zero();
     }
 
     let mut issues = vec![];
 
     // Set everything to what we expect
-    for id in ehp.model.gens_id_in_stem(stem).clone() {
+    for id in model.gens_id_in_stem(stem).clone() {
         if let Some(g) = pages.try_element_final(id)
             && g.1.alive()
         {
-            let name = ehp.get_name_at_sphere(id, sphere).to_string();
+            let name = ehp.get_name_at_sphere(model, id, sphere).to_string();
             let gen_tag = generating_tag(&name);
 
             let target_name = add_sphere_to_tag(gen_tag, sphere);
 
-            match ehp.model.try_index(&target_name) {
+            match model.try_index(&target_name) {
                 Some(target_id) => {
-                    let t_g = ehp.model.get_mut(target_id);
-                    if g.0 + 1 != t_g.af {
+                    let t_af = model.get(target_id).af;
+                    if g.0 + 1 != t_af {
                         issues.push(Issue::InvalidAFRecursion {
                             from: id,
                             to: target_id,
@@ -336,7 +372,7 @@ pub fn ehp_recursion(ehp: &mut SyntheticSS, sphere: i32, stem: i32) -> Result<()
                             to_name: target_name,
                         });
                     } else {
-                        t_g.torsion = g.1;
+                        ehp.generators[target_id] = g.1;
                     }
                 }
                 None => {

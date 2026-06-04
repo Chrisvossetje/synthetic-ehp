@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{domain::model::SyntheticSS, types::Torsion};
+use crate::{domain::e1::E1, types::Torsion};
 
 pub type GeneratorState = (i32, Torsion);
 // TODO: Smallvec performance check ?
@@ -55,9 +55,9 @@ impl SSPages {
         self.generators[elt].as_mut().unwrap().push((page, g));
     }
 
-    pub fn convergence_at_stem(&self, data: &SyntheticSS, stem: i32) -> HashMap<i32, Vec<Torsion>> {
+    pub fn convergence_at_stem(&self, model: &E1, stem: i32) -> HashMap<i32, Vec<Torsion>> {
         let mut m = HashMap::new();
-        for id in data.model.gens_id_in_stem(stem) {
+        for id in model.gens_id_in_stem(stem) {
             if self.element_in_pages(*id) {
                 let g = self.element_final(*id);
                 if g.1.alive() {
@@ -74,11 +74,11 @@ impl SSPages {
 
     pub fn algebraic_convergence_at_stem(
         &self,
-        data: &SyntheticSS,
+        model: &E1,
         stem: i32,
     ) -> HashMap<i32, usize> {
-        let observed_minus_one = self.convergence_at_stem(data, stem - 1);
-        let observed = self.convergence_at_stem(data, stem);
+        let observed_minus_one = self.convergence_at_stem(model, stem - 1);
+        let observed = self.convergence_at_stem(model, stem);
 
         let mut observed: HashMap<_, _> = observed.iter().map(|(k, v)| (*k, v.len())).collect();
         for (j, l) in &observed_minus_one {

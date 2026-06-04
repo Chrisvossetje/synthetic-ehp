@@ -4,6 +4,7 @@ use crate::{
     MAX_STEM, MAX_VERIFY_STEM,
     data::compare::{S0, algebraic_spheres},
     domain::{
+        e1::E1,
         model::SyntheticSS,
         process::{compute_pages, ehp_recursion, try_compute_pages},
         ss::SSPages,
@@ -17,22 +18,13 @@ use crate::{
 };
 
 pub fn ehp_stable_verify(
-    ehp: &SyntheticSS,
-    ahss: &SyntheticSS,
+    _ehp: &SyntheticSS,
+    ehp_model: &E1,
+    _ahss: &SyntheticSS,
     pages: &SSPages,
     stem: i32,
 ) -> Result<(), Vec<Issue>> {
-    // let a = ahss.model.gens_id_in_stem_y(stem+1, 1);
-    // let expected: HashMap<_, _> = a.iter().map(|i| {
-    //     let g = ahss.model.get(*i);
-    //     (g.af, g.torsion)
-    // }).collect();
-    // let expected_names: HashSet<_> = a.iter().map(|i| {
-    //     let g = ahss.model.get(*i);
-    //     &g.name
-    // }).collect();
-
-    let observed = pages.convergence_at_stem(ehp, stem);
+    let observed = pages.convergence_at_stem(ehp_model, stem);
 
     compare_synthetic(&observed, &S0, 0, 256, stem)?;
 
@@ -40,12 +32,12 @@ pub fn ehp_stable_verify(
 }
 
 fn verify_algebraic_convergence(
-    data: &SyntheticSS,
+    model: &E1,
     pages: &SSPages,
     sphere: i32,
     stem: i32,
 ) -> Result<(), Vec<Issue>> {
-    let observed = pages.algebraic_convergence_at_stem(data, stem);
+    let observed = pages.algebraic_convergence_at_stem(model, stem);
 
     compare_algebraic(&observed, algebraic_spheres(sphere), 0, sphere, stem)
 }
@@ -76,6 +68,7 @@ fn ehp_iterate(
 
 pub fn apply_ehp_recursively(
     ehp: &mut SyntheticSS,
+    model: &E1,
     stem_minus_sphere: i32,
     slanted: bool,
 ) -> Result<(), Vec<Issue>> {
@@ -90,7 +83,7 @@ pub fn apply_ehp_recursively(
         if (sphere + 2) / 2 + stem >= MAX_STEM {
             continue;
         }
-        ehp_recursion(ehp, sphere, stem)?;
+        ehp_recursion(ehp, model, sphere, stem)?;
     }
 
     Ok(())
@@ -98,31 +91,33 @@ pub fn apply_ehp_recursively(
 
 pub fn find_ehp_issues(
     ehp: &mut SyntheticSS,
+    ehp_model: &E1,
     ahss: &SyntheticSS,
+    ahss_model: &E1,
     map: &SyntheticSSMap,
     stem_minus_sphere: i32,
     slanted: bool,
 ) -> Result<(), Vec<Issue>> {
     // If there is an issue i prefer to first check the algebraic convergence though
-    match apply_ehp_recursively(ehp, stem_minus_sphere, slanted) {
+    match apply_ehp_recursively(ehp, ehp_model, stem_minus_sphere, slanted) {
         Ok(_) => {}
         Err(issues) => {
             let (sphere, stem) = match &issues[0] {
                 Issue::InvalidName {
-                    original_name,
-                    unexpected_name,
+                    original_name: _,
+                    unexpected_name: _,
                     sphere,
                     stem,
-                    af,
+                    af: _,
                 } => (*sphere, *stem),
                 _ => {
                     return Err(issues);
                 }
             };
 
-            let pages = try_compute_pages(ehp, 0, sphere - 1, stem - 1, stem, true)?;
+            let pages = try_compute_pages(ehp, ehp_model, 0, sphere - 1, stem - 1, stem, true)?;
 
-            verify_algebraic_convergence(ehp, &pages, sphere, stem)?;
+            verify_algebraic_convergence(ehp_model, &pages, sphere, stem)?;
 
             return Err(issues);
         }
@@ -135,17 +130,17 @@ pub fn find_ehp_issues(
 
         let pages = if sphere - 2 == stem {
             // Stable
-            let pages = try_compute_pages(ehp, 0, sphere - 1, stem, stem, true)?;
-            ehp_stable_verify(ehp, ahss, &pages, stem)?;
+            let pages = try_compute_pages(ehp, ehp_model, 0, sphere - 1, stem, stem, true)?;
+            ehp_stable_verify(ehp, ehp_model, ahss, &pages, stem)?;
             pages
         } else {
             // Unstable
-            let pages = try_compute_pages(ehp, 0, sphere - 1, stem - 1, stem, true)?;
-            verify_algebraic_convergence(ehp, &pages, sphere, stem)?;
+            let pages = try_compute_pages(ehp, ehp_model, 0, sphere - 1, stem - 1, stem, true)?;
+            verify_algebraic_convergence(ehp_model, &pages, sphere, stem)?;
             pages
         };
 
-        compare_algebraic_spectral_sequence(ehp, &pages, stem, 0, sphere - 1, false)?;
+        compare_algebraic_spectral_sequence(ehp, ehp_model, &pages, stem, 0, sphere - 1, false)?;
         compare_ehp_ahss(ehp, ahss, map, stem, sphere - 1)?;
     }
 
@@ -153,7 +148,7 @@ pub fn find_ehp_issues(
 }
 
 /// Verify stable stems match expected values
-pub fn verify_geometric(data: &SyntheticSS) {
+pub fn verify_geometric(data: &SyntheticSS, model: &E1) {
     const CLASSICAL_MAX_SPHERE: i32 = 35;
     const CLASSICAL_MAX_STEM: i32 = 33;
 
@@ -302,11 +297,11 @@ pub fn verify_geometric(data: &SyntheticSS) {
     ];
 
     for sphere in (1..=CLASSICAL_MAX_SPHERE).into_iter().rev() {
-        let (pages, _) = compute_pages(data, 0, sphere - 1, 0, 256, true);
+        let (pages, _) = compute_pages(data, model, 0, sphere - 1, 0, 256, true);
 
         let mut conv_gens = vec![0; (CLASSICAL_MAX_STEM + 1) as usize];
 
-        for (id, g) in data.model.enumerate() {
+        for (id, g) in model.enumerate() {
             if pages.element_in_pages(id) {
                 if pages.element_final(id).1.free() {
                     if g.stem <= CLASSICAL_MAX_STEM {

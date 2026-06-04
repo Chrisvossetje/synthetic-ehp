@@ -56,16 +56,14 @@ function syncViewControlsForDataSource(updateChart = true) {
     const truncationControls = document.getElementById('truncation-controls') as HTMLDivElement | null;
     const sphereControls = document.getElementById('sphere-controls') as HTMLDivElement | null;
     const fakeControls = document.getElementById('fake-controls') as HTMLDivElement | null;
-    const fakeControlsSpacer = document.getElementById('fake-controls-spacer') as HTMLDivElement | null;
     const showFakeCheckbox = document.getElementById('show-fake-checkbox') as HTMLInputElement | null;
     const controls = getTruncationControls();
 
-    if (!dataSourceSwitch || !truncationControls || !sphereControls || !fakeControls || !fakeControlsSpacer || !showFakeCheckbox || !controls) {
+    if (!dataSourceSwitch || !truncationControls || !sphereControls || !fakeControls || !showFakeCheckbox || !controls) {
         return;
     }
 
     fakeControls.style.display = 'flex';
-    fakeControlsSpacer.style.display = 'block';
     fakeControls.style.opacity = '1';
     fakeControls.style.pointerEvents = 'auto';
     showFakeCheckbox.disabled = false;

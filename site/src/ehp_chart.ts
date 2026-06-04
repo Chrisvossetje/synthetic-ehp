@@ -13,9 +13,10 @@ import {
     setUseStableData,
     survivesFilteredGenerator,
     viewSettings,
-    ensureStableDataLoading
+    ensureStableDataLoading,
+    shouldIncludeKind
 } from "./logic";
-import { Differential, SyntheticEHP } from "./types";
+import { Differential, Kind, SyntheticEHP } from "./types";
 import { buildGeneratorInfoLines, showInfoPanel } from "./ui/info_panel";
 
 let computedDiffsByKey: Map<string, Differential> = new Map();
@@ -33,12 +34,8 @@ function getAllTauMults(data: SyntheticEHP) {
     return [...data.internal_tau_mults, ...data.external_tau_mults];
 }
 
-function shouldDisplayKind(kind: "Real" | "Fake" | "Unknown"): boolean {
-    return viewSettings.showFakeData || kind !== "Fake";
-}
-
 function shouldDisplayTauMult(
-    kind: "Real" | "Fake" | "Unknown",
+    kind: Kind,
     gens: Record<string, [number | undefined, number]>,
     from: string,
     to: string
@@ -269,35 +266,38 @@ export function update_ehp_chart() {
     );
     cacheComputedDiffs(diffs);
 
-    const real_diffs = diffs.filter((d) => {
-        if (!shouldDisplayKind(d.kind)) {
+    const real_diffs = activeData.differentials.filter((d) => {
+        if (!shouldIncludeKind(d.kind)) {
             return false;
         }
-        if (!gens[d.from] || !gens[d.to]) {
+        if (!gens[d.from] || gens[d.from][0] === 0 || !gens[d.to] || gens[d.to][0] === 0) {
             return false;
         }
         if (!viewSettings.allDiffs && d.d != viewSettings.page) {
             return false;
         }
+        if (d.d && d.d < viewSettings.page) {
+            return false;
+        }
         return true;
     });
-    displayedDiffsByKey.clear();
-    real_diffs.forEach((d) => {
-        const diffPage = d.d ?? Number.POSITIVE_INFINITY;
-        if (viewSettings.allDiffs && diffPage < viewSettings.page) {
-            return;
-        }
-        const key = `${d.from}->${d.to}`;
-        const existing = displayedDiffsByKey.get(key);
-        if (!existing) {
-            displayedDiffsByKey.set(key, d);
-            return;
-        }
-        const existingPage = existing.d ?? Number.POSITIVE_INFINITY;
-        if (diffPage < existingPage) {
-            displayedDiffsByKey.set(key, d);
-        }
-    });
+    // displayedDiffsByKey.clear();
+    // real_diffs.forEach((d) => {
+    //     const diffPage = d.d ?? Number.POSITIVE_INFINITY;
+    //     if (viewSettings.allDiffs && diffPage < viewSettings.page) {
+    //         return;
+    //     }
+    //     const key = `${d.from}->${d.to}`;
+    //     // const existing = displayedDiffsByKey.get(key);
+    //     // if (!existing) {
+    //     //     displayedDiffsByKey.set(key, d);
+    //     //     return;
+    //     // }
+    //     // const existingPage = existing.d ?? Number.POSITIVE_INFINITY;
+    //     // if (diffPage < existingPage) {
+    //     //     displayedDiffsByKey.set(key, d);
+    //     // }
+    // });
 
     Object.entries(gens).forEach(([name, [torsion, filtration]]) => {
         if (torsion == undefined || torsion > 0) {
@@ -306,10 +306,13 @@ export function update_ehp_chart() {
             ehpChart.display_dot(name, true, perm, torsion ?? null, filtration);
         }
     });
-    displayedDiffsByKey.forEach((d) => {
+    real_diffs.forEach((d) => {
         let torsion = getDisplayedDiffCoeff(d.from, d.to);
         if (viewSettings.category != Category.Synthetic) {
             torsion = 0;
+        }
+        if (viewSettings.category === Category.Algebraic && d.kind !== "Algebraic") {
+            return;
         }
         ehpChart.display_diff(d.from, d.to, true, torsion);
     });
@@ -326,7 +329,7 @@ export function update_ehp_chart() {
     // Display tau multiplications only when both generators are alive
     if (viewSettings.category == Category.Synthetic) {
         activeData.internal_tau_mults.forEach((t) => {
-            if (!shouldDisplayKind(t.kind)) {
+            if (!shouldIncludeKind(t.kind)) {
                 return;
             }
             if (!viewSettings.allDiffs && t.page !== viewSettings.page) {
@@ -339,7 +342,7 @@ export function update_ehp_chart() {
 
         if (viewSettings.allDiffs || viewSettings.page > 999) {
             activeData.external_tau_mults.forEach((t) => {
-                if (!shouldDisplayKind(t.kind)) {
+                if (!shouldIncludeKind(t.kind)) {
                     return;
                 }
                 if (shouldDisplayTauMult(t.kind, gens as Record<string, [number | undefined, number]>, t.from, t.to)) {

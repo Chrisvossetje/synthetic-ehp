@@ -1,7 +1,8 @@
 import { Chart } from "./chart";
 import { ehpChart } from "./charts";
 import { getComputedDiffCoeff } from "./ehp_chart";
-import { isUsingStableData, viewSettings, get_filtered_data, Category } from "./logic";
+import { isUsingStableData, viewSettings, get_filtered_data, Category, shouldIncludeKind } from "./logic";
+import { Kind } from "./types";
 
 // Screenshot state
 let screenshotState: "idle" | "selecting" | "capturing" = "idle";
@@ -26,9 +27,9 @@ function getTikzColor(torsion: number | undefined): string {
     return "black";
 }
 
-function shouldExportDifferentialKind(kind: "Real" | "Fake" | "Unknown"): boolean {
-    return viewSettings.showFakeData || kind !== "Fake";
-}
+// function shouldExportDifferentialKind(kind: Kind): boolean {
+//     return viewSettings.showFakeData || kind !== "Fake";
+// }
 
 /**
  * Start screenshot mode
@@ -238,7 +239,7 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
 
     // Draw differentials first (so they're behind dots)
     const differentials = chart.differentials.filter(d => {
-        if (!shouldExportDifferentialKind(d.kind)) {
+        if (!shouldIncludeKind(d.kind)) {
             return false;
         }
         if (!getVisibleDiffElement(chart, d.from, d.to)) {
@@ -259,7 +260,7 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
 
         const computedCoeff = getComputedDiffCoeff(diff.from, diff.to);
         const color = getTikzColor(computedCoeff ?? diff.coeff);
-        const lineStyle = diff.kind == "Fake" ? ",dotted" : "";
+        const lineStyle = (diff.kind === "Algebraic" || diff.kind === "Real") ?  "": ",dotted";
         const fromYFlip = flipY(fromLoc[1]);
         const toYFlip = flipY(toLoc[1]);
         tikz += `\\draw[${color},line width=0.4pt${lineStyle}] (${roundCoord(fromLoc[0])},${roundCoord(fromYFlip)}) -- (${roundCoord(toLoc[0])},${roundCoord(toYFlip)});\n`;

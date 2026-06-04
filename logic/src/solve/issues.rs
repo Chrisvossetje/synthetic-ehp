@@ -8,7 +8,7 @@ use crate::{
         compare::EMPTY_LIST_TORSION,
         curtis::{DATA_PAGES, STABLE_DATA_PAGES},
     },
-    domain::{model::SyntheticSS, ss::SSPages},
+    domain::{e1::E1, model::SyntheticSS, ss::SSPages},
     types::{Kind, Torsion},
 };
 
@@ -201,6 +201,7 @@ pub fn compare_algebraic(
 
 pub fn compare_algebraic_spectral_sequence(
     data: &SyntheticSS,
+    model: &E1,
     pages: &SSPages,
     stem: i32,
     bot_trunc: i32,
@@ -221,24 +222,24 @@ pub fn compare_algebraic_spectral_sequence(
     // TODO: This should be somewhat dependent on the top_truncation.
     // At least for EHP this is important
 
-    for &from in data.model.gens_id_in_stem(stem + 1) {
+    for &from in model.gens_id_in_stem(stem + 1) {
         let tos = &data.out_diffs[from];
         for &to in tos {
-            if data.model.stem(to) == stem
-                && bot_trunc <= data.model.y(to)
-                && data.model.y(from) <= top_trunc
+            if model.stem(to) == stem
+                && bot_trunc <= model.y(to)
+                && model.y(from) <= top_trunc
             {
-                let (from_name, to_name) = data.get_names(from, to);
+                let (from_name, to_name) = model.get_names(from, to);
                 let alg = data.from_to.get(&(from, to)).unwrap().0 == Kind::Algebraic;
                 if alg {
-                    if !data.model.original_torsion(to).alive()
-                    && data.model.original_torsion(from).alive()
+                    if !data.generators[to].alive()
+                    && data.generators[from].alive()
                     {
-                        let page = data.model.y(from) - data.model.y(to);
+                        let page = model.y(from) - model.y(to);
                         // From should die before the corresponding page.
                         let from_g = pages.element_at_page(page, from);
-                        if from_g.1.alive() && from_g.0 == data.model.original_af(from) {
-                            let (from_name, to_name) = data.get_names(from, to);
+                        if from_g.1.alive() && from_g.0 == model.af(from) {
+                            let (from_name, to_name) = model.get_names(from, to);
                             issues.push(Issue::InvalidAEHP {
                                 from,
                                 to,
@@ -249,17 +250,17 @@ pub fn compare_algebraic_spectral_sequence(
                         }
                     }
                 } else {
-                    if data.model.original_torsion(from).alive() {
-                        let coeff = data.model.original_af(to) - data.model.original_af(from);
-                        let page = data.model.y(from) - data.model.y(to);
+                    if data.generators[from].alive() {
+                        let coeff = model.af(to) - model.af(from);
+                        let page = model.y(from) - model.y(to);
                         let (af, tor) = pages.element_at_page(page, from);
-                        let or_af = data.model.original_af(from);
+                        let or_af = model.af(from);
 
                         // af == or_af means that from actually maps to something in Algebraic
                         if coeff == 1 && af == or_af && tor.alive() {
                             // Now we could have that the target was already dead in the Algebraic part
                             if alg_pages.element_at_page(page, to).1.alive() {
-                                let (from_name, to_name) = data.get_names(from, to);
+                                let (from_name, to_name) = model.get_names(from, to);
                                 issues.push(Issue::InvalidAEHP {
                                     from,
                                     to,

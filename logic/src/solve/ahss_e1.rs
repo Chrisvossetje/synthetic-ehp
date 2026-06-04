@@ -2,7 +2,7 @@ use itertools::{self, Itertools};
 
 use crate::{
     data::naming::{generate_names_from_tag, name_get_tag},
-    domain::model::SyntheticSS,
+    domain::{e1::E1, model::SyntheticSS},
     solve::{action::Action, issues::Issue},
     types::Torsion,
 };
@@ -93,13 +93,13 @@ pub struct GeneratorChange {
 //     }
 // }
 
-fn get_all_elts_belonging_to_this_e1(data: &SyntheticSS, g: usize) -> Vec<usize> {
-    let name = data.model.name(g);
+fn get_all_elts_belonging_to_this_e1(model: &E1, g: usize) -> Vec<usize> {
+    let name = model.name(g);
     let tag = name_get_tag(&name);
 
     let mut idxs = vec![];
     for n in generate_names_from_tag(tag, 1, 1) {
-        if let Some(id) = data.model.try_index(&n) {
+        if let Some(id) = model.try_index(&n) {
             idxs.push(id);
         } else {
             break;
@@ -202,8 +202,8 @@ fn get_all_elts_belonging_to_this_e1(data: &SyntheticSS, g: usize) -> Vec<usize>
 //     println!("{:?}", res);
 // }
 
-pub fn get_all_e1_solutions(data: &SyntheticSS, issues: &Vec<Issue>) -> Vec<Vec<Action>> {
-    let sols: Vec<_> = issues.iter().map(|i| get_e1_solutions(data, i)).collect();
+pub fn get_all_e1_solutions(data: &SyntheticSS, model: &E1, issues: &Vec<Issue>) -> Vec<Vec<Action>> {
+    let sols: Vec<_> = issues.iter().map(|i| get_e1_solutions(data, model, i)).collect();
 
     sols.iter()
         .map(|s| 0..s.len())
@@ -217,7 +217,7 @@ pub fn get_all_e1_solutions(data: &SyntheticSS, issues: &Vec<Issue>) -> Vec<Vec<
         .collect()
 }
 
-pub fn get_e1_solutions(data: &SyntheticSS, issue: &Issue) -> Vec<Vec<Action>> {
+pub fn get_e1_solutions(_data: &SyntheticSS, model: &E1, issue: &Issue) -> Vec<Vec<Action>> {
     // Give a list of options which one could / should change
     // This is the only time i (should) do this forward approach. Aka giving potential solutions.
     // In other cases i should just "go" and see if some option resolves some issue
@@ -232,7 +232,7 @@ pub fn get_e1_solutions(data: &SyntheticSS, issue: &Issue) -> Vec<Vec<Action>> {
         observed,
     } = issue
     {
-        let stem_af_to_index = data.model.gens_id_in_stem_af(*stem, *af);
+        let stem_af_to_index = model.gens_id_in_stem_af(*stem, *af);
 
         // let stem = stem + 1;
 
@@ -243,7 +243,7 @@ pub fn get_e1_solutions(data: &SyntheticSS, issue: &Issue) -> Vec<Vec<Action>> {
             for (id, &torsion) in p.into_iter().enumerate() {
                 if torsion != Torsion::default() {
                     let real_id = stem_af_to_index[id];
-                    let tag = name_get_tag(data.model.name(real_id)).to_string();
+                    let tag = name_get_tag(model.name(real_id)).to_string();
                     change.push(Action::SetE1 {
                         tag,
                         torsion,

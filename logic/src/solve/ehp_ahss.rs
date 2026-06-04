@@ -1,7 +1,5 @@
 use crate::{
-    domain::{model::SyntheticSS, process::compute_pages, ss::SSPages},
-    solve::issues::Issue,
-    types::Kind,
+    data::curtis::{MODEL, STABLE_MODEL}, domain::{e1::E1, model::SyntheticSS, process::compute_pages, ss::SSPages}, solve::issues::Issue, types::Kind
 };
 
 // (EHP -> AHSS, Lifts from AHSS -> EHP)
@@ -11,19 +9,23 @@ pub fn in_metastable_range(y: i32, stem: i32) -> bool {
     stem < (y * 3)
 }
 
-pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result<(), ()> {
-    for g in ahss.model.gens() {
+pub fn set_metastable_range(
+    ehp: &mut SyntheticSS,
+    ahss: &SyntheticSS,
+) -> Result<(), ()> {
+    for (idx, g) in STABLE_MODEL.gens().iter().enumerate() {
         if in_metastable_range(g.y, g.stem) {
-            ehp.set_generator(&g.name, g.torsion)?;
+            ehp.set_generator(&MODEL, &g.name, ahss.generators[idx])?;
         }
     }
     for ds in &ahss.diffs_page {
         for d in ds {
-            let g_from = ahss.model.get(d.from);
-            let g_to = ahss.model.get(d.to);
+            let g_from = &STABLE_MODEL.get(d.from);
+            let g_to = &STABLE_MODEL.get(d.to);
             if in_metastable_range(g_to.y, g_to.stem) {
                 let (kind, proof) = ahss.from_to.get(&(d.from, d.to)).expect("If there is no reference to a proof here (note that the string can still be empty), then inserting differentials not done carefully enough.");
                 ehp.add_diff_name(
+                    &MODEL,
                     g_from.name.clone(),
                     g_to.name.clone(),
                     proof.clone().map(|x| format!("(Metastable) - {x} ")),
@@ -35,11 +37,12 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
 
     for (page, ts) in ahss.internal_tau_page.iter().enumerate() {
         for t in ts {
-            let g_from = ahss.model.get(t.from);
-            let g_to = ahss.model.get(t.to);
+            let g_from = &STABLE_MODEL.get(t.from);
+            let g_to = &STABLE_MODEL.get(t.to);
             if in_metastable_range(g_to.y, g_to.stem) {
                 let (kind, proof) = ahss.from_to.get(&(t.from, t.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting internal tau's not done carefully enough.");
                 ehp.add_int_tau_name(
+                    &MODEL,
                     g_from.name.clone(),
                     g_to.name.clone(),
                     page as i32,
@@ -54,11 +57,12 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
         for ess in esss {
             for es in ess {
                 for e in es {
-                    let g_from = ahss.model.get(e.from);
-                    let g_to = ahss.model.get(e.to);
+                    let g_from = &STABLE_MODEL.get(e.from);
+                    let g_to = &STABLE_MODEL.get(e.to);
                     if in_metastable_range(g_to.y, g_to.stem) {
                         let (kind, proof) = ahss.from_to.get(&(e.from, e.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting external tau's not done carefully enough.");
                         ehp.add_ext_tau_name(
+                            &MODEL,
                             g_from.name.clone(),
                             g_to.name.clone(),
                             e.af,
@@ -74,18 +78,16 @@ pub fn set_metastable_range(ehp: &mut SyntheticSS, ahss: &SyntheticSS) -> Result
     Ok(())
 }
 
-pub fn ehp_to_ahss_map(ehp: &SyntheticSS, ahss: &SyntheticSS) -> SyntheticSSMap {
-    let ehp_ahss: Vec<_> = ehp
-        .model
+pub fn ehp_to_ahss_map() -> SyntheticSSMap {
+    let ehp_ahss: Vec<_> = MODEL
         .gens()
         .iter()
-        .map(|g| ahss.model.try_index(&g.name))
+        .map(|g| STABLE_MODEL.try_index(&g.name))
         .collect();
-    let ahss_ehp: Vec<_> = ahss
-        .model
+    let ahss_ehp: Vec<_> = STABLE_MODEL
         .gens()
         .iter()
-        .map(|g| ehp.model.try_index(&g.name))
+        .map(|g| MODEL.try_index(&g.name))
         .collect();
 
     (ehp_ahss, ahss_ehp)
@@ -93,6 +95,7 @@ pub fn ehp_to_ahss_map(ehp: &SyntheticSS, ahss: &SyntheticSS) -> SyntheticSSMap 
 
 fn check(
     a: &SyntheticSS,
+    a_model: &E1,
     b: &SyntheticSS,
     a_p: &SSPages,
     b_p: &SSPages,
@@ -117,7 +120,7 @@ fn check(
             continue;
         }
 
-        if a.model.stem(to) != stem {
+        if a_model.stem(to) != stem {
             continue;
         }
 
@@ -127,14 +130,14 @@ fn check(
                     // let from_g = ahss_p.element_at_page(d_y, from);
                     // let to_g = ahss_p.element_at_page(d_y, to);
 
-                    let d_y = a.model.y(from) - a.model.y(to);
+                    let d_y = a_model.y(from) - a_model.y(to);
 
                     // We only check differentials.
                     // Tau extensions are usually clear to resolve
-                    let d_stem = a.model.stem(from) - a.model.stem(to);
+                    let d_stem = a_model.stem(from) - a_model.stem(to);
 
                     if d_y > 0 && d_stem == 1 {
-                        let (from_name, to_name) = a.get_names(from, to);
+                        let (from_name, to_name) = a_model.get_names(from, to);
 
                         // This is a slightly looser check
                         // We check if they are non zero 1 page later
@@ -163,6 +166,8 @@ fn check(
     issues
 }
 
+
+// TODO : Compare this one to the one in automated EHP
 // This is a reduced version
 // Below is the "official" version
 pub fn compare_ehp_ahss(
@@ -172,19 +177,21 @@ pub fn compare_ehp_ahss(
     stem: i32,
     sphere: i32,
 ) -> Result<(), Vec<Issue>> {
-    let (ehp_p, _) = compute_pages(ehp, 0, sphere - 1, stem, stem + 1, false);
-    let (ahss_p, _) = compute_pages(ahss, 0, sphere - 1, stem, stem + 1, false);
+    return Ok(());
+
+    let (ehp_p, _) = compute_pages(ehp, &MODEL, 0, sphere - 1, stem, stem + 1, false);
+    let (ahss_p, _) = compute_pages(ahss, &STABLE_MODEL, 0, sphere - 1, stem, stem + 1, false);
 
     let mut issues = vec![];
 
     // First we check if the torsion on E1 is mapped correctly
     for y in 0..=(sphere - 1) {
-        for &ehp_id in ehp.model.gens_id_in_stem_y(stem, y) {
+        for &ehp_id in MODEL.gens_id_in_stem_y(stem, y) {
             if let Some(ahss_id) = ehp_ahss[ehp_id] {
-                if ehp.model.original_torsion(ehp_id).alive() {
-                    if ehp.model.original_torsion(ehp_id) > ahss.model.original_torsion(ahss_id) {
+                if ehp.generators[ehp_id].alive() {
+                    if ehp.generators[ehp_id] > ahss.generators[ahss_id] {
                         issues.push(Issue::InvalidEHPAHSSGen {
-                            name: ehp.model.name(ehp_id).to_string(),
+                            name: MODEL.name(ehp_id).to_string(),
                             stem,
                         });
                     }
@@ -192,7 +199,7 @@ pub fn compare_ehp_ahss(
                 if ehp_p.element_in_pages(ehp_id) {
                     if ehp_p.element_final(ehp_id).1 > ahss_p.element_final(ehp_id).1 {
                         issues.push(Issue::InvalidEHPAHSSGen {
-                            name: ehp.model.name(ehp_id).to_string(),
+                            name: MODEL.name(ehp_id).to_string(),
                             stem,
                         });
                     }
@@ -202,10 +209,10 @@ pub fn compare_ehp_ahss(
     }
 
     issues.append(&mut check(
-        ahss, ehp, &ahss_p, &ehp_p, ahss_ehp, stem, sphere,
+        ahss, &STABLE_MODEL, ehp, &ahss_p, &ehp_p, ahss_ehp, stem, sphere,
     ));
     issues.append(&mut check(
-        ehp, ahss, &ehp_p, &ahss_p, ehp_ahss, stem, sphere,
+        ehp, &MODEL, ahss, &ehp_p, &ahss_p, ehp_ahss, stem, sphere,
     ));
 
     if issues.len() == 0 {

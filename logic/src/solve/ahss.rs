@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     data::compare::{S0_ZEROES, algebraic_rp, rp_truncations, synthetic_rp},
-    domain::{model::SyntheticSS, process::try_compute_pages, ss::SSPages},
+    domain::{e1::E1, model::SyntheticSS, process::try_compute_pages, ss::SSPages},
     solve::issues::{
         Issue, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic,
         synthetic_issue_is_tau_structure_issue,
@@ -10,13 +10,13 @@ use crate::{
 };
 
 fn verify_convergence(
-    data: &SyntheticSS,
+    model: &E1,
     pages: &SSPages,
     bot_trunc: i32,
     top_trunc: i32,
     stem: i32,
 ) -> Result<(), Vec<Issue>> {
-    let observed = pages.convergence_at_stem(data, stem);
+    let observed = pages.convergence_at_stem(model, stem);
 
     compare_synthetic(
         &observed,
@@ -28,13 +28,13 @@ fn verify_convergence(
 }
 
 fn verify_algebraic_convergence(
-    data: &SyntheticSS,
+    model: &E1,
     pages: &SSPages,
     bot_trunc: i32,
     top_trunc: i32,
     stem: i32,
 ) -> Result<(), Vec<Issue>> {
-    let observed = pages.algebraic_convergence_at_stem(data, stem);
+    let observed = pages.algebraic_convergence_at_stem(model, stem);
 
     compare_algebraic(
         &observed,
@@ -45,14 +45,14 @@ fn verify_algebraic_convergence(
     )
 }
 
-pub fn find_ahss_issues(data: &SyntheticSS, stem: i32) -> Result<(), Vec<Issue>> {
-    ahss_synthetic_e1_issue(data, stem)?;
+pub fn find_ahss_issues(data: &SyntheticSS, model: &E1, stem: i32) -> Result<(), Vec<Issue>> {
+    ahss_synthetic_e1_issue(data, model, stem)?;
 
     for &(synthetic, bot_trunc, top_trunc) in rp_truncations() {
         let pages = if synthetic {
-            let pages = try_compute_pages(data, bot_trunc, top_trunc, stem, stem, true)?;
+            let pages = try_compute_pages(data, model, bot_trunc, top_trunc, stem, stem, true)?;
 
-            verify_convergence(&data, &pages, bot_trunc, top_trunc, stem).map_err(|x| {
+            verify_convergence(model, &pages, bot_trunc, top_trunc, stem).map_err(|x| {
                 println!(
                     "Tau issues: {}",
                     synthetic_issue_is_tau_structure_issue(&x).0
@@ -61,23 +61,23 @@ pub fn find_ahss_issues(data: &SyntheticSS, stem: i32) -> Result<(), Vec<Issue>>
             })?;
             pages
         } else {
-            let pages = try_compute_pages(data, bot_trunc, top_trunc, stem - 1, stem, true)?;
+            let pages = try_compute_pages(data, model, bot_trunc, top_trunc, stem - 1, stem, true)?;
 
-            verify_algebraic_convergence(&data, &pages, bot_trunc, top_trunc, stem)?;
+            verify_algebraic_convergence(model, &pages, bot_trunc, top_trunc, stem)?;
             pages
         };
-        compare_algebraic_spectral_sequence(data, &pages, stem, bot_trunc, top_trunc, true)?;
+        compare_algebraic_spectral_sequence(data, model, &pages, stem, bot_trunc, top_trunc, true)?;
     }
 
     Ok(())
 }
 
-pub fn ahss_synthetic_e1_issue(data: &SyntheticSS, stem: i32) -> Result<(), Vec<Issue>> {
+pub fn ahss_synthetic_e1_issue(data: &SyntheticSS, model: &E1, stem: i32) -> Result<(), Vec<Issue>> {
     let mut observed = HashMap::new();
-    for id in data.model.gens_id_in_stem(stem) {
-        let g = data.model.get(*id);
+    for id in model.gens_id_in_stem(stem) {
+        let g = model.get(*id);
         if g.y == 1 && g.stem == stem {
-            observed.entry(g.af - 1).or_insert(vec![]).push(g.torsion);
+            observed.entry(g.af - 1).or_insert(vec![]).push(data.generators[*id]);
         }
     }
 

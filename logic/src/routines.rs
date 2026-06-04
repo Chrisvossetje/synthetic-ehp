@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use crate::{
-    MAX_STEM, MAX_VERIFY_STEM, data::curtis::{DATA, STABLE_DATA}, domain::model::SyntheticSS, io::{
+    MAX_STEM, MAX_VERIFY_STEM, data::curtis::{DATA, MODEL, STABLE_DATA, STABLE_MODEL}, domain::model::SyntheticSS, io::{
         cli::process_input,
         export::write_all, import::get_log,
     }, solve::{
@@ -10,7 +10,7 @@ use crate::{
 };
 
 pub fn interactive_ahss() -> (SyntheticSS, Duration) {
-    let original_data = STABLE_DATA.clone();
+    let original_data = &STABLE_DATA.clone();
 
     let mut log = match get_log(false, true) {
         Ok(log) => log,
@@ -18,9 +18,9 @@ pub fn interactive_ahss() -> (SyntheticSS, Duration) {
             panic!("Log importing was not succesful");
         }
     };
-    let mut data = revert_log_and_remake(0, &mut log, &STABLE_DATA, true);
+    let mut data = revert_log_and_remake(0, &mut log, &STABLE_MODEL, &STABLE_DATA, true);
 
-    write_all(&data, &log, true);
+    write_all(&data, &STABLE_MODEL, &log, true);
 
     let mut stem = 2;
 
@@ -38,14 +38,14 @@ pub fn interactive_ahss() -> (SyntheticSS, Duration) {
     'outer: while stem <= MAX_VERIFY_STEM {
         print!("{stem}-");
 
-        'middle: while let Err(issues) = find_ahss_issues(&data, stem) {
+        'middle: while let Err(issues) = find_ahss_issues(&data, &STABLE_MODEL, stem) {
             println!("");
             for issue in &issues {
                 // Automatic
-                match auto_deduce(&data, &issue) {
+                match auto_deduce(&data, &STABLE_MODEL, &issue) {
                     Ok(actions) => {
                         for action in actions {
-                            match process_action(&mut data, &action, false) {
+                            match process_action(&mut data, &STABLE_MODEL, &action, false) {
                                 Ok(_) => {
                                     println!("\n{:?}\n", issue);
                                     println!(
@@ -53,7 +53,7 @@ pub fn interactive_ahss() -> (SyntheticSS, Duration) {
                                         action
                                     );
                                     log.push(action);
-                                    write_all(&data, &log, false);
+                                    write_all(&data, &STABLE_MODEL, &log, false);
                                 }
                                 Err(_) => {
                                     panic!("Automated action was invalid ?? {action:?}");
@@ -78,15 +78,15 @@ pub fn interactive_ahss() -> (SyntheticSS, Duration) {
                     Ok(action) => {
                         total_input_time += waited_on_input.elapsed();
                         if let Action::Revert { times } = action {
-                            data = revert_log_and_remake(times, &mut log, &original_data, true);
-                            write_all(&data, &log, true);
+                            data = revert_log_and_remake(times, &mut log, &STABLE_MODEL, &original_data, true);
+                            write_all(&data, &STABLE_MODEL, &log, true);
                             stem = 2;
                             break;
                         } else {
-                            match process_action(&mut data, &action, true) {
+                            match process_action(&mut data, &STABLE_MODEL, &action, true) {
                                 Ok(_) => {
                                     log.push(action);
-                                    write_all(&data, &log, true);
+                                    write_all(&data, &STABLE_MODEL, &log, true);
                                     break;
                                 }
                                 Err(_) => {
@@ -113,13 +113,29 @@ pub fn interactive_ahss() -> (SyntheticSS, Duration) {
         stem += 1;
     }
 
-    write_all(&data, &log, true);
+    write_all(&data, &STABLE_MODEL, &log, true);
     return (data, total_input_time);
 }
 
-pub fn interactive_ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
+pub fn interactive_ehp() -> (SyntheticSS, Duration) {
+
     let mut original_data = DATA.clone();
-    set_metastable_range(&mut original_data, ahss).unwrap();
+
+    let mut ahss_log = match get_log(false, true) {
+        Ok(log) => log,
+        Err(_) => {
+            println!("Log importing was not succesful");
+            println!("Log importing was not succesful");
+            println!("Log importing was not succesful");
+            println!("Log importing was not succesful");
+            println!("Log importing was not succesful");
+            vec![]
+        }
+    };
+
+    let ahss = revert_log_and_remake(0, &mut ahss_log, &STABLE_MODEL, &STABLE_DATA, true);
+
+    set_metastable_range(&mut original_data, &ahss).unwrap();
 
     let mut log = match get_log(false, false) {
         Ok(log) => log,
@@ -132,11 +148,11 @@ pub fn interactive_ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
             vec![]
         }
     };
-    let mut data = revert_log_and_remake(0, &mut log, &original_data, false);
+    let mut data = revert_log_and_remake(0, &mut log, &MODEL, &original_data, false);
 
-    write_all(&data, &log, false);
+    write_all(&data, &MODEL, &log, false);
 
-    let map = ehp_to_ahss_map(&data, ahss);
+    let map = ehp_to_ahss_map();
 
     let mut total_input_time = Duration::ZERO;
 
@@ -155,17 +171,17 @@ pub fn interactive_ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
         print!("{stem_minus_sphere}-");
 
         'middle: while let Err(issues) =
-            find_ehp_issues(&mut data, ahss, &map, stem_minus_sphere, slanted)
+            find_ehp_issues(&mut data, &MODEL, &ahss, &STABLE_MODEL, &map, stem_minus_sphere, slanted)
         {
             println!("");
 
-            write_all(&data, &log, false);
+            write_all(&data, &MODEL, &log, false);
             for issue in &issues {
                 // Automatic
-                match auto_deduce(&data, &issue) {
+                match auto_deduce(&data, &MODEL, &issue) {
                     Ok(actions) => {
                         for action in actions {
-                            match process_action(&mut data, &action, false) {
+                            match process_action(&mut data, &MODEL, &action, false) {
                                 Ok(_) => {
                                     println!("\n{:?}\n", issue);
                                     println!(
@@ -173,7 +189,7 @@ pub fn interactive_ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
                                         action
                                     );
                                     log.push(action);
-                                    write_all(&data, &log, false);
+                                    write_all(&data, &MODEL, &log, false);
                                 }
                                 Err(_) => {
                                     panic!("Automated action was invalid ?? {action:?}");
@@ -198,12 +214,12 @@ pub fn interactive_ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
                     Ok(action) => {
                         total_input_time += waited_on_input.elapsed();
                         if let Action::Revert { times } = action {
-                            data = revert_log_and_remake(times, &mut log, &original_data, false);
-                            write_all(&data, &log, false);
+                            data = revert_log_and_remake(times, &mut log, &MODEL, &original_data, false);
+                            write_all(&data, &MODEL, &log, false);
                             stem_minus_sphere = 2;
                             break;
                         } else {
-                            match process_action(&mut data, &action, false) {
+                            match process_action(&mut data, &MODEL, &action, false) {
                                 Ok(_) => {
                                     stem_minus_sphere = 2;
                                     log.push(action);
@@ -232,15 +248,11 @@ pub fn interactive_ehp(ahss: &SyntheticSS) -> (SyntheticSS, Duration) {
         stem_minus_sphere += 1;
     }
 
-    // // TODO : Do a verify Hopf Inv One maps thing ?
-    // THIS CAN BE VERIFIED BY JUST NOT ALLOWING DIFF / THINGS FROM y = 3 / 7
-
     for i in 2..=MAX_STEM {
-        let _ = apply_ehp_recursively(&mut data, i, false);
+        let _ = apply_ehp_recursively(&mut data, &MODEL, i, false);
     }
 
-    // add_final_diagonal(&mut data);
-    write_all(&data, &log, false);
+    write_all(&data, &MODEL, &log, false);
     (data, total_input_time)
 }
 
@@ -253,7 +265,7 @@ pub fn automated_ahss() {
     };
 
     let (ahss_log, ahss) = ahss_solver(ahss_log);
-    write_all(&ahss, &ahss_log, true);
+    write_all(&ahss, &STABLE_MODEL, &ahss_log, true);
 
     println!("\nProgram took: {:.2?}\n", start.elapsed());
 }
@@ -266,7 +278,7 @@ pub fn automated_ehp() -> SyntheticSS {
         Err(_) => vec![],
     };
 
-    let ahss = revert_log_and_remake(0, &mut ahss_log, &STABLE_DATA, true);
+    let ahss = revert_log_and_remake(0, &mut ahss_log, &STABLE_MODEL, &STABLE_DATA, true);
 
     let ehp_log = match get_log(true, false) {
         Ok(log) => log,
@@ -274,15 +286,12 @@ pub fn automated_ehp() -> SyntheticSS {
             panic!("Log importing was not succesful");
         }
     };
-        
+
     let (ehp_log, ehp) = ehp_solver(&ahss, Some(ehp_log));
-    
-    write_all(&ehp, &ehp_log, false);
-    
-    // verify_geometric(&ehp);
-    // export_order_table(&ehp);
+
+    write_all(&ehp, &&STABLE_MODEL, &ehp_log, false);
 
     println!("\nProgram took: {:.2?}\n", start.elapsed());
-    
+
     ehp
 }

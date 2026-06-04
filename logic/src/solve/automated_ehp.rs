@@ -2,16 +2,12 @@ use core::panic;
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    MAX_STEM,
-    data::{
+    MAX_STEM, MAX_VERIFY_STEM, data::{
         compare::{ALGEBRAIC_SPHERE_PAGES, EHP_TO_AHSS, RADON_HURWITZ_NUMBERS, S0, algebraic_spheres},
-        curtis::DATA,
-    },
-    domain::{
-        model::{Diff, ExtTauMult, SyntheticSS},
-        process::{compute_pages, ehp_recursion, try_compute_pages}, ss::SSPages,
-    },
-    solve::{
+        curtis::{DATA, MODEL, STABLE_MODEL},
+    }, domain::{
+        e1::E1, model::{Diff, ExtTauMult, SyntheticSS}, process::{compute_pages, ehp_recursion, try_compute_pages}, ss::SSPages
+    }, solve::{
         action::{Action, process_action, revert_log_and_remake},
         automated::{ALWAYS_PRINT, MAX_DEPTH, TauIssue},
         ehp_ahss::{in_metastable_range, set_metastable_range},
@@ -25,8 +21,7 @@ use crate::{
             BranchResult, ChoiceResult, GetOut, SpeculativeBranchOutcome, branch_on_speculative_worlds, check_getout, create_getout, empty_getout, signal_parent_getout
         },
         solve::{suggest_tau_solution_algebraic, suggest_tau_solution_generator_synthetic},
-    },
-    types::Kind,
+    }, types::Kind
 };
 
 
@@ -44,12 +39,13 @@ enum FixNamesResult {
 
 fn commit_diff_choice(
     data: &mut SyntheticSS,
+    model: &E1,
     log: &Arc<Mutex<Vec<Action>>>,
     depth: i32,
     d: Diff,
     commitment: Commitment,
 ) {
-    let (from_name, to_name) = data.get_names(d.from, d.to);
+    let (from_name, to_name) = model.get_names(d.from, d.to);
 
     match commitment {
         Commitment::Fake(proof) => {
@@ -64,7 +60,7 @@ fn commit_diff_choice(
                     kind: Kind::Fake,
                 });
             }
-            data.add_diff(d.from, d.to, Some(proof), Kind::Fake);
+            data.add_diff(model, d.from, d.to, Some(proof), Kind::Fake);
         }
         Commitment::Real(proof) => {
             if ALWAYS_PRINT || depth == 0 {
@@ -78,7 +74,7 @@ fn commit_diff_choice(
                     kind: Kind::Real,
                 });
             }
-            data.add_diff(d.from, d.to, Some(proof), Kind::Real);
+            data.add_diff(model, d.from, d.to, Some(proof), Kind::Real);
         }
         Commitment::Unknown => {
             if ALWAYS_PRINT || depth == 0 {
@@ -92,19 +88,20 @@ fn commit_diff_choice(
                     kind: Kind::Unknown,
                 });
             }
-            data.add_diff(d.from, d.to, None, Kind::Unknown);
+            data.add_diff(model, d.from, d.to, None, Kind::Unknown);
         }
     }
 }
 
 fn commit_tau_choice(
     data: &mut SyntheticSS,
+    model: &E1,
     log: &Arc<Mutex<Vec<Action>>>,
     depth: i32,
     d: ExtTauMult,
     commitment: Commitment,
 ) {
-    let (from_name, to_name) = data.get_names(d.from, d.to);
+    let (from_name, to_name) = model.get_names(d.from, d.to);
 
     match commitment {
         Commitment::Fake(proof) => {
@@ -116,11 +113,11 @@ fn commit_tau_choice(
                     from: from_name,
                     to: to_name,
                     af: d.af,
-                    proof: proof.clone(),
+                    proof: Some(proof.clone()),
                     kind: Kind::Fake,
                 });
             }
-            data.add_ext_tau(d.from, d.to, d.af, Some(proof), Kind::Fake);
+            data.add_ext_tau(model, d.from, d.to, d.af, None, Kind::Fake);
         }
         Commitment::Real(proof) => {
             if ALWAYS_PRINT || depth == 0 {
@@ -131,11 +128,11 @@ fn commit_tau_choice(
                     from: from_name,
                     to: to_name,
                     af: d.af,
-                    proof: proof.clone(),
+                    proof: Some(proof.clone()),
                     kind: Kind::Real,
                 });
             }
-            data.add_ext_tau(d.from, d.to, d.af, Some(proof), Kind::Real);
+            data.add_ext_tau(model, d.from, d.to, d.af, None, Kind::Real);
         }
         Commitment::Unknown => {
             if ALWAYS_PRINT || depth == 0 {
@@ -146,17 +143,18 @@ fn commit_tau_choice(
                     from: from_name,
                     to: to_name,
                     af: d.af,
-                    proof: "".to_string(),
+                    proof: None,
                     kind: Kind::Unknown,
                 });
             }
-            data.add_ext_tau(d.from, d.to, d.af, Some("".to_string()), Kind::Unknown);
+            data.add_ext_tau(model, d.from, d.to, d.af, None, Kind::Unknown);
         }
     }
 }
 
 fn commit_induced_name_choice(
     data: &mut SyntheticSS,
+    model: &E1,
     depth: i32,
     action: &mut Action,
     proof: String,
@@ -173,31 +171,32 @@ fn commit_induced_name_choice(
         println!("Choosing induced name: {:?} | because {proof}", action);
     }
 
-    process_action(data, action, false).unwrap();
+    process_action(data, model, action, false).unwrap();
     action.clone()
 }
 
-fn check_issue(data: &SyntheticSS, ahss_pages: &[SSPages; (MAX_STEM + 1) as usize], stem: i32, sphere: i32) -> Result<(), Vec<Issue>> {
+fn check_issue(data: &SyntheticSS, model: &E1, ahss_pages: &[SSPages; (MAX_STEM + 1) as usize], stem: i32, sphere: i32) -> Result<(), Vec<Issue>> {
     let pages = if stem + 2 == sphere {
-        let pages = try_compute_pages(data, 0, sphere - 1, stem, stem, true)?;
+        let pages = try_compute_pages(data, model, 0, sphere - 1, stem, stem, true)?;
 
-        let observed = pages.convergence_at_stem(data, stem);
+        let observed = pages.convergence_at_stem(model, stem);
 
         compare_synthetic(&observed, &S0, 0, sphere - 1, stem)?;
 
-        compare_algebraic_spectral_sequence(data, &pages, stem, 0, sphere - 1, false)?;
+        compare_algebraic_spectral_sequence(data, model, &pages, stem, 0, sphere - 1, false)?;
 
         pages
     } else {
-        let pages = try_compute_pages(data, 0, sphere - 1, stem - 1, stem, true)?;
+        let pages = try_compute_pages(data, model, 0, sphere - 1, stem - 1, stem, true)?;
 
-        let observed = pages.algebraic_convergence_at_stem(data, stem);
+        let observed = pages.algebraic_convergence_at_stem(model, stem);
 
         compare_algebraic(&observed, algebraic_spheres(sphere), 0, sphere - 1, stem)?;
         pages
     };
 
-    for &f_id in data.model.gens_id_in_stem(stem) {
+    // This verifies EHP -> AHSS
+    for &f_id in model.gens_id_in_stem(stem) {
         if let Some(t_id) = EHP_TO_AHSS[f_id]
             && ahss_pages[(sphere - 1) as usize].element_in_pages(t_id)
         {
@@ -209,7 +208,7 @@ fn check_issue(data: &SyntheticSS, ahss_pages: &[SSPages; (MAX_STEM + 1) as usiz
 
                         if !t_torsion.can_map_with_coeff(&f_torsion, t_af - f_af) {
                             return Err(vec![Issue::InvalidEHPAHSSMap {
-                                name: data.model.name(f_id).to_string(),
+                                name: model.name(f_id).to_string(),
                                 from_torsion: *f_torsion,
                                 to_torsion: t_torsion,
                                 stem,
@@ -227,52 +226,35 @@ fn check_issue(data: &SyntheticSS, ahss_pages: &[SSPages; (MAX_STEM + 1) as usiz
 
 fn filter_diff(
     data: &SyntheticSS,
+    model: &E1,
     alg_ehp: &SyntheticSS,
     bot_trunc: i32,
     top_trunc: i32,
     d: Diff,
 ) -> Option<Kind> {
-    let stem = data.model.stem(d.to);
-    let y = data.model.y(d.from);
+    let _stem = model.stem(d.to);
+    let y = model.y(d.from);
 
-    if y - data.model.y(d.to) < RADON_HURWITZ_NUMBERS[y as usize] {
+    if y - model.y(d.to) < RADON_HURWITZ_NUMBERS[y as usize] {
         Some(Kind::MinimalLength)
     } else if data.in_diffs[d.to]
         .iter()
-        .any(|from| data.model.y(*from) == top_trunc && data.model.original_torsion(*from).alive())
+        .any(|from| model.y(*from) == top_trunc && data.generators[*from].alive())
     {
         Some(Kind::AdditiveStructure)
     } else if bot_trunc & 1 == 0
         && let Some(alg_to) = alg_ehp.out_diffs[d.from].first()
-        && data.model.original_torsion(*alg_to).alive()
-        && data.model.y(*alg_to) + 1 == bot_trunc
+        && data.generators[*alg_to].alive()
+        && model.y(*alg_to) + 1 == bot_trunc
     {
         Some(Kind::Invisible)
     } else if top_trunc & 1 == 1
-        && let Some(dies) = data.model.get(d.to).dies
+        && let Some(dies) = model.get(d.to).dies
         && let Some(source) = alg_ehp.in_diffs[d.to].first()
-        && data.model.original_torsion(*source).free()
+        && data.generators[*source].free()
         && top_trunc + 2 == dies
     {
         Some(Kind::Unnecessary)
-        // TODO: Is this necc. ?
-    // } else if data.out_diffs[d.from]
-    //     .last()
-    //     .map(|x| {
-    //         if let Some(target) = data.out_taus[*x].last() {
-    //             *target != d.to
-    //         } else {
-    //             false
-    //         }
-    //     })
-    //     .unwrap_or(false)
-    // {
-    //     Some((
-    //         Kind::Fake,
-    //         format!(
-    //             "Can't have a differential which earlier hits some tau multiple and then later does not."
-    //         ),
-    //     ))
     } else {
         None
     }
@@ -280,21 +262,17 @@ fn filter_diff(
 
 fn filter_tau(
     data: &SyntheticSS,
-    alg_ahss: &SyntheticSS,
-    bot_trunc: i32,
-    top_trunc: i32,
+    model: &E1,
+    _alg_ahss: &SyntheticSS,
+    _bot_trunc: i32,
+    _top_trunc: i32,
     d: ExtTauMult,
-) -> Option<(Kind, String)> {
-    let stem = data.model.stem(d.to);
-    let y = data.model.y(d.from);
+) -> Option<Kind> {
+    let _stem = model.stem(d.to);
+    let _y = model.y(d.from);
 
-    if data.model.original_torsion(d.from).free() {
-        Some((
-            Kind::Fake,
-            format!(
-                "We have not enough information to see the difference between this tau extension and having the incoming differential just go to the thing this tau extension is targeting."
-            ),
-        ))
+    if data.generators[d.from].free() {
+        Some(Kind::Unnecessary)
     } else {
         None
     }
@@ -314,6 +292,7 @@ fn get_first_non_metastable_range(stem: i32, top_trunc: i32) -> i32 {
 
 fn ehp_iterate(
     mut data: SyntheticSS,
+    model: &E1,
     alg_ehp: &SyntheticSS,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
     ahss_pages: &[SSPages; (MAX_STEM + 1) as usize],
@@ -325,11 +304,11 @@ fn ehp_iterate(
     depth: i32,
 ) -> BranchResult {
     loop {
-        if depth == 0 && stem >= 47 {
+        if depth == 0 && stem >= MAX_VERIFY_STEM {
             return BranchResult::Open;
         }
 
-        if depth > MAX_DEPTH || stem >= 48 {
+        if depth > MAX_DEPTH || stem >= MAX_STEM {
             return BranchResult::Open;
         }
 
@@ -338,12 +317,15 @@ fn ehp_iterate(
         }
 
         if bot_trunc != 0 {
-            let option = get_a_diff(&data, top_trunc, bot_trunc, stem);
-
+            let option = get_a_diff(&data, model, top_trunc, bot_trunc, stem);
             // Should only need first option here
             if let Some(d) = option {
+                if depth >= MAX_DEPTH {
+                    return BranchResult::Open;
+                }
                 match try_diff(
                     &mut data,
+                    model,
                     alg_ehp,
                     ahss_and_alg_data,
                     ahss_pages,
@@ -367,7 +349,7 @@ fn ehp_iterate(
                 }
             }
         } else {
-            let potential_tau_thing = match is_tau_issue(&data, ahss_pages, stem, top_trunc + 1) {
+            let potential_tau_thing = match is_tau_issue(&data, model, ahss_pages, stem, top_trunc + 1) {
                 Ok(tau_issue) => tau_issue,
                 Err(is) => {
                     signal_parent_getout(&mut getout, depth);
@@ -379,6 +361,7 @@ fn ehp_iterate(
                 let option = match synthetic {
                     TauIssue::AlgTauIssue => suggest_tau_solution_algebraic(
                         &data,
+                        model,
                         &mut issues,
                         top_trunc,
                         bot_trunc,
@@ -386,6 +369,7 @@ fn ehp_iterate(
                     ),
                     TauIssue::SynTauGeneratorIssue => suggest_tau_solution_generator_synthetic(
                         &data,
+                        model,
                         &mut issues,
                         top_trunc,
                         bot_trunc,
@@ -393,6 +377,7 @@ fn ehp_iterate(
                     ),
                     TauIssue::SynTauModuleIssue => suggest_tau_solution_generator_synthetic(
                         &data,
+                        model,
                         &mut issues,
                         top_trunc,
                         bot_trunc,
@@ -401,8 +386,12 @@ fn ehp_iterate(
                 };
 
                 if let Some(d) = option {
+                    if depth >= MAX_DEPTH {
+                        return BranchResult::Open;
+                    }
                     match try_tau(
                         &mut data,
+                        model,
                         alg_ehp,
                         ahss_and_alg_data,
                         ahss_pages,
@@ -440,6 +429,7 @@ fn ehp_iterate(
             // TODO: Do something wth this result ?
             let _ = add_diffs(
                 &mut data,
+                model,
                 ahss_and_alg_data,
                 stem,
                 &log,
@@ -453,6 +443,7 @@ fn ehp_iterate(
             if top_trunc & 1 == 0 && (top_trunc / 2) + stem < MAX_STEM {
                 match fix_names(
                     &mut data,
+                    model,
                     alg_ehp,
                     ahss_and_alg_data,
                     ahss_pages,
@@ -472,37 +463,20 @@ fn ehp_iterate(
                         FixNamesResult::Cancelled => return BranchResult::Cancelled,
                         FixNamesResult::Open => return BranchResult::Open,
                     },
-                    Err(e) => return BranchResult::Contradiction(e),
+                    Err(e) => {
+                        signal_parent_getout(&mut getout, depth);
+                        return BranchResult::Contradiction(e)
+                    },
                 }
             }
         }
 
         if top_trunc & 1 == 0 && top_trunc <= stem && (top_trunc / 2) + stem < MAX_STEM {
-            let res = ehp_recursion(&mut data, top_trunc + 1, stem).map_err(|x| format!("{x:?}"));
+            let res = ehp_recursion(&mut data, model, top_trunc + 1, stem).map_err(|x| format!("{x:?}"));
             if res.is_err() {
                 panic!();
             }
         }
-
-        // Stupid complicated formula
-        // But all this works out to always traverse all sphere in such a manner that the recursion is always "just in time"
-        // Aka, we move through the SS in a slanted way
-        // Sadly this also means that we can only use the synthetic knowledge "very late"
-        // But we have the benifit of seeing tau torsion like issues early
-        // if top_trunc == 1 {
-        //     top_trunc = 2*((stem+2)/3);
-        //     stem = ((2*(stem+1))+1)/3;
-        // } else {
-        //     if top_trunc == 3 || (top_trunc & 1 == 0 && top_trunc == stem + 1) {
-        //         stem += 1;
-        //         top_trunc -= 2;
-        //     } else if top_trunc & 1 == 0 {
-        //         top_trunc += 1;
-        //     } else {
-        //         stem += 1;
-        //         top_trunc -= 3;
-        //     }
-        // }
 
         // Slightly less complicated formula
         if top_trunc >= stem + 1 {
@@ -538,6 +512,7 @@ fn ehp_iterate(
 
 fn fix_names(
     data: &mut SyntheticSS,
+    model: &E1,
     alg_ehp: &SyntheticSS,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
     ahss_pages: &[SSPages; (MAX_STEM + 1) as usize],
@@ -550,36 +525,32 @@ fn fix_names(
 ) -> Result<FixNamesResult, String> {
     let sphere = top_trunc + 1;
 
-    let (pages, _) = compute_pages(data, 0, sphere - 1, stem, stem, true);
+    let (pages, _) = compute_pages(data, model, 0, sphere - 1, stem, stem, true);
     let alg_pages = &ALGEBRAIC_SPHERE_PAGES[sphere as usize];
 
     let mut issues = vec![];
 
-    for &id in data.model.gens_id_in_stem(stem) {
+    for &id in model.gens_id_in_stem(stem) {
         // Synthetic Generators
         if let Some((id_af, id_torsion)) = pages.try_element_final(id)
             && id_torsion.alive()
         {
-            let ind_name = data.get_name_at_sphere(id, sphere);
-            let g = data.model.get_name(ind_name);
+            let ind_name = data.get_name_at_sphere(model, id, sphere).to_string();
+            let g = model.get_name(&ind_name);
             if let Some(dies) = g.dies
                 && dies <= sphere
             {
-                // PROBLEM
-
-                // Here we should already try to solve this shit
                 issues.push(Issue::InvalidName {
-                    original_name: data.model.name(id).to_string(),
-                    unexpected_name: ind_name.to_string(),
+                    original_name: model.name(id).to_string(),
+                    unexpected_name: ind_name,
                     sphere,
                     stem,
                     af: id_af,
                 });
             } else if id_af != g.af {
-                // Here we should already try to solve this shit
                 issues.push(Issue::InvalidName {
-                    original_name: data.model.name(id).to_string(),
-                    unexpected_name: ind_name.to_string(),
+                    original_name: model.name(id).to_string(),
+                    unexpected_name: ind_name,
                     sphere,
                     stem,
                     af: id_af,
@@ -593,7 +564,7 @@ fn fix_names(
     for i in &issues {
         if let Issue::InvalidName {
             original_name,
-            unexpected_name,
+            unexpected_name: _,
             sphere,
             stem,
             af,
@@ -602,11 +573,11 @@ fn fix_names(
             // Problem things
             let mut syn = vec![];
             let mut alg = vec![];
-            for id in DATA.model.gens_id_in_stem(*stem) {
+            for id in MODEL.gens_id_in_stem(*stem) {
                 if pages.element_in_pages(*id) {
                     let g = pages.element_final(*id);
                     if g.1.alive() && g.0 == *af {
-                        let name = data.get_name_at_sphere(*id, *sphere);
+                        let name = data.get_name_at_sphere(model, *id, *sphere).to_string();
                         syn.push(name);
                     }
                 }
@@ -614,7 +585,7 @@ fn fix_names(
                 if alg_pages.element_in_pages(*id) {
                     let g = alg_pages.element_final(*id);
                     if g.1.alive() && g.0 == *af {
-                        let name = DATA.model.name(*id);
+                        let name = MODEL.name(*id).to_string();
                         alg.push(name);
                     }
                 }
@@ -639,11 +610,9 @@ fn fix_names(
                     ),
                 };
 
-                process_action(data, &action, false).unwrap();
+                process_action(data, model, &action, false).unwrap();
                 sols.push(action);
             } else {
-                // TODO: i have to collect all the problems and THEN fix the stuffzies
-
                 // Go do a branching search to find best candidates
                 if fil_syn.len() == 1 && fil_alg.len() == 2 {
                     let g = create_getout(getout, 2, depth);
@@ -663,10 +632,11 @@ fn fix_names(
 
                     let a = || {
                         let mut with_data = data.clone();
-                        process_action(&mut with_data, &a_action, false).unwrap();
+                        process_action(&mut with_data, model, &a_action, false).unwrap();
 
                         ehp_iterate(
                             with_data,
+                            model,
                             alg_ehp,
                             ahss_and_alg_data,
                             ahss_pages,
@@ -680,10 +650,11 @@ fn fix_names(
                     };
                     let b = || {
                         let mut without_data = data.clone();
-                        process_action(&mut without_data, &b_action, false).unwrap();
+                        process_action(&mut without_data, model, &b_action, false).unwrap();
 
                         ehp_iterate(
                             without_data,
+                            model,
                             alg_ehp,
                             ahss_and_alg_data,
                             ahss_pages,
@@ -702,11 +673,11 @@ fn fix_names(
 
                     match branch_on_speculative_worlds(depth, a, b) {
                         SpeculativeBranchOutcome::ChooseRight(e) => {
-                            let action = commit_induced_name_choice(data, depth, &mut b_action, e);
+                            let action = commit_induced_name_choice(data, model, depth, &mut b_action, e);
                             sols.push(action);
                         }
                         SpeculativeBranchOutcome::ChooseLeft(e) => {
-                            let action = commit_induced_name_choice(data, depth, &mut a_action, e);
+                            let action = commit_induced_name_choice(data, model, depth, &mut a_action, e);
                             sols.push(action);
                         }
                         SpeculativeBranchOutcome::Cancelled => {
@@ -714,14 +685,6 @@ fn fix_names(
                         }
                         SpeculativeBranchOutcome::BothOpen => {
                             return Ok(FixNamesResult::Open);
-                            // if depth == 0 {
-                            //     unreachable!("Induced-name branching should distinguish the two choices.");
-                            // } else {
-                            //     // What should i do here ?
-                            //     // I probably can't see the result yet ?
-                            //     let action = commit_induced_name_choice(data, depth, &mut a_action, "".to_string());
-                            //     sols.push(action);
-                            // }
                         }
                     }
                 } else {
@@ -747,6 +710,7 @@ fn fix_names(
 
 fn try_diff(
     data: &mut SyntheticSS,
+    model: &E1,
     alg_ehp: &SyntheticSS,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
     ahss_pages: &[SSPages; (MAX_STEM + 1) as usize],
@@ -758,44 +722,42 @@ fn try_diff(
     depth: i32,
     d: Diff,
 ) -> ChoiceResult {
-    let (from_name, to_name) = data.get_names(d.from, d.to);
+    let (from_name, to_name) = model.get_names(d.from, d.to);
 
-    let filter = filter_diff(&data, alg_ehp, bot_trunc, top_trunc, d);
+    let filter = filter_diff(&data, model, alg_ehp, bot_trunc, top_trunc, d);
 
     if let Some(kind) = filter {
         if depth == 0 {
             log.lock().unwrap().push(Action::AddDiff {
-                from: from_name,
-                to: to_name,
+                from: from_name.clone(),
+                to: to_name.clone(),
                 proof: None,
                 kind,
             });
         }
 
-        let (from_name, to_name) = data.get_names(d.from, d.to);
-
         if ALWAYS_PRINT || depth == 0 {
             println!(
-                "Finished diff by: {} | {} -> {kind:?}",
+                "Finished diff by {kind:?}: {} -> {}",
                 from_name, to_name
             );
         }
-        data.add_diff(d.from, d.to, None, kind);
+        data.add_diff(model, d.from, d.to, None, kind);
         return ChoiceResult::Chosen;
     }
 
     if ALWAYS_PRINT || depth == 0 {
-        println!("Trying diff: {} | {}", from_name, to_name);
+        println!("Trying diff: {} -> {}", from_name, to_name);
     }
 
     let g = create_getout(getout, 2, depth);
 
     let with = || {
-        // println!("{depth} With Trying diff: {} | {}", from_name, to_name);
         let mut with_data = data.clone();
-        with_data.add_diff(d.from, d.to, Some("".to_string()), Kind::Real);
+        with_data.add_diff(model, d.from, d.to, Some("".to_string()), Kind::Real);
         ehp_iterate(
             with_data,
+            model,
             alg_ehp,
             ahss_and_alg_data,
             ahss_pages,
@@ -808,11 +770,11 @@ fn try_diff(
         )
     };
     let without = || {
-        // println!("{depth} Without Trying diff: {} | {}", from_name, to_name);
         let mut without_data = data.clone();
-        without_data.add_diff(d.from, d.to, Some("".to_string()), Kind::Fake);
+        without_data.add_diff(model, d.from, d.to, Some("".to_string()), Kind::Fake);
         ehp_iterate(
             without_data,
+            model,
             alg_ehp,
             ahss_and_alg_data,
             ahss_pages,
@@ -827,18 +789,15 @@ fn try_diff(
 
     match branch_on_speculative_worlds(depth, with, without) {
         SpeculativeBranchOutcome::ChooseRight(e) => {
-            commit_diff_choice(data, log, depth, d, Commitment::Fake(e));
+            commit_diff_choice(data, model, log, depth, d, Commitment::Fake(e));
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::ChooseLeft(e) => {
-            commit_diff_choice(data, log, depth, d, Commitment::Real(e));
+            commit_diff_choice(data, model, log, depth, d, Commitment::Real(e));
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::BothOpen => {
-            // In this case it merely means that i don't know what happened for sure
-            // if im in depth == 0 i HAVE to make a choice
-            // Else i just return and try to follow the other branch
-            commit_diff_choice(data, log, depth, d, Commitment::Unknown);
+            commit_diff_choice(data, model, log, depth, d, Commitment::Unknown);
             ChoiceResult::Open
         }
         SpeculativeBranchOutcome::Cancelled => ChoiceResult::Cancelled,
@@ -847,20 +806,21 @@ fn try_diff(
 
 fn is_tau_issue(
     data: &SyntheticSS,
+    model: &E1,
     ahss_pages: &[SSPages; (MAX_STEM + 1) as usize],
     real_stem: i32,
     sphere: i32,
 ) -> Result<Option<(TauIssue, Vec<Issue>)>, String> {
-    match check_issue(data, ahss_pages, real_stem, sphere) {
+    match check_issue(data, model, ahss_pages, real_stem, sphere) {
         Ok(_) => Ok(None),
         Err(is) => {
             let all_synth_conv = if let Issue::SyntheticConvergence {
-                bot_trunc,
-                top_trunc,
-                stem,
-                af,
-                expected,
-                observed,
+                bot_trunc: _,
+                top_trunc: _,
+                stem: _,
+                af: _,
+                expected: _,
+                observed: _,
             } = &is[0]
             {
                 true
@@ -896,6 +856,7 @@ fn is_tau_issue(
 
 fn try_tau(
     data: &mut SyntheticSS,
+    model: &E1,
     alg_ehp: &SyntheticSS,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
     ahss_pages: &[SSPages; (MAX_STEM + 1) as usize],
@@ -907,30 +868,28 @@ fn try_tau(
     depth: i32,
     d: ExtTauMult,
 ) -> ChoiceResult {
-    let (from_name, to_name) = data.get_names(d.from, d.to);
+    let (from_name, to_name) = model.get_names(d.from, d.to);
 
-    let filter = filter_tau(data, alg_ehp, bot_trunc, top_trunc, d);
+    let filter = filter_tau(data, model, alg_ehp, bot_trunc, top_trunc, d);
 
-    if let Some((kind, reason)) = filter {
+    if let Some(kind) = filter {
         if depth == 0 {
             log.lock().unwrap().push(Action::AddExt {
-                from: from_name,
-                to: to_name,
+                from: from_name.clone(),
+                to: to_name.clone(),
                 af: d.af,
-                proof: reason.clone(),
                 kind,
+                proof: None,
             });
         }
 
-        let (from_name, to_name) = data.get_names(d.from, d.to);
-
         if ALWAYS_PRINT || depth == 0 {
             println!(
-                "Finished tau by: {} | {} -> {kind:?} + {reason}",
+                "Finished tau by {kind:?}: {} -> {}",
                 from_name, to_name
             );
         }
-        data.add_ext_tau(d.from, d.to, d.af, Some(reason), kind);
+        data.add_ext_tau(model, d.from, d.to, d.af, None, kind);
         return ChoiceResult::Chosen;
     }
 
@@ -948,9 +907,10 @@ fn try_tau(
 
     let with = || {
         let mut with_data = data.clone();
-        with_data.add_ext_tau(d.from, d.to, d.af, Some("".to_string()), Kind::Real);
+        with_data.add_ext_tau(model, d.from, d.to, d.af, Some("".to_string()), Kind::Real);
         ehp_iterate(
             with_data,
+            model,
             alg_ehp,
             ahss_and_alg_data,
             ahss_pages,
@@ -964,9 +924,10 @@ fn try_tau(
     };
     let without = || {
         let mut without_data = data.clone();
-        without_data.add_ext_tau(d.from, d.to, d.af, Some("".to_string()), Kind::Fake);
+        without_data.add_ext_tau(model, d.from, d.to, d.af, Some("".to_string()), Kind::Fake);
         ehp_iterate(
             without_data,
+            model,
             alg_ehp,
             ahss_and_alg_data,
             ahss_pages,
@@ -981,15 +942,18 @@ fn try_tau(
 
     match branch_on_speculative_worlds(depth, with, without) {
         SpeculativeBranchOutcome::ChooseRight(e) => {
-            commit_tau_choice(data, log, depth, d, Commitment::Fake(e));
+            commit_tau_choice(data, model, log, depth, d, Commitment::Fake(e));
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::ChooseLeft(e) => {
-            commit_tau_choice(data, log, depth, d, Commitment::Real(e));
+            commit_tau_choice(data, model, log, depth, d, Commitment::Real(e));
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::BothOpen => {
-            // commit_tau_choice(data, log, depth, d, Commitment::Unknown);
+            commit_tau_choice(data, model, log, depth, d, Commitment::Unknown);
+            if ALWAYS_PRINT || depth == 0 {
+                println!("BothOpen: {from_name} | {to_name} tau multiple");
+            }
             ChoiceResult::Open
         }
         SpeculativeBranchOutcome::Cancelled => ChoiceResult::Cancelled,
@@ -998,6 +962,7 @@ fn try_tau(
 
 fn add_diffs(
     data: &mut SyntheticSS,
+    model: &E1,
     ahss_and_alg_data: &Vec<Vec<Vec<Vec<(usize, usize, Kind, Option<String>)>>>>,
     stem: i32,
     log: &Arc<Mutex<Vec<Action>>>,
@@ -1005,14 +970,12 @@ fn add_diffs(
     bot_trunc: i32,
     depth: i32,
 ) -> Result<(), String> {
-    // As we are moving up a page for possible diffs,
-    // we should add all AHSS / adams differentials which could arise from here
-
     let d_y = top_trunc - bot_trunc + 1;
 
+    
     for (from, to, k, p) in &ahss_and_alg_data[stem as usize][d_y as usize][top_trunc as usize] {
-        if let Some(p) = p {
-            let pages = try_compute_pages(&data, 0, top_trunc, stem, stem, false)
+        if *k != Kind::Algebraic {
+            let pages = try_compute_pages(&data, model, 0, top_trunc, stem, stem, false)
                 .map_err(|x| format!("{x:?}"))?;
 
             if let Some((f_af, f_torsion)) = pages.try_element_final(*from)
@@ -1021,11 +984,8 @@ fn add_diffs(
                 if let Some((t_af, t_torsion)) = pages.try_element_final(*to)
                     && t_torsion.alive()
                 {
-                    let coeff = t_af - f_af - 1;
-                    // if t_torsion.can_map_with_coeff(&f_torsion, coeff) {
-
                     if depth == 0 {
-                        let (from_name, to_name) = data.get_names(*from, *to);
+                        let (from_name, to_name) = model.get_names(*from, *to);
                         if ALWAYS_PRINT || depth == 0 {
                             println!("Lifted diff: {} | {}", from_name, to_name);
                         }
@@ -1037,12 +997,7 @@ fn add_diffs(
                         });
                     }
                     // If added torsion is invalid we will see it in useless diff / invalid torsion / EHPAHSS map error
-                    data.add_diff(*from, *to, Some("".to_string()), *k);
-                    // } else {
-                    //     return Err(format!("We want to lift the diff from {} to {}. However, this would give ")
-                    //     println!("stem: {stem} | {:?}", data.get_names(*from, *to));
-                    //     panic!("");
-                    // }
+                    data.add_diff(model, *from, *to, None, *k);
                 } else {
 
                     // This is too strong! as i have not yet given EHP the chance to find differentials which could support this.
@@ -1051,7 +1006,7 @@ fn add_diffs(
                 }
             }
         } else {
-            data.add_diff(*from, *to, None, *k);
+            data.add_diff(model, *from, *to, None, *k);
         }
     }
 
@@ -1059,9 +1014,7 @@ fn add_diffs(
 }
 
 pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>, SyntheticSS) {
-    let alg_ehp = DATA.clone();
-    let mut partial_ehp = SyntheticSS::empty(alg_ehp.model.clone());
-    // We should add all d1's from the algebraic data
+    let mut partial_ehp = SyntheticSS::empty(MODEL.clone());
 
     let _ = set_metastable_range(&mut partial_ehp, ahss);
 
@@ -1074,153 +1027,112 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
     let mut log = log.unwrap_or(vec![]);
 
     // Add EHP Algebraic Diffs
-    for (&(from, to), _) in &alg_ehp.from_to {
-        let d_y = alg_ehp.model.y(from) - alg_ehp.model.y(to);
+    for (&(from, to), (kind, reason)) in &DATA.from_to {
+        let d_y = MODEL.y(from) - MODEL.y(to);
         // Exclude metastable ones, as they have already been added
-        if !in_metastable_range(alg_ehp.model.y(to), alg_ehp.model.stem(to)) {
+        if !in_metastable_range(MODEL.y(to), MODEL.stem(to)) {
             if d_y == 1 {
-                partial_ehp.add_diff(from, to, None, Kind::Real);
+                partial_ehp.add_diff(&MODEL, from, to, None, *kind);
             } else {
-                let stem = alg_ehp.model.stem(to);
-                let top_trunc = alg_ehp.model.y(from);
+                let stem = MODEL.stem(to);
+                let top_trunc = MODEL.y(from);
                 ahss_and_alg_data[stem as usize][d_y as usize][top_trunc as usize].push((
                     from,
                     to,
-                    Kind::Real,
+                    *kind,
                     None,
                 ));
             }
         }
     }
 
-    // // Add compatible AHSS diffs
-    // for (&(from, to), proof) in &ahss.proven_from_to {
-    //     let d_y = ahss.model.y(from) - ahss.model.y(to);
-    //     if let Some(from_id) = alg_ehp.model.try_index(ahss.model.name(from)) {
-    //         if let Some(to_id) = alg_ehp.model.try_index(ahss.model.name(to)) {
-    //             // Differentials
-    //             if ahss.model.stem(from) != ahss.model.stem(to) {
-    //                 // Exclude metastable ones, as they have already been added
-    //                 if !in_metastable_range(ahss.model.y(to), ahss.model.stem(to)) {
-    //                     // if in_metastable_range(ahss.model.y(to) + 1, ahss.model.stem(to)) {
-    //                     //     if let Some(p) = proof {
-    //                     //         partial_ehp.add_diff(
-    //                     //             from_id,
-    //                     //             to_id,
-    //                     //             Some(format!("Lifted from Stable EHP")),
-    //                     //             Kind::Real,
-    //                     //         );
-    //                     //     }
-    //                     // } else {
-    //                     // Don't include the Algebraic diffs of AHSS
-    //                     if let Some(p) = proof
-    //                         && ahss.model.name(from) != "5 6 5 2 3 5 7 7[4]"
-    //                     {
-    //                         if d_y == 1 {
-    //                             let (from_name, to_name) = alg_ehp.get_names(from_id, to_id);
-    //                             log.push(Action::AddDiff {
-    //                                 from: from_name,
-    //                                 to: to_name,
-    //                                 kind: Kind::Real,
-    //                                 proof: Some(format!("(Lifted from AHSS) - {:?}", p)),
-    //                             });
-    //                         } else {
-    //                             let stem = alg_ehp.model.stem(to_id);
-    //                             let top_trunc = alg_ehp.model.y(from_id);
-    //                             ahss_and_alg_data[stem as usize][d_y as usize][top_trunc as usize]
-    //                                 .push((
-    //                                     from_id,
-    //                                     to_id,
-    //                                     Kind::Real,
-    //                                     Some(format!("(Lifted from AHSS) - {:?}", p)),
-    //                                 ));
-    //                         }
-    //                     }
-    //                     // }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+    // Add compatible AHSS diffs
+    for (&(from, to), (kind, proof)) in &ahss.from_to {
+        let d_y = STABLE_MODEL.y(from) - STABLE_MODEL.y(to);
 
-    // // Add disproven compatible AHSS diffs
-    // for (&(from, to), proof) in &ahss.disproven_from_to {
-    //     let d_y = ahss.model.y(from) - ahss.model.y(to);
+        // Only add differentials here
+        if STABLE_MODEL.stem(from) != STABLE_MODEL.stem(to) {
+            if let Some(from_id) = MODEL.try_index(STABLE_MODEL.name(from)) {
+                if let Some(to_id) = MODEL.try_index(STABLE_MODEL.name(to)) {
+                    // Don't include the Unknown and Algebraic differentials
+                    if *kind == Kind::Algebraic || *kind == Kind::Unknown {
+                        continue;
+                    }
 
-    //     // Only add differentials here
-    //     if ahss.model.stem(from) != ahss.model.stem(to) {
-    //         if let Some(from_id) = alg_ehp.model.try_index(ahss.model.name(from)) {
-    //             if let Some(to_id) = alg_ehp.model.try_index(ahss.model.name(to)) {
-    //                 // Don't include the Unknown differentials
-    //                 if let Some(p) = proof {
-    //                     let (from_name, to_name) = alg_ehp.get_names(from_id, to_id);
-    //                     log.push(Action::AddDiff {
-    //                         from: from_name,
-    //                         to: to_name,
-    //                         kind: Kind::Fake,
-    //                         proof: Some(format!("(Lifted from AHSS) - {:?}", p)),
-    //                     });
-    //                     // partial_ehp.add_diff(
-    //                     //     from_id,
-    //                     //     to_id,
-    //                     //     Some(format!("Lifted from Stable EHP")),
-    //                     //     Kind::Fake,
-    //                     // );
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+                    let (from_name, to_name) = MODEL.get_names(from_id, to_id);
+                    
+                    if *kind == Kind::Real {
+                        if d_y == 1 {
+                                let (from_name, to_name) = MODEL.get_names(from_id, to_id);
+                                log.push(Action::AddDiff {
+                                    from: from_name,
+                                    to: to_name,
+                                    kind: *kind,
+                                    proof: Some(format!("Lifted")),
+                                });
+                            } else {
+                                let stem = MODEL.stem(to_id);
+                                let top_trunc = MODEL.y(from_id);
 
-    // // let mut fakes = vec![];
+                                ahss_and_alg_data[stem as usize][d_y as usize][top_trunc as usize]
+                                    .push((
+                                        from_id,
+                                        to_id,
+                                        *kind,
+                                        Some(format!("Lifted")),
+                                    ));
+                            }
+                    } else {
+                        log.push(Action::AddDiff {
+                            from: from_name,
+                            to: to_name,
+                            kind: *kind,
+                            proof: Some(format!("Lifted")),
+                        });
+                    }
+                }
+            }
+        }
+    }
 
-    // // Add all external tau's
-    // // We won't worry about the fake ones
-    // for esss in &ahss.external_tau_page {
-    //     for ess in esss {
-    //         for es in ess {
-    //             for e in es {
-    //                 if let Some(from_id) = alg_ehp.model.try_index(ahss.model.name(e.from)) {
-    //                     if let Some(to_id) = alg_ehp.model.try_index(ahss.model.name(e.to)) {
-    //                         let (kind, p) = ahss
-    //                             .from_to
-    //                             .get(&(e.from, e.to))
-    //                             .unwrap()
-    //                             .as_ref()
-    //                             .unwrap();
-    //                         log.push(Action::AddExt {
-    //                             from: ahss.model.name(e.from).to_string(),
-    //                             to: ahss.model.name(e.to).to_string(),
-    //                             af: e.af,
-    //                             kind: Kind::Real,
-    //                             proof: format!("(Lifted from AHSS) - {:?}", p),
-    //                         });
-    //                         // } else {
-    //                         //     if ahss.out_diffs[e.to].len() > 0 {
-    //                         //         fakes.push((ahss.model.stem(e.from), ahss.model.name(e.from), ahss.model.name(e.to)));
-    //                         //     }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+    // let mut fakes = vec![];
 
-    // fakes.sort();
-    // for f in fakes {
-    //     println!("AHSS Ext lift potential (stem {}) : {} -> {}", f.0, f.1, f.2);
-    // }
+    // Add all external tau's
+    // We won't worry about the fake ones
+    for esss in &ahss.external_tau_page {
+        for ess in esss {
+            for es in ess {
+                for e in es {
+                    if let Some(from_id) = MODEL.try_index(STABLE_MODEL.name(e.from)) {
+                        if let Some(to_id) = MODEL.try_index(STABLE_MODEL.name(e.to)) {
+                            let (kind, p) = ahss
+                                .from_to
+                                .get(&(e.from, e.to))
+                                .unwrap().clone();
+                            log.push(Action::AddExt {
+                                from: STABLE_MODEL.name(e.from).to_string(),
+                                to: STABLE_MODEL.name(e.to).to_string(),
+                                af: e.af,
+                                kind: kind,
+                                proof: Some("Lifted".to_string()),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
 
-    // panic!();
 
-    let ehp = revert_log_and_remake(0, &mut log, &partial_ehp, false);
+    let ehp = revert_log_and_remake(0, &mut log, &MODEL, &partial_ehp, false);
     let log = Arc::new(Mutex::new(log));
 
-    let ahss_pages = std::array::from_fn(|x| compute_pages(&ahss, 0, x as i32, 0, 150, false).0);
+    let ahss_pages = std::array::from_fn(|x| compute_pages(&ahss, &STABLE_MODEL, 0, x as i32, 0, 150, false).0);
 
     let res = ehp_iterate(
         ehp,
-        &alg_ehp,
+        &MODEL,
+        &DATA,
         &ahss_and_alg_data,
         &ahss_pages,
         empty_getout(),
@@ -1232,13 +1144,13 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
     );
 
     // Add EHP Algebraic Diffs
-    for (&(from, to), _) in &alg_ehp.from_to {
-        partial_ehp.add_diff(from, to, None, Kind::Real);
+    for (&(from, to), _) in &DATA.from_to {
+        partial_ehp.add_diff(&MODEL, from, to, None, Kind::Algebraic);
     }
 
     println!("{res:?}");
 
     let mut log = Arc::try_unwrap(log).unwrap().into_inner().unwrap();
-    let ehp = revert_log_and_remake(0, &mut log, &partial_ehp, false);
+    let ehp = revert_log_and_remake(0, &mut log, &MODEL, &partial_ehp, false);
     (log, ehp)
 }

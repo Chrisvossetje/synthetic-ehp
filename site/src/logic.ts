@@ -206,8 +206,8 @@ function buildYByName(data: SyntheticEHP): Record<string, number> {
     return yByName;
 }
 
-function shouldIncludeKind(kind: Kind, data: SyntheticEHP): boolean {
-    return (viewSettings.showFakeData && kind === "Fake") || (kind === "Real" || kind === "Unknown" || kind === "Algebraic");
+export function shouldIncludeKind(kind: Kind): boolean {
+    return (viewSettings.showFakeData) || (kind === "Real" || kind === "Unknown" || kind === "Algebraic");
 }
 
 function getDiffPage(diff: Differential, yByName: Record<string, number>): number | undefined {
@@ -263,7 +263,7 @@ function buildSyntheticCache(
 
     const diffsByPage: Differential[][] = Array.from({ length: MAX_STEM + 1 }, () => []);
     data.differentials.forEach((diff) => {
-        if (!shouldIncludeKind(diff.kind, data)) return;
+        if (!shouldIncludeKind(diff.kind)) return;
         // if (diff.kind !== "Real") return;
         const diffPage = getDiffPage(diff, yByName);
         if (diffPage === undefined || !Number.isFinite(diffPage)) return;
@@ -272,7 +272,7 @@ function buildSyntheticCache(
     });
     const internalTauByPage: InternalTauMult[][] = Array.from({ length: MAX_STEM + 1 }, () => []);
     data.internal_tau_mults.forEach((tm) => {
-        if (!shouldIncludeKind(tm.kind, data)) return;
+        if (!shouldIncludeKind(tm.kind)) return;
         if (tm.kind !== "Real") return;
         if (!Number.isFinite(tm.page)) return;
         if (tm.page < 0 || tm.page > MAX_STEM) return;
@@ -281,7 +281,7 @@ function buildSyntheticCache(
 
     const externalTaus: ExternalTauMult[] = [];
     data.external_tau_mults.forEach((tm) => {
-        if (!shouldIncludeKind(tm.kind, data)) return;
+        if (!shouldIncludeKind(tm.kind)) return;
         if (tm.kind !== "Real") return;
         externalTaus.push(tm);
     });
