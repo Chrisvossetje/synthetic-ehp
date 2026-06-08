@@ -2,7 +2,7 @@ use std::time::Instant;
 
 
 use crate::{
-    data::curtis::{MODEL, STABLE_MODEL}, io::{
+    data::curtis::{DATA, MODEL, STABLE_MODEL}, io::{
         export::write_all, import::get_log,
     }, routines::{automated_ahss, automated_ehp, interactive_ahss, interactive_ehp}, solve::{automated::ahss_solver, ehp::verify_geometric}
 };
@@ -46,18 +46,19 @@ fn main() {
     if 1 != 1 {
         let (ahss, _) = interactive_ahss();
         interactive_ehp();
-        automated_ahss();
+        automated_ahss(true);
         automated_ehp();
     }
-    
+
     // let (ahss, _) = interactive_ahss();
 
     // interactive_ehp();
 
-    automated_ahss();
+    automated_ahss(true);
     
     // let ehp = automated_ehp();
     // verify_geometric(&ehp, &MODEL);
+
 
 
     // export_order_table(&ehp);

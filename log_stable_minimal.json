@@ -154,4 +154,202 @@
             "proof": "This is forced by the tau extension 10 2 4 5 3 3 3[9] to 9 3 6 6 5 3[7]"
         }
     }
+    ,
+    {
+        "AddDiff": {
+            "from": "14 4 5 7 7[8]",
+            "to": "19 7 7 7[4]",
+            "kind": "Real",
+            "proof": "The program can't find this differential as it thinks this differential already has another one coming in, but it only had an algebraic differential coming in. This algebraic differential is not possible anymore as its source already dies earlier."
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "14 4 5 7 7[6]",
+            "to": "21 11 7[3]",
+            "kind": "Real",
+            "proof": "This must exist by the tau extension from 13 2 3 5 7 7[5] to 21 11 7[3]."
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "14 5 7 7[10]",
+            "to": "5 9 3 5 7 7[6]",
+            "kind": "Unnecessary"
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "5 9 7 7 7[9]",
+            "to": "4 1 1 2 4 1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[4]",
+            "kind": "Unnecessary"
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "5 9 7 7 7[9]",
+            "to": "5 6 5 2 3 5 7 7[3]",
+            "kind": "Invisible"
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "5 6 2 3 5 7 3 3[10]",
+            "to": "4 1 1 2 4 1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[4]",
+            "kind": "Unnecessary"
+        }
+    }
+    ,
+    {
+        "AddExt": {
+            "from": "2 4 3 3 3[26]",
+            "to": "3 6 2 3 3[24]",
+            "af": 6,
+            "kind": "Real",
+            "proof": "The other possibility in this range is 2 4 3 3 3[26] to 6 6 5 3[21]. But this is unnecessary as we must also have this real tau extension on RP23^infty."
+        }
+    }
+    ,
+    {
+        "AddExt": {
+            "from": "10 2 4 5 3 3 3[13]",
+            "to": "5 7 3 5 7 7[9]",
+            "af": 6,
+            "kind": "Fake",
+            "proof": "The other possibility in this range hits 9 3 6 6 5 3[11], which coincides with the differentials in this range."
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "9 3 3 3[28]",
+            "to": "9 3 5 7 7[14]",
+            "kind": "Real",
+            "proof": "For RP7_46 the F_2 vector space generators don't add up. [SyntheticConvergence { bot_trunc: 7, top_trunc: 46, stem: 45, af: 7, expected: [Torsion(None), Torsion(Some(2))], observed: [Torsion(None), Torsion(None)] }]"
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "9 3 3 3[28]",
+            "to": "7 13 5 7 7[6]",
+            "kind": "Fake",
+            "proof": "Only logical choice to correct synthetic convergence in RP1_28"
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "13 5 7 7[15]",
+            "to": "5 5 6 5 2 3 5 7 7[1]",
+            "kind": "Fake",
+            "proof": "Would give tau^4 torsion which cannot be killed."
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "5 9 3 5 7 7[11]",
+            "to": "2 4 7 3 3 6 6 5 3[7]",
+            "kind": "Invisible"
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "13 5 7 7[15]",
+            "to": "2 3 4 4 1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[6]",
+            "kind": "Invisible"
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "2 4 1 1 2 4 3 3 3[24]",
+            "to": "13 1 2 4 1 1 2 4 1 1 1[15]",
+            "kind": "Fake",
+            "proof": "Does not agree with the tau extension 2 2 2 2 3 5 7 3 3[17] to 5 5 3 6 6 5 3[13]."
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "5 7 7[28]",
+            "to": "4 4 1 1 2 4 1 1 2 4 1 1 1[19]",
+            "kind": "Fake",
+            "proof": "TODO"
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "2 4 5 3 3 3[8]",
+            "to": "2 4 1 1 2 4 3 3 3[4]",
+            "kind": "Real",
+            "proof": "TODO"
+        }
+    }
+    ,
+    {
+        "AddExt": {
+            "from": "6 2 2 4 5 3 3 3[17]",
+            "to": "9 11 7 7 7[4]",
+            "af": 7,
+            "kind": "Unnecessary"
+        }
+    }
+    ,
+    {
+        "AddExt": {
+            "from": "2 3 4 4 1 1 2 4 1 1 2 4 1 1 2 4 1 1 1[6]",
+            "to": "2 2 2 2 2 2 2 2 2 2 2 2 2 4 5 3 3 3[2]",
+            "af": 19,
+            "kind": "Real",
+            "proof": "Program doesn't always find tau extension which changes module structure"
+        }
+    }
+    ,
+    {
+        "AddExt": {
+            "from": "2 3 4 4 1 1 2 4 1 1 1[22]",
+            "to": "2 2 2 2 2 4 5 3 3 3[18]",
+            "af": 11,
+            "kind": "Real",
+            "proof": "Program doesn't always find tau extension which changes module structure"
+        }
+    }
+    ,
+    {
+        "AddExt": {
+            "from": "2 3 4 4 1 1 2 4 1 1 2 4 1 1 1[14]",
+            "to": "2 2 2 2 2 2 2 2 2 4 5 3 3 3[10]",
+            "af": 15,
+            "kind": "Real",
+            "proof": "Program doesn't always find tau extension which changes module structure"
+        }
+    }
+    ,
+    {
+        "AddExt": {
+            "from": "3 5 7 3 5 7 7[8]",
+            "to": "9 11 7 7 7[4]",
+            "af": 7,
+            "kind": "Unnecessary"
+        }
+    }
+    ,
+    {
+        "AddExt": {
+            "from": "2 4 1 1 2 4 3 3 3[23]",
+            "to": "10 2 4 5 3 3 3[16]",
+            "af": 9,
+            "kind": "Fake",
+            "proof": "This does tau extension does not agree with the differential 6 2 3 4 4 1 1 1[25] to 6 2 2 4 5 3 3 3[18]."
+        }
+    }
 ]

@@ -1,6 +1,6 @@
 import { Chart } from "./chart";
 import { ehpChart } from "./charts";
-import { getComputedDiffCoeff } from "./ehp_chart";
+import { getComputedDiffCoeff, getDisplayedGenerator } from "./ehp_chart";
 import { isUsingStableData, viewSettings, get_filtered_data, Category, shouldIncludeKind } from "./logic";
 import { Kind } from "./types";
 
@@ -302,7 +302,13 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
 
         const [cx, cy] = location;
         const cyFlip = flipY(cy);
-        const color = getTikzColor(gen.torsion);
+        // Use the page-filtered torsion/filtration as currently displayed on the
+        // chart, not the static generator data, so higher pages render correct
+        // colors and AF values. Fall back to the static data if unavailable.
+        const displayed = getDisplayedGenerator(gen.name);
+        const torsion = displayed ? displayed[0] : gen.torsion;
+        const af = displayed ? displayed[1] : gen.af;
+        const color = getTikzColor(torsion);
         const radius = 0.022; // Match SVG radius of 0.022 in chart units
 
         // Check if the dot is filled (permanent) by looking at the actual SVG element
@@ -325,7 +331,7 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
         }
 
         // Add adams filtration (to the right of the dot, very small)
-        tikz += `\\node[anchor=west,scale=0.15,gray,inner sep=0pt] at (${roundCoord(cx + 0.04)},${roundCoord(cyFlip)}) {${gen.af}};\n`;
+        tikz += `\\node[anchor=west,scale=0.15,gray,inner sep=0pt] at (${roundCoord(cx + 0.04)},${roundCoord(cyFlip)}) {${af}};\n`;
     }
 
     tikz += "\\end{scope}\n";

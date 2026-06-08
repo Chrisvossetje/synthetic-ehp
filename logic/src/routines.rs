@@ -256,10 +256,10 @@ pub fn interactive_ehp() -> (SyntheticSS, Duration) {
     (data, total_input_time)
 }
 
-pub fn automated_ahss() {
+pub fn automated_ahss(minimal: bool) {
     let start = Instant::now();
 
-    let ahss_log = match get_log(true, true) {
+    let ahss_log = match get_log(minimal, true) {
         Ok(log) => Some(log),
         Err(_) => None,
     };
@@ -289,7 +289,7 @@ pub fn automated_ehp() -> SyntheticSS {
 
     let (ehp_log, ehp) = ehp_solver(&ahss, Some(ehp_log));
 
-    write_all(&ehp, &&STABLE_MODEL, &ehp_log, false);
+    write_all(&ehp, &MODEL, &ehp_log, false);
 
     println!("\nProgram took: {:.2?}\n", start.elapsed());
 

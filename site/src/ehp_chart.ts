@@ -70,6 +70,15 @@ export function getComputedDiffCoeff(from: string, to: string): number | undefin
     return getDisplayedDiffCoeff(from, to);
 }
 
+/**
+ * Get the page-filtered [torsion, filtration] for a generator as currently
+ * displayed on the chart. Returns undefined if the generator is not alive on
+ * the current page. Used by the screenshot export so colors/AF match the chart.
+ */
+export function getDisplayedGenerator(name: string): [number | undefined, number] | undefined {
+    return currentFilteredGenerators[name];
+}
+
 export function handleDotClick(dot: string) {
     console.log('Dot clicked:', dot);
     const gen = find(dot);
@@ -145,8 +154,6 @@ export function handleLineClick(from: string, to: string) {
     const extraLines: string[] = [];
     if (rawDiff && "proof" in rawDiff) {
         extraLines.push(`Proof: ${rawDiff.proof ?? ""}`);
-    } else if (rawDiff?.kind != "Unknown") {
-        extraLines.push("AEHP differential");
     }
 
     showInfoPanel("Differential", lines, extraLines);

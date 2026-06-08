@@ -132,6 +132,8 @@ impl SyntheticSS {
                 Kind::Real => {
                     let y_from = model.y(from);
                     let y_to = model.y(to);
+                    let af_from = model.af(from);
+                    // self.external_tau_page[af_from as usize][af as usize][y_from as usize]
                     self.external_tau_page[y_from as usize][af as usize][(y_from - y_to) as usize]
                         .push(ExtTauMult { from, to, af });
                     self.out_taus[from].push(to);

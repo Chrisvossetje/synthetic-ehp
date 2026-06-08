@@ -33,7 +33,7 @@ use crate::{
 
 pub const PARALLEL_DEPTH: i32 = 5;
 pub const ALWAYS_PRINT: bool = false;
-pub const MAX_DEPTH: i32 = 9;
+pub const MAX_DEPTH: i32 = 12;
 
 enum Commitment {
     Real(String),
