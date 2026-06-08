@@ -47,17 +47,17 @@ fn main() {
         let (ahss, _) = interactive_ahss();
         interactive_ehp();
         automated_ahss(true);
-        automated_ehp();
+        automated_ehp(true);
     }
 
     // let (ahss, _) = interactive_ahss();
 
     // interactive_ehp();
 
-    automated_ahss(true);
+    // automated_ahss(true);
     
-    // let ehp = automated_ehp();
-    // verify_geometric(&ehp, &MODEL);
+    let ehp = automated_ehp(true);
+    verify_geometric(&ehp, &MODEL);
 
 
 

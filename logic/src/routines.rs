@@ -270,7 +270,7 @@ pub fn automated_ahss(minimal: bool) {
     println!("\nProgram took: {:.2?}\n", start.elapsed());
 }
 
-pub fn automated_ehp() -> SyntheticSS {
+pub fn automated_ehp(minimal: bool) -> SyntheticSS {
     let start = Instant::now();
 
     let mut ahss_log = match get_log(false, true) {
@@ -280,7 +280,7 @@ pub fn automated_ehp() -> SyntheticSS {
 
     let ahss = revert_log_and_remake(0, &mut ahss_log, &STABLE_MODEL, &STABLE_DATA, true);
 
-    let ehp_log = match get_log(true, false) {
+    let ehp_log = match get_log(minimal, false) {
         Ok(log) => log,
         Err(_) => {
             panic!("Log importing was not succesful");

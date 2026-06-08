@@ -31,9 +31,9 @@ use crate::{
     }, types::{Kind, Torsion}
 };
 
-pub const PARALLEL_DEPTH: i32 = 5;
+pub const PARALLEL_DEPTH: i32 = 6;
 pub const ALWAYS_PRINT: bool = false;
-pub const MAX_DEPTH: i32 = 12;
+pub const MAX_DEPTH: i32 = 10;
 
 enum Commitment {
     Real(String),

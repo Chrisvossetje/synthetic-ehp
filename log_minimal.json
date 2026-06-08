@@ -1,5 +1,44 @@
 [
     {
+        "AddDiff": {
+            "from": "9 7 7 7[6]",
+            "to": "7 3 6 6 5 3[5]",
+            "kind": "Unknown",
+            "proof": "If we assume this we have one less generator on the 35/36 stem for the spheres 7/8. It's shadow also reduces one generator on the 38/39 stem for the 4 sphere only and has no further effects."
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "3 3 5 9 3 5 7 7[2]",
+            "to": "1 2 2 4 7 3 3 6 6 5 3[1]",
+            "kind": "Unknown",
+            "proof": "This differential does not have enough shadows to be fully deducable. The computation of the UASS for S3 by Curtis and Mahowald show that it should not exist. It reduces one generator on stem 43/44 for the 3/4 sphere. Interestingly, it has no shadow at all!"
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "15 7 7 7[9]",
+            "to": "3 5 9 3 5 7 7[5]",
+            "kind": "Unknown",
+            "proof": "It's shadow appears on stem 49, which is past the range of the algebraic EHP SS."
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "9 11 7 7 7[5]",
+            "to": "6 5 9 3 5 7 7[3]",
+            "kind": "Unknown",
+            "proof": null
+        }
+    }
+
+
+
+
+    {
         "AddExt": {
             "from": "2 4 1 1 2 4 3 3 3[7]",
             "to": "2 3 3 6 6 5 3[2]",
@@ -7,25 +46,28 @@
             "kind": "Real",
             "proof": "This tau extension should be lifted of off the AHSS, but that is only visible synthetically. It can be seen that on stem 28, 3 3 6 6 5 3[2] will tau extend with 6 2 3 4 4 1 1 1[6]. What this means is that 2 3 3 6 6 5 3[2] on S^5 will hit tau * 6 2 2 4 5 3 3 3[2] on the sphere spectrum."
         }
-    },
+    }
+    ,
     {
         "AddExt": {
             "from": "2 4 1 1 2 4 1 1 2 4 3 3 3[7]",
             "to": "2 2 2 2 2 3 3 6 6 5 3[2]",
             "af": 12,
             "kind": "Real",
-            "proof": "TODO: This tau extension should be lifted of off the AHSS, but that is only visible synthetically. It can be seen that on stem 28, 3 3 6 6 5 3[2] will tau extend with 6 2 3 4 4 1 1 1[6]. What this means is that 2 3 3 6 6 5 3[2] on S^5 will hit tau * 6 2 2 4 5 3 3 3[2] on the sphere spectrum."
+            "proof": "This tau extension should be lifted of off the AHSS, but that is only visible synthetically. On the E_2 page this already makes sense."
         }
-    },
+    }
+    ,
     {
         "AddExt": {
             "from": "2 4 1 1 2 4 1 1 2 4 1 1 2 4 3 3 3[7]",
             "to": "2 2 2 2 2 2 2 2 2 3 3 6 6 5 3[2]",
             "af": 17,
             "kind": "Real",
-            "proof": "TODO: This tau extension should be lifted of off the AHSS, but that is only visible synthetically. It can be seen that on stem 28, 3 3 6 6 5 3[2] will tau extend with 6 2 3 4 4 1 1 1[6]. What this means is that 2 3 3 6 6 5 3[2] on S^5 will hit tau * 6 2 2 4 5 3 3 3[2] on the sphere spectrum."
+            "proof": "This tau extension should be lifted of off the AHSS, but that is only visible synthetically. On the E_2 page this already makes sense."
         }
-    },
+    }
+    ,
 
 
     {
@@ -35,6 +77,25 @@
             "af": 7,
             "kind": "Real",
             "proof": "For S^6 the other target of this extension would be 3 6 6 5 3[3]. But we know that 3 6 6 5 3[3] must survive stably."
+        }
+    }
+    ,
+    {
+        "AddExt": {
+            "from": "2 2 2 2 2 2 2 2 2 2 4 5 3 3 3[6]",
+            "to": "2 2 2 2 2 2 2 2 3 3 6 6 5 3[2]",
+            "af": 15,
+            "kind": "Real",
+            "proof": "Only choice making sense with wrt. tau extensions"
+        }
+    }
+    ,
+    {
+        "AddExt": {
+            "from": "2 2 2 2 2 2 2 2 2 2 4 5 3 3 3[6]",
+            "to": "2 2 2 2 2 4 3 3 3 6 6 5 3[1]",
+            "af": 15,
+            "kind": "Unnecessary"
         }
     }
     ,
@@ -55,7 +116,51 @@
             "proof": "TODO"
         }
     }
-
+    ,
+    {
+        "AddDiff": {
+            "from": "2 2 2 2 2 2 2 2 3 5 7 3 3[8]",
+            "to": "2 2 2 2 2 2 2 2 2 2 4 5 3 3 3[6]",
+            "kind": "Real",
+            "proof": "We have that the element 2 2 2 2 2 2 2 2 2 2 4 5 3 3 3[6] injects into 6 2 3 4 4 1 1 2 4 1 1 2 4 1 1 1[6], and thus the lift of the AHSS differential should target this generator."
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "5 6 5 2 3 5 7 7[4]",
+            "to": "1 2 4 7 3 3 6 6 5 3[3]",
+            "kind": "Fake",
+            "proof": "Lift doesn't make sense here as we have a logical algebraic differential."
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "4 2 2 2 2 2 2 2 2 4 5 3 3 3[6]",
+            "to": "6 2 3 4 4 1 1 2 4 1 1 2 4 1 1 1[5]",
+            "kind": "Real",
+            "proof": "Program crashes further but i cant see the problem yet. This differential must live to support the differential 3 6 2 3 4 4 1 1 2 4 1 1 1[11] to 6 2 3 4 4 1 1 2 4 1 1 2 4 1 1 1[5]"
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "1 2 4 7 3 3 6 6 5 3[4]",
+            "to": "1 2 2 4 7 3 3 6 6 5 3[1]",
+            "kind": "Real",
+            "proof": "Program crashes further but i cant see the problem yet. This differential must live to support the differential 3 6 2 3 4 4 1 1 2 4 1 1 1[11] to 6 2 3 4 4 1 1 2 4 1 1 2 4 1 1 1[5]"
+        }
+    }
+    ,
+    {
+        "AddDiff": {
+            "from": "3 5 9 7 7 7[4]",
+            "to": "3 6 5 2 3 5 7 7[3]",
+            "kind": "Fake",
+            "proof": "TODO: Differential would have 7 5 5 3 6 6 5 3[4] survive, with no way to kill it off."
+        }
+    }
 
 
 
@@ -75,26 +180,28 @@
             "kind": "Real",
             "proof": "TODO: This tau extension should be lifted of off the AHSS, but that is only visible synthetically. It can be seen that on stem 28, 3 3 6 6 5 3[2] will tau extend with 6 2 3 4 4 1 1 1[6]. What this means is that 2 3 3 6 6 5 3[2] on S^5 will hit tau * 6 2 2 4 5 3 3 3[2] on the sphere spectrum."
         }
-    },
-
+    }
+    ,
     {
         "AddInt": {
             "from": "8 7 7 7[10]",
             "to": "15 6 2 3 3[10]",
             "page": 2,
             "kind": "Real",
-            "proof": "TODO: "
+            "proof": "Only sensible choice wrt. algebraic differential from 8 7 7 7[10] to 13 5 7 3 3[7]"
         }
-    },
+    }
+    ,
     {
         "AddInt": {
             "from": "2 2 2 2 2 2 4 5 3 3 3[9]",
             "to": "6 2 3 4 4 1 1 2 4 1 1 1[9]",
             "page": 10,
             "kind": "Real",
-            "proof": "TODO: "
+            "proof": "Sensible choice with respect to the differential form 4 2 2 2 2 4 5 3 3 3[10]"
         }
-    },
+    }
+    ,
 
     
     {
@@ -104,7 +211,8 @@
             "sphere": 15,
             "proof": "TODO:"
         }
-    },
+    }
+    ,
     {
         "SetInducedName": {
             "name": "2 4 1 1 2 4 3 3 3[12]",
@@ -169,22 +277,7 @@
             "proof": "With the other choice we are unable to fix a torsion issue on stem 36"
         }
     },
-    {
-        "AddDiff": {
-            "from": "9 7 7 7[6]",
-            "to": "7 3 6 6 5 3[5]",
-            "kind": "Unknown",
-            "proof": "If we assume this we have one less generator on the 35/36 stem for the spheres 7/8. It's shadow also reduces one generator on the 38/39 stem for the 4 sphere only and has no further effects."
-        }
-    },
-    {
-        "AddDiff": {
-            "from": "3 3 5 9 3 5 7 7[2]",
-            "to": "1 2 2 4 7 3 3 6 6 5 3[1]",
-            "kind": "Unknown",
-            "proof": "This differential does not have enough shadows to be fully deducable. The computation of the UASS for S3 by Curtis and Mahowald show that it should not exist. It reduces one generator on stem 43/44 for the 3/4 sphere. Interestingly, it has no shadow at all!"
-        }
-    },
+
     {
         "SetInducedName": {
             "name": "5 5 3 6 6 5 3[5]",
@@ -199,15 +292,6 @@
             "new_name": "5 5 3 6 6 5 3[5]",
             "sphere": 9,
             "proof": "With the normal choice we get that on stem 41 the synthetic lifts do not line up as naturally as we want to. Also without this, the induced element on stem 41 will become the other on the 5-sphere already!"
-        }
-    }
-    ,
-    {
-        "AddDiff": {
-            "from": "2 2 2 2 2 2 2 2 3 5 7 3 3[8]",
-            "to": "2 2 2 2 2 2 2 2 2 2 4 5 3 3 3[6]",
-            "kind": "Real",
-            "proof": "We have that the element 2 2 2 2 2 2 2 2 2 2 4 5 3 3 3[6] injects into 6 2 3 4 4 1 1 2 4 1 1 2 4 1 1 1[6], and thus the lift of the AHSS differential should target this generator."
         }
     }
 ]

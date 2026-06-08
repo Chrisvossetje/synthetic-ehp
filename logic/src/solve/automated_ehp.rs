@@ -1025,7 +1025,7 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
         ];
 
     let mut log = log.unwrap_or(vec![]);
-
+    
     // Add EHP Algebraic Diffs
     for (&(from, to), (kind, reason)) in &DATA.from_to {
         let d_y = MODEL.y(from) - MODEL.y(to);
