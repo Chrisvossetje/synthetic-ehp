@@ -1,11 +1,18 @@
+//! [`SSPages`]: the computed state of every generator across the spectral
+//! sequence's pages, produced by [`crate::domain::process`]. For each generator
+//! we store the sequence of (page, state) it passes through; `None` means the
+//! generator does not appear in this truncation.
+
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{domain::e1::E1, types::Torsion};
 
+/// A generator's (AF, torsion) on a given page.
 pub type GeneratorState = (i32, Torsion);
 // TODO: Smallvec performance check ?
+/// The (page, state) checkpoints a generator passes through, in page order.
 pub type PagesGeneratorState = Vec<(i32, GeneratorState)>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -20,6 +27,8 @@ pub struct SSPages {
 }
 
 impl SSPages {
+    /// The generator's state as of `page`: the last checkpoint whose page is
+    /// `<= page` (checkpoints are stored in increasing page order).
     pub fn element_at_page(&self, page: i32, elt: usize) -> GeneratorState {
         let l = self.generators[elt].as_ref().unwrap();
         let mut id = 0;
@@ -40,15 +49,12 @@ impl SSPages {
     }
 
     pub fn element_final(&self, elt: usize) -> GeneratorState {
-        let a = &self.generators[elt];
-        let b = a.as_deref().unwrap();
-        b.last().unwrap().1.clone()
+        self.try_element_final(elt).unwrap()
     }
 
     pub fn try_element_final(&self, elt: usize) -> Option<GeneratorState> {
-        let a = &self.generators[elt];
-        let b = a.as_deref()?;
-        Some(b.last().unwrap().1.clone())
+        let states = self.generators[elt].as_deref()?;
+        Some(states.last().unwrap().1)
     }
 
     pub fn push(&mut self, elt: usize, page: i32, g: GeneratorState) {

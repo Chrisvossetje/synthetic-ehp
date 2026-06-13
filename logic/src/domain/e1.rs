@@ -1,3 +1,7 @@
+//! The E1 page: the fixed list of [`Generator`]s together with lookup indices
+//! by name, by stem, by (stem, AF), and by (stem, y). These never change during
+//! a solve — only the spectral-sequence facts layered on top of them do.
+
 use std::{collections::HashMap, iter::Enumerate, slice::Iter};
 
 use serde::{Deserialize, Serialize};
@@ -9,7 +13,10 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct E1 {
+    // Actual data
     generators: Vec<Generator>,
+
+    // LUTS
     index: HashMap<String, usize>,
     stem: HashMap<i32, Vec<usize>>,
     stem_af: HashMap<(i32, i32), Vec<usize>>,
@@ -55,6 +62,7 @@ impl E1 {
         self.generators[elt].af
     }
 
+    #[allow(dead_code)]
     pub fn torsion(&self, elt: usize) -> Torsion {
         self.generators[elt].torsion
     }
@@ -72,7 +80,7 @@ impl E1 {
     }
 
     pub fn try_index(&self, name: &str) -> Option<usize> {
-        self.index.get(name).map(|x| *x)
+        self.index.get(name).copied()
     }
 
     pub fn get_name(&self, name: &str) -> &Generator {
@@ -93,15 +101,15 @@ impl E1 {
     }
 
     pub fn gens_id_in_stem(&self, stem: i32) -> &Vec<usize> {
-        &self.stem.get(&stem).unwrap()
+        self.stem.get(&stem).unwrap()
     }
 
     pub fn gens_id_in_stem_af(&self, stem: i32, af: i32) -> &Vec<usize> {
-        &self.stem_af.get(&(stem, af)).unwrap()
+        self.stem_af.get(&(stem, af)).unwrap()
     }
 
     pub fn gens_id_in_stem_y(&self, stem: i32, y: i32) -> &Vec<usize> {
-        &self.stem_y.get(&(stem, y)).unwrap_or(&EMPTY_LIST_USIZE)
+        self.stem_y.get(&(stem, y)).unwrap_or(&EMPTY_LIST_USIZE)
     }
 
     pub fn push(&mut self, g: Generator) {

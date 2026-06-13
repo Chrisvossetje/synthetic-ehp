@@ -1,3 +1,9 @@
+//! String helpers for the generator naming scheme, where a name looks like
+//! `"tag[sphere]"` (e.g. `"5 3[6]"`): the `tag` records how the generator was
+//! built and the bracketed number records the sphere it lives on. These
+//! functions slice names apart and reassemble them as the EHP recursion moves
+//! generators between spheres.
+
 use std::{
     collections::HashMap, iter::{Map, StepBy}, ops::RangeInclusive
 };
@@ -35,8 +41,7 @@ pub fn name_to_sphere(name: &str) -> i32 {
         .next()
         .unwrap()
         .split('[')
-        .skip(1)
-        .next()
+        .nth(1)
         .unwrap()
         .parse()
         .unwrap()
@@ -78,9 +83,6 @@ pub fn generating_tag(name: &str) -> String {
         format!("{} {}", real_last, initial)
     }
 }
-
-
-
 
 
 

@@ -1,3 +1,9 @@
+//! [`SyntheticSS`]: the spectral-sequence facts asserted on top of an [`E1`]
+//! page — differentials, internal tau-multiplications (same bidegree) and
+//! external tau-multiplications (same stem). All facts are keyed in `from_to`
+//! to dedupe, and additionally bucketed (by page / y-degree) so that
+//! [`crate::domain::process`] can apply them in the right order.
+
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -10,7 +16,6 @@ use crate::{
 
 pub type FromTo = (usize, usize);
 
-// A diff could also be defined just by where it is from to where it goes ?
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Diff {
     pub from: usize,
@@ -20,6 +25,7 @@ pub struct Diff {
 // Here Tau Mult extension is probably not really correct ?
 // It probably has more to do with choice of basis ?
 // But i have to say something about convergence and how certain elements will lift :(
+// Conclusion: This is the easiest workable method
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct IntTauMult {
     pub from: usize,
@@ -132,8 +138,6 @@ impl SyntheticSS {
                 Kind::Real => {
                     let y_from = model.y(from);
                     let y_to = model.y(to);
-                    let af_from = model.af(from);
-                    // self.external_tau_page[af_from as usize][af as usize][y_from as usize]
                     self.external_tau_page[y_from as usize][af as usize][(y_from - y_to) as usize]
                         .push(ExtTauMult { from, to, af });
                     self.out_taus[from].push(to);

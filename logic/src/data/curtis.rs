@@ -1,3 +1,11 @@
+//! Parsing the Curtis tables (`curtis_table.txt` for the unstable/EHP sequence,
+//! `curtis_table_stable.txt` for the stable/AHSS one) into the algebraic E1
+//! model and its built-in algebraic differentials.
+//!
+//! The public `MODEL`/`DATA` statics (and their `STABLE_*` counterparts) are
+//! the crate-wide entry points: the E1 page, the seeded algebraic spectral
+//! sequence, and its computed pages, all initialized lazily on first use.
+
 use std::sync::LazyLock;
 
 use crate::{
@@ -24,6 +32,7 @@ pub static STABLE_DATA: LazyLock<SyntheticSS> = LazyLock::new(|| generate_algebr
 pub static STABLE_DATA_PAGES: LazyLock<SSPages> =
     LazyLock::new(|| compute_pages(&STABLE_DATA, &STABLE_MODEL, 0, 256, 0, MAX_STEM, true).0);
 
+/// A Curtis-table entry that survives (a permanent cycle): a single generator.
 #[derive(Debug, Clone)]
 pub struct Untagged {
     pub stem: i32,
@@ -32,6 +41,8 @@ pub struct Untagged {
     pub origin: i32,
 }
 
+/// A Curtis-table entry recording a differential: `right` supports a
+/// differential hitting `left`, so both endpoints are described.
 #[derive(Debug, Clone)]
 pub struct Tagged {
     pub stem: i32,
@@ -42,6 +53,8 @@ pub struct Tagged {
     pub right_origin: i32,
 }
 
+/// Split a Curtis name like `"6 5 3"` into its leading origin number (`6`) and
+/// the remaining tag (`"5 3"`); a bare number yields an empty tag.
 fn name_to_tag_origin(name: &str) -> (i32, String) {
     match name.split_once(" ") {
         Some((first, second)) => {
@@ -117,6 +130,8 @@ fn parse_curtis_table() -> (Vec<Untagged>, Vec<Tagged>) {
     (untagged, tagged)
 }
 
+/// Like [`name_to_tag_origin`] but for the stable table's `"(origin) tag"`
+/// format, e.g. `"(6) 5 3"` -> `(6, "5 3")`.
 fn stable_name_to_tag_origin(name: &str) -> (i32, String) {
     let (first, second) = name.strip_prefix('(').unwrap().split_once(')').unwrap();
     let y: i32 = first.parse().unwrap();
@@ -178,6 +193,9 @@ fn parse_stable_curtis_table() -> (Vec<Untagged>, Vec<Tagged>) {
     (untagged, tagged)
 }
 
+/// Turn parsed table entries into the E1 generators and the algebraic
+/// differentials between them. Each tagged entry contributes both endpoints of
+/// its differential as generators plus the differential itself.
 fn parse_algebraic(untagged: &[Untagged], tagged: &[Tagged]) -> (Vec<Generator>, Vec<Differential>) {
     let mut generators = Vec::new();
     let mut differentials = Vec::new();
@@ -248,6 +266,8 @@ fn build_data(model: &E1, differentials: Vec<Differential>) -> SyntheticSS {
     data
 }
 
+/// Parse the appropriate Curtis table and assemble the E1 page together with
+/// its seeded algebraic spectral sequence. `ahss` selects the stable table.
 fn generate_algebraic_model(ahss: bool) -> (E1, SyntheticSS) {
     let (untagged, tagged) = if ahss {
         parse_stable_curtis_table()

@@ -1,21 +1,29 @@
+//! The automated EHP (unstable) solver — the counterpart to
+//! [`crate::solve::automated_ahss`] for the EHP sequence. [`ehp_solver`] seeds the
+//! metastable range from the AHSS, then runs the same speculative search
+//! ([`ehp_iterate`], `try_diff`/`try_tau`) sphere by sphere, additionally
+//! resolving the induced names that the EHP recursion introduces ([`fix_names`])
+//! and lifting solved values upward via [`crate::domain::process::ehp_recursion`].
+
 use core::panic;
 use std::sync::{Arc, Mutex};
 
 use crate::{
     MAX_STEM, MAX_VERIFY_STEM, data::{
-        r#static::{ALGEBRAIC_SPHERE_PAGES, EHP_TO_AHSS, RADON_HURWITZ_NUMBERS, S0, algebraic_spheres},
+        r#static::{ALGEBRAIC_SPHERE_PAGES, EHP_TO_AHSS, S0, algebraic_spheres},
         curtis::{DATA, MODEL, STABLE_MODEL},
     }, domain::{
         e1::E1, model::{Diff, ExtTauMult, SyntheticSS}, process::{compute_pages, ehp_recursion, try_compute_pages}, ss::SSPages
     }, solve::{
         action::{Action, process_action, revert_log_and_remake},
-        automated::{ALWAYS_PRINT, MAX_DEPTH, TauIssue},
+        automated::{
+            ALWAYS_PRINT, Commitment, MAX_DEPTH, TauIssue, classify_tau_issue, commit_diff_choice,
+            commit_tau_choice, filter_diff,
+        },
         ehp_ahss::{in_metastable_range, set_metastable_range},
         generate::get_a_diff,
         issues::{
-            Issue, algebraic_issue_is_fixable_by_tau_extensions, compare_algebraic,
-            compare_algebraic_spectral_sequence, compare_synthetic,
-            synthetic_issue_is_tau_structure_issue,
+            Issue, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic,
         },
         search::{
             BranchResult, ChoiceResult, GetOut, SpeculativeBranchOutcome, branch_on_speculative_worlds, check_getout, create_getout, empty_getout, signal_parent_getout
@@ -25,131 +33,10 @@ use crate::{
 };
 
 
-enum Commitment {
-    Real(String),
-    Fake(String),
-    Unknown,
-}
-
 enum FixNamesResult {
     Applied(Vec<Action>),
     Open,
     Cancelled,
-}
-
-fn commit_diff_choice(
-    data: &mut SyntheticSS,
-    model: &E1,
-    log: &Arc<Mutex<Vec<Action>>>,
-    depth: i32,
-    d: Diff,
-    commitment: Commitment,
-) {
-    let (from_name, to_name) = model.get_names(d.from, d.to);
-
-    match commitment {
-        Commitment::Fake(proof) => {
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Disproven diff: {} | {} by {proof}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof: Some(proof.clone()),
-                    kind: Kind::Fake,
-                });
-            }
-            data.add_diff(model, d.from, d.to, Some(proof), Kind::Fake);
-        }
-        Commitment::Real(proof) => {
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Proven diff: {} | {} | {:?}", from_name, to_name, proof);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof: Some(proof.clone()),
-                    kind: Kind::Real,
-                });
-            }
-            data.add_diff(model, d.from, d.to, Some(proof), Kind::Real);
-        }
-        Commitment::Unknown => {
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Unknown diff: {} | {}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddDiff {
-                    from: from_name,
-                    to: to_name,
-                    proof: None,
-                    kind: Kind::Unknown,
-                });
-            }
-            data.add_diff(model, d.from, d.to, None, Kind::Unknown);
-        }
-    }
-}
-
-fn commit_tau_choice(
-    data: &mut SyntheticSS,
-    model: &E1,
-    log: &Arc<Mutex<Vec<Action>>>,
-    depth: i32,
-    d: ExtTauMult,
-    commitment: Commitment,
-) {
-    let (from_name, to_name) = model.get_names(d.from, d.to);
-
-    match commitment {
-        Commitment::Fake(proof) => {
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Disproven tau: {} | {} by {proof}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof: Some(proof.clone()),
-                    kind: Kind::Fake,
-                });
-            }
-            data.add_ext_tau(model, d.from, d.to, d.af, None, Kind::Fake);
-        }
-        Commitment::Real(proof) => {
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Proven tau: {} | {} by {proof}", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof: Some(proof.clone()),
-                    kind: Kind::Real,
-                });
-            }
-            data.add_ext_tau(model, d.from, d.to, d.af, None, Kind::Real);
-        }
-        Commitment::Unknown => {
-            if ALWAYS_PRINT || depth == 0 {
-                println!("Unknown tau: {} | {} by ", from_name, to_name);
-            }
-            if depth == 0 {
-                log.lock().unwrap().push(Action::AddExt {
-                    from: from_name,
-                    to: to_name,
-                    af: d.af,
-                    proof: None,
-                    kind: Kind::Unknown,
-                });
-            }
-            data.add_ext_tau(model, d.from, d.to, d.af, None, Kind::Unknown);
-        }
-    }
 }
 
 fn commit_induced_name_choice(
@@ -175,6 +62,10 @@ fn commit_induced_name_choice(
     action.clone()
 }
 
+/// Verify the EHP at a given (stem, sphere) against everything we know: its own
+/// convergence (synthetic if `stem + 2 == sphere`, i.e. the stable cell, else
+/// algebraic) and compatibility with the precomputed AHSS pages. Returns the
+/// offending [`Issue`]s, which the caller may yet recognise as tau-fixable.
 fn check_issue(data: &SyntheticSS, model: &E1, ahss_pages: &[SSPages; (MAX_STEM + 1) as usize], stem: i32, sphere: i32) -> Result<(), Vec<Issue>> {
     let pages = if stem + 2 == sphere {
         let pages = try_compute_pages(data, model, 0, sphere - 1, stem, stem, true)?;
@@ -195,7 +86,8 @@ fn check_issue(data: &SyntheticSS, model: &E1, ahss_pages: &[SSPages; (MAX_STEM 
         pages
     };
 
-    // This verifies EHP -> AHSS
+    // EHP -> AHSS compatibility: each live EHP generator that has a stable
+    // counterpart must, at every page, map into it without exceeding its torsion.
     for &f_id in model.gens_id_in_stem(stem) {
         if let Some(t_id) = EHP_TO_AHSS[f_id]
             && ahss_pages[(sphere - 1) as usize].element_in_pages(t_id)
@@ -222,42 +114,6 @@ fn check_issue(data: &SyntheticSS, model: &E1, ahss_pages: &[SSPages; (MAX_STEM 
     }
 
     Ok(())
-}
-
-fn filter_diff(
-    data: &SyntheticSS,
-    model: &E1,
-    alg_ehp: &SyntheticSS,
-    bot_trunc: i32,
-    top_trunc: i32,
-    d: Diff,
-) -> Option<Kind> {
-    let _stem = model.stem(d.to);
-    let y = model.y(d.from);
-
-    if y - model.y(d.to) < RADON_HURWITZ_NUMBERS[y as usize] {
-        Some(Kind::MinimalLength)
-    } else if data.in_diffs[d.to]
-        .iter()
-        .any(|from| model.y(*from) == top_trunc && data.generators[*from].alive())
-    {
-        Some(Kind::AdditiveStructure)
-    } else if bot_trunc & 1 == 0
-        && let Some(alg_to) = alg_ehp.out_diffs[d.from].first()
-        && data.generators[*alg_to].alive()
-        && model.y(*alg_to) + 1 == bot_trunc
-    {
-        Some(Kind::Invisible)
-    } else if top_trunc & 1 == 1
-        && let Some(dies) = model.get(d.to).dies
-        && let Some(source) = alg_ehp.in_diffs[d.to].first()
-        && data.generators[*source].free()
-        && top_trunc + 2 == dies
-    {
-        Some(Kind::Unnecessary)
-    } else {
-        None
-    }
 }
 
 fn filter_tau(
@@ -303,6 +159,11 @@ fn ehp_iterate(
     mut bot_trunc: i32,
     depth: i32,
 ) -> BranchResult {
+    // Same shape as the AHSS loop (see `automated_ahss::ahss_iterate`), but the
+    // unstable EHP traversal is more intricate: `bot_trunc` walks the metastable
+    // range, the spheres are stepped in the odd/even dance at the bottom of the
+    // loop, induced names must be resolved (`fix_names`), and each solved sphere
+    // is lifted to the next via `ehp_recursion`.
     loop {
         if depth == 0 && stem >= MAX_VERIFY_STEM {
             return BranchResult::Open;
@@ -316,6 +177,7 @@ fn ehp_iterate(
             return BranchResult::Cancelled;
         }
 
+        // While still inside the truncation window, try the next differential.
         if bot_trunc != 0 {
             let option = get_a_diff(&data, model, top_trunc, bot_trunc, stem);
             // Should only need first option here
@@ -349,6 +211,8 @@ fn ehp_iterate(
                 }
             }
         } else {
+            // At the bottom of the window: check convergence on this sphere and,
+            // if a tau is needed, ask the matching suggester and try it.
             let potential_tau_thing = match is_tau_issue(&data, model, ahss_pages, stem, top_trunc + 1) {
                 Ok(tau_issue) => tau_issue,
                 Err(is) => {
@@ -425,6 +289,8 @@ fn ehp_iterate(
             }
         }
 
+        // Fold in the deferred (lifted/algebraic) differentials for this page and
+        // step the window down; once it reaches the bottom, resolve induced names.
         if bot_trunc != 0 {
             // TODO: Do something wth this result ?
             let _ = add_diffs(
@@ -471,6 +337,7 @@ fn ehp_iterate(
             }
         }
 
+        // Once a sphere is fully solved, lift its values onto the next odd sphere.
         if top_trunc & 1 == 0 && top_trunc <= stem && (top_trunc / 2) + stem < MAX_STEM {
             let res = ehp_recursion(&mut data, model, top_trunc + 1, stem).map_err(|x| format!("{x:?}"));
             if res.is_err() {
@@ -478,7 +345,9 @@ fn ehp_iterate(
             }
         }
 
-        // Slightly less complicated formula
+        // Advance to the next (stem, sphere) cell. Spheres are visited in the order
+        // the EHP recursion needs them (even spheres, then the 5/3/1 odd chain that
+        // steps back two stems), not simply left-to-right.
         if top_trunc >= stem + 1 {
             stem += 1;
             top_trunc = 4;
@@ -523,11 +392,16 @@ fn fix_names(
     bot_trunc: i32,
     depth: i32,
 ) -> Result<FixNamesResult, String> {
+    // The EHP recursion carries each generator a name describing where it came
+    // from one sphere down. On a new sphere those induced names can become wrong
+    // (the named class died, or sits at a different filtration). This step detects
+    // such generators and decides which algebraic class each should now be called.
     let sphere = top_trunc + 1;
 
     let (pages, _) = compute_pages(data, model, 0, sphere - 1, stem, stem, true);
     let alg_pages = &ALGEBRAIC_SPHERE_PAGES[sphere as usize];
 
+    // Collect the generators whose current induced name is inconsistent.
     let mut issues = vec![];
 
     for &id in model.gens_id_in_stem(stem) {
@@ -570,7 +444,9 @@ fn fix_names(
             af,
         } = i
         {
-            // Problem things
+            // Compare the live synthetic names at this filtration with the live
+            // algebraic ones; the names present in one set but not the other are
+            // the candidates this generator could be renamed to.
             let mut syn = vec![];
             let mut alg = vec![];
             for id in MODEL.gens_id_in_stem(*stem) {
@@ -599,6 +475,7 @@ fn fix_names(
                     "This should have been seen as an algebraic convergence issue"
                 ));
             }
+            // Unique candidate on each side: the rename is forced — apply it.
             if fil_syn.len() == 1 && fil_alg.len() == 1 {
                 let name = fil_alg[0];
                 let action = Action::SetInducedName {
@@ -613,7 +490,8 @@ fn fix_names(
                 process_action(data, model, &action, false).unwrap();
                 sols.push(action);
             } else {
-                // Go do a branching search to find best candidates
+                // Two algebraic candidates: speculatively try each name and keep
+                // the one whose world stays consistent (same with/without search).
                 if fil_syn.len() == 1 && fil_alg.len() == 2 {
                     let g = create_getout(getout, 2, depth);
 
@@ -724,7 +602,7 @@ fn try_diff(
 ) -> ChoiceResult {
     let (from_name, to_name) = model.get_names(d.from, d.to);
 
-    let filter = filter_diff(&data, model, alg_ehp, bot_trunc, top_trunc, d);
+    let filter = filter_diff(&data, model, alg_ehp, bot_trunc, top_trunc, d, false);
 
     if let Some(kind) = filter {
         if depth == 0 {
@@ -789,15 +667,15 @@ fn try_diff(
 
     match branch_on_speculative_worlds(depth, with, without) {
         SpeculativeBranchOutcome::ChooseRight(e) => {
-            commit_diff_choice(data, model, log, depth, d, Commitment::Fake(e));
+            commit_diff_choice(data, model, log, depth, d, Commitment::Fake(e), false);
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::ChooseLeft(e) => {
-            commit_diff_choice(data, model, log, depth, d, Commitment::Real(e));
+            commit_diff_choice(data, model, log, depth, d, Commitment::Real(e), false);
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::BothOpen => {
-            commit_diff_choice(data, model, log, depth, d, Commitment::Unknown);
+            commit_diff_choice(data, model, log, depth, d, Commitment::Unknown, false);
             ChoiceResult::Open
         }
         SpeculativeBranchOutcome::Cancelled => ChoiceResult::Cancelled,
@@ -813,44 +691,7 @@ fn is_tau_issue(
 ) -> Result<Option<(TauIssue, Vec<Issue>)>, String> {
     match check_issue(data, model, ahss_pages, real_stem, sphere) {
         Ok(_) => Ok(None),
-        Err(is) => {
-            let all_synth_conv = if let Issue::SyntheticConvergence {
-                bot_trunc: _,
-                top_trunc: _,
-                stem: _,
-                af: _,
-                expected: _,
-                observed: _,
-            } = &is[0]
-            {
-                true
-            } else {
-                false
-            };
-
-            if all_synth_conv {
-                let (solvable, generator) = synthetic_issue_is_tau_structure_issue(&is);
-                if solvable {
-                    if generator {
-                        Ok(Some((TauIssue::SynTauGeneratorIssue, is)))
-                    } else {
-                        Ok(Some((TauIssue::SynTauModuleIssue, is)))
-                    }
-                } else {
-                    Err(format!(
-                        "For the stable Sphere the F_2 vector space generators don't add up. {is:?}"
-                    ))
-                }
-            } else {
-                if algebraic_issue_is_fixable_by_tau_extensions(&is) {
-                    Ok(Some((TauIssue::AlgTauIssue, is)))
-                } else {
-                    Err(format!(
-                        "For S^{sphere} there is no way to fix the algebraic convergence issues with tau extensions. {is:?}"
-                    ))
-                }
-            }
-        }
+        Err(issues) => classify_tau_issue(issues, "For the stable Sphere", &format!("For S^{sphere}")),
     }
 }
 
@@ -942,15 +783,15 @@ fn try_tau(
 
     match branch_on_speculative_worlds(depth, with, without) {
         SpeculativeBranchOutcome::ChooseRight(e) => {
-            commit_tau_choice(data, model, log, depth, d, Commitment::Fake(e));
+            commit_tau_choice(data, model, log, depth, d, Commitment::Fake(e), false);
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::ChooseLeft(e) => {
-            commit_tau_choice(data, model, log, depth, d, Commitment::Real(e));
+            commit_tau_choice(data, model, log, depth, d, Commitment::Real(e), false);
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::BothOpen => {
-            commit_tau_choice(data, model, log, depth, d, Commitment::Unknown);
+            commit_tau_choice(data, model, log, depth, d, Commitment::Unknown, false);
             if ALWAYS_PRINT || depth == 0 {
                 println!("BothOpen: {from_name} | {to_name} tau multiple");
             }
@@ -960,6 +801,10 @@ fn try_tau(
     }
 }
 
+/// Add the deferred differentials (lifted from AHSS, or algebraic) that belong
+/// to the current page. Algebraic ones go in unconditionally; lifted ones only
+/// when both endpoints are still alive at this truncation (otherwise the lift
+/// isn't yet justified and we let the search find its own support first).
 fn add_diffs(
     data: &mut SyntheticSS,
     model: &E1,
@@ -972,16 +817,16 @@ fn add_diffs(
 ) -> Result<(), String> {
     let d_y = top_trunc - bot_trunc + 1;
 
-    
+
     for (from, to, k, p) in &ahss_and_alg_data[stem as usize][d_y as usize][top_trunc as usize] {
         if *k != Kind::Algebraic {
             let pages = try_compute_pages(&data, model, 0, top_trunc, stem, stem, false)
                 .map_err(|x| format!("{x:?}"))?;
 
-            if let Some((f_af, f_torsion)) = pages.try_element_final(*from)
+            if let Some((_, f_torsion)) = pages.try_element_final(*from)
                 && f_torsion.alive()
             {
-                if let Some((t_af, t_torsion)) = pages.try_element_final(*to)
+                if let Some((_, t_torsion)) = pages.try_element_final(*to)
                     && t_torsion.alive()
                 {
                     if depth == 0 {
@@ -1013,11 +858,17 @@ fn add_diffs(
     Ok(())
 }
 
+/// Entry point: run the automated EHP solver given an already-solved AHSS and an
+/// optional starting log. Returns the produced log and the resulting sequence.
 pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>, SyntheticSS) {
+    // Start from the AHSS facts that are valid in the metastable range.
     let mut partial_ehp = SyntheticSS::empty(MODEL.clone());
 
     let _ = set_metastable_range(&mut partial_ehp, ahss);
 
+    // Differentials longer than length 1 are deferred into `ahss_and_alg_data`
+    // (keyed by stem / length / top filtration) to be added at the right page,
+    // exactly as in the AHSS solver; length-1 ones are added immediately.
     let mut ahss_and_alg_data =
         vec![
             vec![vec![vec![]; (MAX_STEM + 2) as usize]; (MAX_STEM + 1) as usize];
@@ -1025,9 +876,10 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
         ];
 
     let mut log = log.unwrap_or(vec![]);
-    
-    // Add EHP Algebraic Diffs
-    for (&(from, to), (kind, reason)) in &DATA.from_to {
+
+    // Seed the EHP's own algebraic differentials (skipping the metastable ones,
+    // already added above).
+    for (&(from, to), (kind, _)) in &DATA.from_to {
         let d_y = MODEL.y(from) - MODEL.y(to);
         // Exclude metastable ones, as they have already been added
         if !in_metastable_range(MODEL.y(to), MODEL.stem(to)) {
@@ -1046,8 +898,10 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
         }
     }
 
-    // Add compatible AHSS diffs
-    for (&(from, to), (kind, proof)) in &ahss.from_to {
+    // Lift the AHSS's proven differentials into the EHP (the stable sequence's
+    // facts must hold unstably too), skipping algebraic/unknown ones. Real
+    // length-1 diffs and fakes go to the log; longer ones are deferred like above.
+    for (&(from, to), (kind, _)) in &ahss.from_to {
         let d_y = STABLE_MODEL.y(from) - STABLE_MODEL.y(to);
 
         // Only add differentials here
@@ -1103,20 +957,21 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
         for ess in esss {
             for es in ess {
                 for e in es {
-                    if let Some(from_id) = MODEL.try_index(STABLE_MODEL.name(e.from)) {
-                        if let Some(to_id) = MODEL.try_index(STABLE_MODEL.name(e.to)) {
-                            let (kind, p) = ahss
-                                .from_to
-                                .get(&(e.from, e.to))
-                                .unwrap().clone();
-                            log.push(Action::AddExt {
-                                from: STABLE_MODEL.name(e.from).to_string(),
-                                to: STABLE_MODEL.name(e.to).to_string(),
-                                af: e.af,
-                                kind: kind,
-                                proof: Some("Lifted".to_string()),
-                            });
-                        }
+                    // Only lift taus whose endpoints both exist in the EHP model.
+                    if MODEL.try_index(STABLE_MODEL.name(e.from)).is_some()
+                        && MODEL.try_index(STABLE_MODEL.name(e.to)).is_some()
+                    {
+                        let (kind, _) = ahss
+                            .from_to
+                            .get(&(e.from, e.to))
+                            .unwrap().clone();
+                        log.push(Action::AddExt {
+                            from: STABLE_MODEL.name(e.from).to_string(),
+                            to: STABLE_MODEL.name(e.to).to_string(),
+                            af: e.af,
+                            kind: kind,
+                            proof: Some("Lifted".to_string()),
+                        });
                     }
                 }
             }
@@ -1127,8 +982,11 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
     let ehp = revert_log_and_remake(0, &mut log, &MODEL, &partial_ehp, false);
     let log = Arc::new(Mutex::new(log));
 
+    // Precompute each AHSS sphere's pages once, so `check_issue` can cheaply
+    // verify EHP -> AHSS compatibility while the search runs.
     let ahss_pages = std::array::from_fn(|x| compute_pages(&ahss, &STABLE_MODEL, 0, x as i32, 0, 150, false).0);
 
+    // Drive the search from the first cell; it appends every fact to `log`.
     let res = ehp_iterate(
         ehp,
         &MODEL,
@@ -1143,7 +1001,8 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
         0,
     );
 
-    // Add EHP Algebraic Diffs
+    // Rebuild the final sequence from the produced log on top of the algebraic
+    // differentials, so the result is exactly what replaying the log yields.
     for (&(from, to), _) in &DATA.from_to {
         partial_ehp.add_diff(&MODEL, from, to, None, Kind::Algebraic);
     }

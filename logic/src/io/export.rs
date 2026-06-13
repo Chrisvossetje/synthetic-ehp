@@ -1,3 +1,7 @@
+//! Serialization of the computed spectral sequence to disk: the website's
+//! TypeScript data files (`write_typescript_file`), the replayable action logs
+//! (`write_log`), and a LaTeX-style order table (`export_order_table`).
+
 use std::{
     fs::File, io::{self, Write}, path::{Path, PathBuf}
 };
@@ -38,34 +42,6 @@ pub struct Differential {
     pub kind: Kind,
 }
 
-// impl PartialEq for Differential {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.from == other.from && self.to == other.to && self.coeff == other.coeff && self.d == other.d && self.proof == other.proof
-//     }
-// }
-
-// impl Eq for Differential { }
-
-// impl PartialOrd for Differential {
-//     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-//         if self.d == other.d {
-//             return other.coeff.partial_cmp(&self.coeff);
-//         } else {
-//             return self.d.partial_cmp(&other.d);
-//         }
-//     }
-// }
-
-// impl Ord for Differential {
-//     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-//         if self.d == other.d {
-//             return other.coeff.cmp(&self.coeff);
-//         } else {
-//             return self.d.cmp(&other.d);
-//         }
-//     }
-// }
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InternalTauMult {
     pub from: String,
@@ -91,6 +67,7 @@ pub struct ExternalTauMult {
     pub kind: Kind,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Multiplication {
     pub from: String,
@@ -124,67 +101,11 @@ pub fn write_typescript_file(
         .map(|g| serde_json::to_string(g).unwrap())
         .collect();
 
+    // Differentials, internal and external tau-multiplications are all stored
+    // together in `from_to`; we recover which is which from the bidegree shift.
     let mut differentials = vec![];
-    // for ds in &data.diffs_page {
-    //     for d in ds {
-    //         let from_name = data.model.name(d.from).to_string();
-    //         let to_name = data.model.name(d.to).to_string();
-
-    //         let (kind, proof)= data.from_to.get(&(d.from, d.to)).unwrap().clone();
-
-    //         let diff = Differential {
-    //             from: from_name,
-    //             to: to_name,
-    //             proof,
-    //             kind,
-    //         };
-    //         differentials.push(diff);
-    //     }
-    // }
-
     let mut int_tau_mults = vec![];
-    // for (page, its) in data.internal_tau_page.iter().enumerate() {
-    //     for i_t in its {
-    //         let from = data.model.name(i_t.from);
-    //         let to = data.model.name(i_t.to);
-    //         let (kind, proof) = data
-    //             .from_to
-    //             .get(&(i_t.from, i_t.to))
-    //             .unwrap_or(&(Kind::Real, None))
-    //             .clone();
-    //         int_tau_mults.push(InternalTauMult {
-    //             from: from.to_string(),
-    //             to: to.to_string(),
-    //             page: page as i32,
-    //             proof,
-    //             kind,
-    //         });
-    //     }
-    // }
-
     let mut ext_tau_mults = vec![];
-    // for e_tsss in &data.external_tau_page {
-    //     for e_tss in e_tsss {
-    //         for e_ts in e_tss {
-    //             for e_t in e_ts {
-    //                 let from = data.model.name(e_t.from);
-    //                 let to = data.model.name(e_t.to);
-    //                 let proof = data
-    //                     .from_to
-    //                     .get(&(e_t.from, e_t.to))
-    //                     .unwrap_or(&None)
-    //                     .clone();
-    //                 ext_tau_mults.push(ExternalTauMult {
-    //                     from: from.to_string(),
-    //                     to: to.to_string(),
-    //                     af: e_t.af,
-    //                     proof,
-    //                     kind: Kind::Real,
-    //                 });
-    //             }
-    //         }
-    //     }
-    // }
 
     for ((from, to), (kind, p)) in &data.from_to {
         let d_y = model.y(*from) - model.y(*to);

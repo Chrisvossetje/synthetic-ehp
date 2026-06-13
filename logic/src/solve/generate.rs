@@ -1,9 +1,47 @@
-use crate::domain::{
-    e1::E1,
-    model::{Diff, ExtTauMult, SyntheticSS},
-    process::compute_pages,
-    ss::SSPages,
+//! Proposing candidate facts for the solver to try: [`get_a_diff`] finds the
+//! next plausible differential in a stem, and the `get_a_tau*` family finds the
+//! next plausible external tau-multiplication (optionally restricted to given
+//! source/target generators). These only suggest; the solver decides.
+
+use crate::{
+    domain::{
+        e1::E1,
+        model::{Diff, ExtTauMult, SyntheticSS},
+        process::compute_pages,
+        ss::SSPages,
+    },
+    types::Torsion,
 };
+
+/// Build the external tau `s_id -> t_id` if it is dimensionally valid: `from`
+/// must sit above `to`, reach far enough down in AF to land on it, and (when
+/// `to` is itself torsion) not already be covered by `to`'s existing torsion.
+/// `s_torsion` is `from`'s (finite) torsion; `t_torsion` is `to`'s full state.
+fn make_ext_tau(
+    model: &E1,
+    s_id: usize,
+    s_af: i32,
+    s_torsion: i32,
+    t_id: usize,
+    t_af: i32,
+    t_torsion: Torsion,
+) -> Option<ExtTauMult> {
+    let d_y = model.y(s_id) - model.y(t_id);
+    if d_y > 0 && s_af > t_af && s_af - s_torsion <= t_af {
+        let valid = match t_torsion.0 {
+            Some(t_torsion) => t_af - t_torsion < s_af - s_torsion,
+            None => true,
+        };
+        if valid {
+            return Some(ExtTauMult {
+                from: s_id,
+                to: t_id,
+                af: t_af + 1,
+            });
+        }
+    }
+    None
+}
 
 pub fn get_a_diff(data: &SyntheticSS, model: &E1, top_trunc: i32, bot_trunc: i32, stem: i32) -> Option<Diff> {
     // We can look at targets in RP1_256 as we have not added the adams diffs yet!
@@ -17,9 +55,6 @@ pub fn get_a_diff(data: &SyntheticSS, model: &E1, top_trunc: i32, bot_trunc: i32
             && t_torsion.alive()
         {
             for &s_id in model.gens_id_in_stem_y(stem + 1, top_trunc) {
-                let (from_name, to_name) = model.get_names(s_id, t_id);
-
-                
                 if let Some((s_af_final, s_torsion)) = sources.try_element_final(s_id)
                 && s_torsion.alive()
                 {
@@ -81,6 +116,7 @@ pub fn get_a_diff(data: &SyntheticSS, model: &E1, top_trunc: i32, bot_trunc: i32
     None
 }
 
+#[allow(dead_code)]
 pub fn get_a_tau(
     data: &SyntheticSS,
     model: &E1,
@@ -96,36 +132,16 @@ pub fn get_a_tau(
         {
             if let Some(s_torsion) = s_torsion.0 {
                 for &t_id in model.gens_id_in_stem(stem) {
-                    let (from_name, to_name) = model.get_names(s_id, t_id);
-
                     if let Some((t_af, t_torsion)) = elements.try_element_final(t_id)
                         && t_torsion.alive()
+                        && !data.from_to.contains_key(&(s_id, t_id))
                     {
-                        if !data.from_to.contains_key(&(s_id, t_id))
-                        {
-                            let y = model.y(t_id);
-                            if !data.out_taus[s_id].iter().any(|to| model.y(*to) == y) {
-                                let d_y = model.y(s_id) - model.y(t_id);
-                                if d_y > 0 {
-                                    if s_af > t_af && s_af - s_torsion <= t_af {
-                                        if let Some(t_torsion) = t_torsion.0 {
-                                            if t_af - t_torsion < s_af - s_torsion   {
-                                                return Some(ExtTauMult {
-                                                    from: s_id,
-                                                    to: t_id,
-                                                    af: t_af + 1,
-                                                });
-                                            }
-                                        }
-                                        else {
-                                            return Some(ExtTauMult {
-                                                from: s_id,
-                                                to: t_id,
-                                                af: t_af + 1,
-                                            });
-                                        }
-                                    }
-                                }
+                        let y = model.y(t_id);
+                        if !data.out_taus[s_id].iter().any(|to| model.y(*to) == y) {
+                            if let Some(tau) =
+                                make_ext_tau(model, s_id, s_af, s_torsion, t_id, t_af, t_torsion)
+                            {
+                                return Some(tau);
                             }
                         }
                     }
@@ -153,34 +169,15 @@ pub fn get_a_tau_for_t_ids(
                     && s_torsion.alive()
                 {
                     if let Some(s_torsion) = s_torsion.0 {
-                        let (from_name, to_name) = model.get_names(s_id, t_id);
-
-                        if !data.from_to.contains_key(&(s_id, t_id))
-                        {
+                        if !data.from_to.contains_key(&(s_id, t_id)) {
                             let y = model.y(t_id);
                             if !data.out_taus[s_id].iter().any(|to| {
                                 model.y(*to) == y && data.generators[*to].alive()
                             }) {
-                                let d_y = model.y(s_id) - model.y(t_id);
-                                if d_y > 0 {
-                                    if s_af > t_af && s_af - s_torsion <= t_af {
-                                        if let Some(t_torsion) = t_torsion.0 {
-                                            if t_af - t_torsion < s_af - s_torsion   {
-                                                return Some(ExtTauMult {
-                                                    from: s_id,
-                                                    to: t_id,
-                                                    af: t_af + 1,
-                                                });
-                                            }
-                                        }
-                                        else {
-                                            return Some(ExtTauMult {
-                                                from: s_id,
-                                                to: t_id,
-                                                af: t_af + 1,
-                                            });
-                                        }
-                                    }
+                                if let Some(tau) =
+                                    make_ext_tau(model, s_id, s_af, s_torsion, t_id, t_af, t_torsion)
+                                {
+                                    return Some(tau);
                                 }
                             }
                         }
@@ -212,26 +209,10 @@ pub fn get_a_tau_for_t_ids_s_ids(
                         if !data.from_to.contains_key(&(s_id, t_id)) {
                             let y = model.y(t_id);
                             if !data.out_taus[s_id].iter().any(|to| model.y(*to) == y) {
-                                let d_y = model.y(s_id) - model.y(t_id);
-                                if d_y > 0 {
-                                    if s_af > t_af && s_af - s_torsion <= t_af {
-                                        if let Some(t_torsion) = t_torsion.0 {
-                                            if t_af - t_torsion < s_af - s_torsion   {
-                                                return Some(ExtTauMult {
-                                                    from: s_id,
-                                                    to: t_id,
-                                                    af: t_af + 1,
-                                                });
-                                            }
-                                        }
-                                        else {
-                                            return Some(ExtTauMult {
-                                                from: s_id,
-                                                to: t_id,
-                                                af: t_af + 1,
-                                            });
-                                        }
-                                    }
+                                if let Some(tau) =
+                                    make_ext_tau(model, s_id, s_af, s_torsion, t_id, t_af, t_torsion)
+                                {
+                                    return Some(tau);
                                 }
                             }
                         }

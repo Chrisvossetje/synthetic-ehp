@@ -1,3 +1,9 @@
+//! The [`Action`] log: the editable record of facts a user (or the solver) has
+//! asserted — differentials, internal/external taus, E1 generators, induced
+//! names, and reverts. [`process_action`] applies one action to the data
+//! (expanding it across spheres via James periodicity in AHSS mode), and
+//! [`revert_log_and_remake`] replays a whole log from scratch.
+
 use core::panic;
 use std::sync::LazyLock;
 
@@ -10,6 +16,9 @@ use crate::{
     types::{Kind, Torsion},
 };
 
+/// `D_R_REPEATS[d]` is the James-periodicity period for a length-`d` AHSS
+/// differential: 2 raised to the count of `j` in `1..=d` with `j mod 8` in
+/// {0,1,2,4}. Used to replicate one asserted fact across all periodic copies.
 pub static D_R_REPEATS: LazyLock<Vec<usize>> = LazyLock::new(|| {
     let mut r = vec![];
     for i in 0..=MAX_STEM {
@@ -293,23 +302,23 @@ pub fn revert_log_and_remake(
     let log = &*log;
 
     let mut data = original_data.clone();
-    // First do all SetE1's
+
+    // SetE1 actions must run before everything else (later actions depend on the
+    // E1 torsion they establish), so replay the log in two passes.
+    let apply = |data: &mut SyntheticSS, action: &Action| {
+        process_action(data, model, action, ahss).expect(&format!(
+            "There was an invalid action in the log. That should not be possible :( {action:?}"
+        ));
+    };
+
     for action in log {
-        if let Action::SetE1 { tag: _, torsion: _, proof: _ } = action {
-            process_action(&mut data, model, action, ahss).expect(&format!(
-                "There was an invalid action in the log. That should not be possible :( {action:?}"
-            ));
+        if matches!(action, Action::SetE1 { .. }) {
+            apply(&mut data, action);
         }
     }
-
-    // Then do the rest
     for action in log {
-        if let Action::SetE1 { tag: _, torsion: _, proof: _ } = action {
-
-        }  else {
-            process_action(&mut data, model, action, ahss).expect(&format!(
-                "There was an invalid action in the log. That should not be possible :( {action:?}"
-            ));
+        if !matches!(action, Action::SetE1 { .. }) {
+            apply(&mut data, action);
         }
     }
 

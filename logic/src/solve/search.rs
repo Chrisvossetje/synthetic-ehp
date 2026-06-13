@@ -1,3 +1,10 @@
+//! Primitives for the speculative branch-and-bound search the automated solvers
+//! use. A choice (does this differential/tau exist or not?) is explored by
+//! running both worlds — in parallel up to [`PARALLEL_DEPTH`] via rayon — and
+//! [`resolve_speculative_branch_results`] decides the outcome: if one world
+//! hits a contradiction, the other is forced. The [`GetOut`] flags let a
+//! parent cancel sibling branches once enough of them have been resolved.
+
 use std::sync::{
     Arc,
     atomic::{AtomicI32, Ordering},

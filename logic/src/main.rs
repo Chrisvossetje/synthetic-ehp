@@ -1,10 +1,14 @@
-use std::time::Instant;
-
+//! Binary entry point. Wires together the data, domain, io, and solve modules.
+//! `main` is a scratch harness: the currently-active path replays the EHP log
+//! and prints the order table, while the alternative interactive/automated
+//! routines are toggled in and out during development.
+//!
+//! `MAX_STEM`/`MAX_VERIFY_STEM` bound the range of validity of the Curtis data.
 
 use crate::{
-    data::curtis::{DATA, MODEL, STABLE_MODEL}, io::{
-        export::{export_order_table, write_all}, import::get_log,
-    }, routines::{automated_ahss, automated_ehp, interactive_ahss, interactive_ehp}, solve::{action::revert_log_and_remake, automated::ahss_solver, ehp::verify_geometric}
+    data::curtis::{DATA, MODEL}, io::{
+        export::export_order_table, import::get_log,
+    }, routines::{automated_ahss, automated_ehp, interactive_ahss, interactive_ehp}, solve::{action::revert_log_and_remake, ehp::verify_geometric}
 };
 
 mod data;
@@ -44,10 +48,11 @@ const MAX_VERIFY_STEM: i32 = 47;
 
 fn main() {
     if 1 != 1 {
-        let (ahss, _) = interactive_ahss();
+        let (_ahss, _) = interactive_ahss();
         interactive_ehp();
         automated_ahss(true);
-        automated_ehp(true);
+        let ehp = automated_ehp(true);
+        verify_geometric(&ehp);
     }
 
     // let (ahss, _) = interactive_ahss();

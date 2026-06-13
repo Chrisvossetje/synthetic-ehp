@@ -1,3 +1,9 @@
+//! Top-level entry points wiring the pieces together. The `interactive_*`
+//! routines run the verify → resolve loop with a human at the keyboard
+//! (auto-deducing what they can, prompting for the rest), while the
+//! `automated_*` routines run the same loop fully unattended via the solvers.
+//! Both replay a saved log first, so a session resumes where it left off.
+
 use std::time::{Duration, Instant};
 
 use crate::{
@@ -5,7 +11,7 @@ use crate::{
         cli::process_input,
         export::write_all, import::get_log,
     }, solve::{
-        action::{Action, process_action, revert_log_and_remake}, ahss::find_ahss_issues, automated::ahss_solver, automated_ehp::ehp_solver, ehp::{apply_ehp_recursively, find_ehp_issues}, ehp_ahss::{ehp_to_ahss_map, set_metastable_range}, solve::auto_deduce
+        action::{Action, process_action, revert_log_and_remake}, ahss::find_ahss_issues, automated_ahss::ahss_solver, automated_ehp::ehp_solver, ehp::{apply_ehp_recursively, find_ehp_issues}, ehp_ahss::{ehp_to_ahss_map, set_metastable_range}, solve::auto_deduce
     }
 };
 
@@ -125,10 +131,6 @@ pub fn interactive_ehp() -> (SyntheticSS, Duration) {
         Ok(log) => log,
         Err(_) => {
             println!("Log importing was not succesful");
-            println!("Log importing was not succesful");
-            println!("Log importing was not succesful");
-            println!("Log importing was not succesful");
-            println!("Log importing was not succesful");
             vec![]
         }
     };
@@ -140,10 +142,6 @@ pub fn interactive_ehp() -> (SyntheticSS, Duration) {
     let mut log = match get_log(false, false) {
         Ok(log) => log,
         Err(_) => {
-            println!("Log importing was not succesful");
-            println!("Log importing was not succesful");
-            println!("Log importing was not succesful");
-            println!("Log importing was not succesful");
             println!("Log importing was not succesful");
             vec![]
         }

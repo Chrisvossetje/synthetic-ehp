@@ -1,5 +1,13 @@
+//! Core value types shared across the crate: [`Torsion`] (a generator's order
+//! as a power of tau, with `None` = free and `Some(0)` = dead), the [`Kind`] of
+//! an asserted fact (algebraic, real, fake, …), and [`Generator`], one element
+//! of the E1 page.
+
 use serde::{Deserialize, Serialize};
 
+/// A generator's tau-torsion: `Some(n)` is a tau^n-torsion class, `Some(0)` is
+/// dead (zero), and `None` is tau-free (survives forever). Ordering is "can map
+/// to": a class is `<=` another iff a differential/tau could carry it there.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Torsion(pub Option<i32>);
 
@@ -114,8 +122,9 @@ impl Generator {
         }
     }
 
+    #[allow(dead_code)]
     pub fn push_induced_name(&mut self, sphere: i32, _name: String) -> Result<(), ()> {
-        if let Some(_) = self.induced_name.iter().find(|x| x.0 == sphere) {
+        if self.induced_name.iter().any(|x| x.0 == sphere) {
             return Err(());
         }
 

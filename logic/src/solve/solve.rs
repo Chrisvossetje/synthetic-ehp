@@ -1,3 +1,9 @@
+//! Turning issues into concrete fixes. [`auto_deduce`] handles the cases where
+//! an issue has a single forced resolution (a unique E1 assignment, or the one
+//! induced name a recursion could mean). The `suggest_tau_solution_*` functions
+//! propose the external tau-multiplication most likely to repair a convergence
+//! mismatch, deferring the actual search to [`crate::solve::generate`].
+
 use crate::{
     data::curtis::{DATA, MODEL},
     domain::{
@@ -6,32 +12,22 @@ use crate::{
         process::compute_pages,
     },
     solve::{
-        action::Action,
-        ahss_e1::get_e1_solutions,
-        generate::{get_a_tau_for_t_ids, get_a_tau_for_t_ids_s_ids},
-        issues::Issue,
+        action::Action, ahss::get_e1_solutions, generate::{get_a_tau_for_t_ids, get_a_tau_for_t_ids_s_ids}, issues::Issue
     },
 };
 
 pub fn auto_deduce(data: &SyntheticSS, model: &E1, issue: &Issue) -> Result<Vec<Action>, ()> {
     match issue {
-        Issue::SyntheticE1Page {
-            stem,
-            af,
-            expected,
-            observed,
-        } => {
+        Issue::SyntheticE1Page { stem, af, .. } => {
             let mut sol = get_e1_solutions(data, model, issue);
             if sol.len() == 1
                 && let Some(mut sol) = sol.pop()
             {
                 for s in &mut sol {
                     match s {
-                        Action::SetE1 {
-                            tag,
-                            torsion,
-                            proof,
-                        } => *proof = format!("Unique solution in stem {stem} af {af}. (auto)"),
+                        Action::SetE1 { proof, .. } => {
+                            *proof = format!("Unique solution in stem {stem} af {af}. (auto)")
+                        }
                         _ => {
                             unreachable!()
                         }
@@ -43,10 +39,10 @@ pub fn auto_deduce(data: &SyntheticSS, model: &E1, issue: &Issue) -> Result<Vec<
         }
         Issue::InvalidName {
             original_name,
-            unexpected_name,
             sphere,
             stem,
             af,
+            ..
         } => {
             let (pages, _) = compute_pages(data, model, 0, sphere - 1, *stem, *stem, true);
             let (alg_pages, _) = compute_pages(&DATA, &MODEL, 0, sphere - 1, *stem, *stem, true);
@@ -106,15 +102,7 @@ pub fn suggest_tau_solution_algebraic(
     let (elements, _) = compute_pages(data, model, bot_trunc, top_trunc, stem, stem, false);
 
     issues.sort_by_key(|i| {
-        if let Issue::AlgebraicConvergence {
-            bot_trunc,
-            top_trunc,
-            stem,
-            af,
-            expected,
-            observed,
-        } = i
-        {
+        if let Issue::AlgebraicConvergence { af, .. } = i {
             *af
         } else {
             unreachable!()
@@ -122,20 +110,12 @@ pub fn suggest_tau_solution_algebraic(
     });
 
     for i in issues {
-        if let Issue::AlgebraicConvergence {
-            bot_trunc,
-            top_trunc,
-            stem,
-            af,
-            expected,
-            observed,
-        } = i
-        {
+        if let Issue::AlgebraicConvergence { stem, af, .. } = i {
             let t_ids: Vec<_> = model
                 .gens_id_in_stem(*stem)
                 .iter()
                 .filter(|t_id| {
-                    if let Some((t_af, t_torsion)) = elements.try_element_final(**t_id) {
+                    if let Some((t_af, _)) = elements.try_element_final(**t_id) {
                         t_af == *af
                     } else {
                         false
@@ -165,15 +145,7 @@ pub fn suggest_tau_solution_generator_synthetic(
     let (elements, _) = compute_pages(data, model, bot_trunc, top_trunc, stem, stem, false);
 
     issues.sort_by_key(|i| {
-        if let Issue::SyntheticConvergence {
-            bot_trunc,
-            top_trunc,
-            stem,
-            af,
-            expected,
-            observed,
-        } = i
-        {
+        if let Issue::SyntheticConvergence { af, .. } = i {
             *af
         } else {
             unreachable!()
@@ -181,19 +153,10 @@ pub fn suggest_tau_solution_generator_synthetic(
     });
 
     let mut t_ids = vec![];
-    // let mut s_ids = vec![];
     for i in issues {
-        if let Issue::SyntheticConvergence {
-            bot_trunc,
-            top_trunc,
-            stem,
-            af,
-            expected,
-            observed,
-        } = i
-        {
+        if let Issue::SyntheticConvergence { stem, af, .. } = i {
             for t_id in model.gens_id_in_stem(*stem).iter().filter(|t_id| {
-                if let Some((t_af, t_torsion)) = elements.try_element_final(**t_id) {
+                if let Some((t_af, _)) = elements.try_element_final(**t_id) {
                     t_af == *af
                 } else {
                     false
@@ -207,6 +170,7 @@ pub fn suggest_tau_solution_generator_synthetic(
     get_a_tau_for_t_ids_s_ids(data, model, &elements, &t_ids, &t_ids)
 }
 
+#[allow(dead_code)]
 pub fn suggest_tau_solution_module_synthetic(
     _data: &SyntheticSS,
     _issues: &Vec<Issue>,

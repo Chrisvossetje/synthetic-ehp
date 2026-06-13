@@ -1,3 +1,7 @@
+//! Interactive terminal menu used to enter spectral-sequence facts by hand
+//! (differentials, tau-multiplications, generators, induced names) and to revert
+//! previous choices. Each menu selection is translated into an [`Action`].
+
 use std::io::{self, Write};
 
 use crate::{
@@ -31,6 +35,20 @@ fn read_int(positive: bool) -> i32 {
     }
 }
 
+/// Print `<label>: ` and read a trimmed line of input.
+fn prompt_line(label: &str) -> String {
+    print!("\n{label}: ");
+    io::stdout().flush().unwrap();
+    read_line()
+}
+
+/// Print `<label>: ` and read a non-negative integer.
+fn prompt_int(label: &str) -> i32 {
+    print!("\n{label}: ");
+    io::stdout().flush().unwrap();
+    read_int(true)
+}
+
 pub fn process_input(ahss: bool) -> Result<Action, ()> {
     loop {
         if ahss {
@@ -55,74 +73,36 @@ pub fn process_input(ahss: bool) -> Result<Action, ()> {
             println!("0 - Exit");
         }
 
-        print!("\nChoice: ");
-        io::stdout().flush().unwrap();
-
-        let choice = read_int(true);
-
-        match choice {
+        match prompt_int("Choice") {
             0 => {
                 return Err(());
             }
 
             1 => {
-                print!("\nFrom: ");
-                io::stdout().flush().unwrap();
-                let from = read_line();
-                print!("\nTo: ");
-                io::stdout().flush().unwrap();
-                let to = read_line();
-                print!("\nProof: ");
-                io::stdout().flush().unwrap();
-                let proof = read_line();
                 return Ok(Action::AddDiff {
-                    from,
-                    to,
-                    proof: Some(proof),
+                    from: prompt_line("From"),
+                    to: prompt_line("To"),
+                    proof: Some(prompt_line("Proof")),
                     kind: Kind::Real,
                 });
             }
 
             2 => {
-                print!("\nFrom: ");
-                io::stdout().flush().unwrap();
-                let from = read_line();
-                print!("\nTo: ");
-                io::stdout().flush().unwrap();
-                let to = read_line();
-                print!("\nPage: ");
-                io::stdout().flush().unwrap();
-                let page = read_int(true);
-                print!("\nProof: ");
-                io::stdout().flush().unwrap();
-                let proof = read_line();
                 return Ok(Action::AddInt {
-                    from,
-                    to,
-                    page,
-                    proof,
+                    from: prompt_line("From"),
+                    to: prompt_line("To"),
+                    page: prompt_int("Page"),
+                    proof: prompt_line("Proof"),
                     kind: Kind::Real,
                 });
             }
 
             3 => {
-                print!("\nFrom: ");
-                io::stdout().flush().unwrap();
-                let from = read_line();
-                print!("\nTo: ");
-                io::stdout().flush().unwrap();
-                let to = read_line();
-                print!("\nValid for AF (can insert 0 if always): ");
-                io::stdout().flush().unwrap();
-                let af = read_int(true);
-                print!("\nProof: ");
-                io::stdout().flush().unwrap();
-                let proof = read_line();
                 return Ok(Action::AddExt {
-                    from,
-                    to,
-                    af,
-                    proof: Some(proof),
+                    from: prompt_line("From"),
+                    to: prompt_line("To"),
+                    af: prompt_int("Valid for AF (can insert 0 if always)"),
+                    proof: Some(prompt_line("Proof")),
                     kind: Kind::Real,
                 });
             }
@@ -132,11 +112,8 @@ pub fn process_input(ahss: bool) -> Result<Action, ()> {
                     continue;
                 }
                 let tag = loop {
-                    print!("\nName: ");
-                    io::stdout().flush().unwrap();
-                    let elt = read_line();
-                    let name = elt.split_once('[');
-                    if let Some((tag, _)) = name {
+                    let elt = prompt_line("Name");
+                    if let Some((tag, _)) = elt.split_once('[') {
                         break tag.to_string();
                     }
                     println!(
@@ -144,18 +121,10 @@ pub fn process_input(ahss: bool) -> Result<Action, ()> {
                     );
                 };
 
-                print!("\nTorsion: ");
-                io::stdout().flush().unwrap();
-                let torsion = read_int(true);
-
-                print!("\nProof: ");
-                io::stdout().flush().unwrap();
-                let proof = read_line();
-
                 return Ok(Action::SetE1 {
                     tag,
-                    proof,
-                    torsion: Torsion::new(torsion),
+                    torsion: Torsion::new(prompt_int("Torsion")),
+                    proof: prompt_line("Proof"),
                 });
             }
             5 => {
@@ -163,34 +132,20 @@ pub fn process_input(ahss: bool) -> Result<Action, ()> {
                     println!("Cannot set induced names in AHSS mode");
                     continue;
                 }
-                print!("\nOriginal: ");
-                io::stdout().flush().unwrap();
-                let from = read_line();
-                print!("\nInduced: ");
-                io::stdout().flush().unwrap();
-                let to = read_line();
-                print!("\nFrom Sphere: ");
-                io::stdout().flush().unwrap();
-                let sphere = read_int(true);
-                print!("\nProof: ");
-                io::stdout().flush().unwrap();
-                let proof = read_line();
-
                 return Ok(Action::SetInducedName {
-                    name: from,
-                    new_name: to,
-                    sphere,
-                    proof,
+                    name: prompt_line("Original"),
+                    new_name: prompt_line("Induced"),
+                    sphere: prompt_int("From Sphere"),
+                    proof: prompt_line("Proof"),
                 });
             }
             7 => {
                 return Ok(Action::Revert { times: 1 });
             }
             8 => {
-                print!("\nTimes: ");
-                io::stdout().flush().unwrap();
-                let times = read_int(true);
-                return Ok(Action::Revert { times });
+                return Ok(Action::Revert {
+                    times: prompt_int("Times"),
+                });
             }
 
             _ => {

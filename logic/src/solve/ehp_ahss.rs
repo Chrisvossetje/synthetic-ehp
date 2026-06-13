@@ -1,3 +1,10 @@
+//! Relating the unstable EHP sequence to the stable AHSS sequence.
+//! [`ehp_to_ahss_map`] builds the generator index maps between the two models;
+//! [`set_metastable_range`] seeds the EHP data with the AHSS facts that hold in
+//! the metastable range; and [`compare_ehp_ahss`] cross-checks the two for
+//! consistency. (`compare_ehp_ahss` currently short-circuits to `Ok`; the full
+//! check and an earlier complete version are kept below for reference.)
+
 use crate::{
     data::curtis::{MODEL, STABLE_MODEL}, domain::{e1::E1, model::SyntheticSS, process::compute_pages, ss::SSPages}, solve::issues::Issue, types::Kind
 };
@@ -9,15 +16,20 @@ pub fn in_metastable_range(y: i32, stem: i32) -> bool {
     stem < (y * 3)
 }
 
+/// Copy every AHSS fact that lives in the metastable range (where the unstable
+/// and stable sequences agree) onto the EHP, by name: E1 torsion first, then the
+/// differentials, internal taus, and external taus whose target is metastable.
 pub fn set_metastable_range(
     ehp: &mut SyntheticSS,
     ahss: &SyntheticSS,
 ) -> Result<(), ()> {
+    // E1-page torsion of every metastable generator.
     for (idx, g) in STABLE_MODEL.gens().iter().enumerate() {
         if in_metastable_range(g.y, g.stem) {
             ehp.set_generator(&MODEL, &g.name, ahss.generators[idx])?;
         }
     }
+    // Differentials whose target is metastable.
     for ds in &ahss.diffs_page {
         for d in ds {
             let g_from = &STABLE_MODEL.get(d.from);
@@ -35,6 +47,7 @@ pub fn set_metastable_range(
         }
     }
 
+    // Internal tau-multiplications whose target is metastable.
     for (page, ts) in ahss.internal_tau_page.iter().enumerate() {
         for t in ts {
             let g_from = &STABLE_MODEL.get(t.from);
@@ -53,6 +66,7 @@ pub fn set_metastable_range(
         }
     }
 
+    // External tau-multiplications whose target is metastable.
     for esss in &ahss.external_tau_page {
         for ess in esss {
             for es in ess {
@@ -106,7 +120,7 @@ fn check(
     let mut issues = vec![];
 
     // We check if every AHSS diff between known generators also exists on EHP
-    for (&(from, to), (kind, p)) in &a.from_to {
+    for (&(from, to), (kind, _)) in &a.from_to {
         // Skip Algebraic things
         // This must already have been commutative
         // Else the algebraic data was wrong, which i don't assume
@@ -137,7 +151,7 @@ fn check(
                     let d_stem = a_model.stem(from) - a_model.stem(to);
 
                     if d_y > 0 && d_stem == 1 {
-                        let (from_name, to_name) = a_model.get_names(from, to);
+                        let (from_name, _) = a_model.get_names(from, to);
 
                         // This is a slightly looser check
                         // We check if they are non zero 1 page later
@@ -170,6 +184,10 @@ fn check(
 // TODO : Compare this one to the one in automated EHP
 // This is a reduced version
 // Below is the "official" version
+//
+// Currently disabled: the early `return Ok(())` short-circuits the check while
+// it's being reworked. The body below is kept (hence the allow attributes).
+#[allow(unused_variables, unreachable_code)]
 pub fn compare_ehp_ahss(
     ehp: &SyntheticSS,
     ahss: &SyntheticSS,

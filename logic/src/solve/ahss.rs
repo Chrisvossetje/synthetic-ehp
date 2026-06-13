@@ -1,12 +1,19 @@
+//! Issue-finding for the AHSS (stable) sequence: [`find_ahss_issues`] computes
+//! the relevant RP^n truncations for a stem and checks both synthetic and
+//! algebraic convergence against the reference data, while
+//! [`ahss_synthetic_e1_issue`] checks the E1 page itself against S0.
+
 use std::collections::HashMap;
 
+use itertools::Itertools;
+
 use crate::{
-    data::r#static::{S0_ZEROES, algebraic_rp, rp_truncations, synthetic_rp},
+    data::{naming::name_get_tag, r#static::{S0_ZEROES, algebraic_rp, rp_truncations, synthetic_rp}},
     domain::{e1::E1, model::SyntheticSS, process::try_compute_pages, ss::SSPages},
-    solve::issues::{
+    solve::{action::Action, issues::{
         Issue, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic,
         synthetic_issue_is_tau_structure_issue,
-    },
+    }}, types::Torsion,
 };
 
 fn verify_convergence(
@@ -109,4 +116,62 @@ pub fn ahss_synthetic_e1_issue(data: &SyntheticSS, model: &E1, stem: i32) -> Res
             })
             .collect()
     })
+}
+
+pub fn get_all_e1_solutions(data: &SyntheticSS, model: &E1, issues: &Vec<Issue>) -> Vec<Vec<Action>> {
+    let sols: Vec<_> = issues.iter().map(|i| get_e1_solutions(data, model, i)).collect();
+
+    sols.iter()
+        .map(|s| 0..s.len())
+        .multi_cartesian_product()
+        .map(|idxs| {
+            sols.iter()
+                .zip(idxs)
+                .flat_map(|(sol, i)| sol[i].clone())
+                .collect()
+        })
+        .collect()
+}
+
+pub fn get_e1_solutions(_data: &SyntheticSS, model: &E1, issue: &Issue) -> Vec<Vec<Action>> {
+    // Give a list of options which one could / should change
+    // This is the only time i (should) do this forward approach. Aka giving potential solutions.
+    // In other cases i should just "go" and see if some option resolves some issue
+
+    // The solutions should be some combinatorial thing
+    // It should be "unique" permutations!
+
+    if let Issue::SyntheticE1Page {
+        stem,
+        af,
+        expected,
+        ..
+    } = issue
+    {
+        let stem_af_to_index = model.gens_id_in_stem_af(*stem, *af);
+
+        // let stem = stem + 1;
+
+        let mut changes = vec![];
+
+        for p in expected.iter().permutations(expected.len()).unique() {
+            let mut change = vec![];
+            for (id, &torsion) in p.into_iter().enumerate() {
+                if torsion != Torsion::default() {
+                    let real_id = stem_af_to_index[id];
+                    let tag = name_get_tag(model.name(real_id)).to_string();
+                    change.push(Action::SetE1 {
+                        tag,
+                        torsion,
+                        proof: "".to_string(),
+                    });
+                }
+            }
+            changes.push(change);
+        }
+
+        changes
+    } else {
+        panic!("Can only call this function on Synthetic E1 error")
+    }
 }

@@ -1,3 +1,10 @@
+//! Static lookup tables and externally-computed comparison data.
+//!
+//! This holds the truncation lists that drive the RP^n / sphere computations,
+//! the EHP<->AHSS generator index maps, and the Adams E2 spectral-sequence data
+//! read from the `AHSS_DATA` CSV files (used to check our results against Lin's
+//! program). Everything is `LazyLock` so it is only built when first accessed.
+
 use std::{
     collections::HashMap,
     fs::File,
@@ -9,7 +16,7 @@ use std::{
 use itertools::{Itertools, chain};
 
 use crate::{
-    MAX_STEM, MAX_VERIFY_STEM,
+    MAX_STEM,
     data::curtis::{DATA, MODEL, STABLE_DATA, STABLE_MODEL},
     domain::{process::compute_pages, ss::SSPages},
     solve::action::D_R_REPEATS,
