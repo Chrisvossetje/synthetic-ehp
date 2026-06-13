@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     MAX_STEM,
     data::{
-        compare::EMPTY_LIST_TORSION,
+        r#static::EMPTY_LIST_TORSION,
         curtis::{DATA_PAGES, STABLE_DATA_PAGES},
     },
     domain::{e1::E1, model::SyntheticSS, ss::SSPages},

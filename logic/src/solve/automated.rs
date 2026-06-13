@@ -6,7 +6,7 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 
 use crate::{
     MAX_STEM, MAX_VERIFY_STEM, data::{
-        compare::{RADON_HURWITZ_NUMBERS, algebraic_rp, rp_truncations, synthetic_rp},
+        r#static::{RADON_HURWITZ_NUMBERS, algebraic_rp, rp_truncations, synthetic_rp},
         curtis::{STABLE_DATA, STABLE_MODEL}, naming::generate_names_from_tag,
     }, domain::{
         e1::E1,

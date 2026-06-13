@@ -6,7 +6,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    MAX_STEM, domain::{e1::E1, model::SyntheticSS}, solve::action::Action, types::{Generator, Kind, Torsion}
+    MAX_STEM, data::curtis::MODEL, domain::{e1::E1, model::SyntheticSS, process::compute_pages}, solve::action::Action, types::{Generator, Kind, Torsion}
 };
 
 pub fn write_vec_to_file<T: std::fmt::Debug>(vec: &[T], path: &str) -> io::Result<()> {
@@ -291,46 +291,42 @@ pub fn write_log(log: &Vec<Action>, ahss: bool) -> io::Result<()> {
 
 
 // TODO : Fix again
-#[allow(unused)]
-fn export_table() {
+pub fn export_order_table(ehp: &SyntheticSS) {
+    let mut things = vec![vec![]; (MAX_STEM + 1) as usize];
 
-    // let ehp = get_log();
+    things[0].push("".to_string());
 
-    // let mut things = vec![vec![]; (MAX_STEM + 1) as usize];
+    for s in 1..MAX_STEM {
+        things[0].push(format!("$S^{{{s}}}$"));
+    }
 
-    // things[0].push("S^n >".to_string());
+    for stem in 0..MAX_STEM {
+        let line_init = format!("$\\pi_{{{stem}+n}}(S^n)$");
+        things[(stem + 1) as usize].push(line_init);
+    }
 
-    // for s in 1..MAX_STEM {
-    //     things[0].push(format!("{s}"));
-    // }
+    for sphere in 1..MAX_STEM {
+        let top_trunc = sphere - 1;
+        let (pages, _) = compute_pages(ehp, &MODEL, 0, top_trunc, 0, MAX_STEM, true);
 
-    // for stem in 0..MAX_STEM {
-    //     let line_init = format!("π{stem}+n(S^n)");
-    //     things[(stem + 1) as usize].push(line_init);
-    // }
+        for stem in 0..MAX_STEM {
+            let mut count = 0;
+            for id in MODEL.gens_id_in_stem(stem) {
+                if let Some(el) = pages.try_element_final(*id)
+                    && el.1.free()
+                {
+                    count += 1;
+                }
+            }
 
-    // for sphere in 1..MAX_STEM {
-    //     let top_trunc = sphere - 1;
-    //     let (pages, _) = compute_pages(ehp, 0, top_trunc, 0, MAX_STEM, true);
+            things[(stem + 1) as usize].push(format!("{}", count));
+        }
+    }
 
-    //     for stem in 0..MAX_STEM {
-    //         let mut count = 0;
-    //         for id in ehp.model.gens_id_in_stem(stem) {
-    //             if let Some(el) = pages.try_element_final(*id)
-    //                 && el.1.free()
-    //             {
-    //                 count += 1;
-    //             }
-    //         }
-
-    //         things[(stem + 1) as usize].push(format!("{}", count));
-    //     }
-    // }
-
-    // let joined: Vec<_> = things.into_iter().map(|x| x.join(",")).collect();
-    // for l in joined {
-    //     println!("{l}");
-    // }
+    let joined: Vec<_> = things.into_iter().map(|x| x.join(",")).collect();
+    for l in joined {
+        println!("{l}");
+    }
 }
 
 

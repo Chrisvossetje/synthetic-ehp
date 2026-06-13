@@ -3,11 +3,10 @@ use std::{collections::HashMap, iter::Enumerate, slice::Iter};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    data::{compare::EMPTY_LIST_USIZE, naming::name_get_tag},
+    data::{r#static::EMPTY_LIST_USIZE, naming::name_get_tag},
     types::{Generator, Torsion},
 };
 
-// This should represent the E1 page ? Is this necessary ?
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct E1 {
     generators: Vec<Generator>,

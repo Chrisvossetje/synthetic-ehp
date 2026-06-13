@@ -10,16 +10,16 @@ use crate::{
 static CURTIS_TXT: &str = include_str!("../../../curtis_table.txt");
 static STABLE_CURTIS_TXT: &str = include_str!("../../../curtis_table_stable.txt");
 
-pub static MODEL: LazyLock<E1> = LazyLock::new(|| generate_algebraic_model());
+pub static MODEL: LazyLock<E1> = LazyLock::new(|| generate_algebraic_model(false).0);
 
-pub static DATA: LazyLock<SyntheticSS> = LazyLock::new(|| generate_algebraic_data());
+pub static DATA: LazyLock<SyntheticSS> = LazyLock::new(|| generate_algebraic_model(false).1);
 
 pub static DATA_PAGES: LazyLock<SSPages> =
     LazyLock::new(|| compute_pages(&DATA, &MODEL, 0, 256, 0, MAX_STEM, true).0);
 
-pub static STABLE_MODEL: LazyLock<E1> = LazyLock::new(|| generate_stable_algebraic_model());
+pub static STABLE_MODEL: LazyLock<E1> = LazyLock::new(|| generate_algebraic_model(true).0);
 
-pub static STABLE_DATA: LazyLock<SyntheticSS> = LazyLock::new(|| generate_stable_algebraic_data());
+pub static STABLE_DATA: LazyLock<SyntheticSS> = LazyLock::new(|| generate_algebraic_model(true).1);
 
 pub static STABLE_DATA_PAGES: LazyLock<SSPages> =
     LazyLock::new(|| compute_pages(&STABLE_DATA, &STABLE_MODEL, 0, 256, 0, MAX_STEM, true).0);
@@ -248,26 +248,14 @@ fn build_data(model: &E1, differentials: Vec<Differential>) -> SyntheticSS {
     data
 }
 
-fn generate_algebraic_model() -> E1 {
-    let (untagged, tagged) = parse_curtis_table();
-    let (generators, _) = parse_algebraic(&untagged, &tagged);
-    E1::new(generators)
-}
-
-fn generate_algebraic_data() -> SyntheticSS {
-    let (untagged, tagged) = parse_curtis_table();
-    let (_, differentials) = parse_algebraic(&untagged, &tagged);
-    build_data(&MODEL, differentials)
-}
-
-fn generate_stable_algebraic_model() -> E1 {
-    let (untagged, tagged) = parse_stable_curtis_table();
-    let (generators, _) = parse_algebraic(&untagged, &tagged);
-    E1::new(generators)
-}
-
-fn generate_stable_algebraic_data() -> SyntheticSS {
-    let (untagged, tagged) = parse_stable_curtis_table();
-    let (_, differentials) = parse_algebraic(&untagged, &tagged);
-    build_data(&STABLE_MODEL, differentials)
+fn generate_algebraic_model(ahss: bool) -> (E1, SyntheticSS) {
+    let (untagged, tagged) = if ahss {
+        parse_stable_curtis_table()
+    } else {
+        parse_curtis_table()
+    };
+    let (generators, differentials) = parse_algebraic(&untagged, &tagged);
+    let model = E1::new(generators);
+    let ss = build_data(&model, differentials);
+    (model, ss)
 }

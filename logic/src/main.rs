@@ -3,8 +3,8 @@ use std::time::Instant;
 
 use crate::{
     data::curtis::{DATA, MODEL, STABLE_MODEL}, io::{
-        export::write_all, import::get_log,
-    }, routines::{automated_ahss, automated_ehp, interactive_ahss, interactive_ehp}, solve::{automated::ahss_solver, ehp::verify_geometric}
+        export::{export_order_table, write_all}, import::get_log,
+    }, routines::{automated_ahss, automated_ehp, interactive_ahss, interactive_ehp}, solve::{action::revert_log_and_remake, automated::ahss_solver, ehp::verify_geometric}
 };
 
 mod data;
@@ -56,12 +56,13 @@ fn main() {
 
     // automated_ahss(true);
     
-    let ehp = automated_ehp(true);
-    verify_geometric(&ehp, &MODEL);
+    // let ehp = automated_ehp(true);
+    // verify_geometric(&ehp, &MODEL);
 
+    let mut ehp = get_log(false, false).unwrap();
 
-
-    // export_order_table(&ehp);
+    let ehp = revert_log_and_remake(0, &mut ehp, &MODEL, &DATA, false);
+    export_order_table(&ehp);
 
     // let (ahss, input_time_ahss) = ahss();
     // let start_ehp = Instant::now();

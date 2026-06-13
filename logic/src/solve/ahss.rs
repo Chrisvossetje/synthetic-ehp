@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    data::compare::{S0_ZEROES, algebraic_rp, rp_truncations, synthetic_rp},
+    data::r#static::{S0_ZEROES, algebraic_rp, rp_truncations, synthetic_rp},
     domain::{e1::E1, model::SyntheticSS, process::try_compute_pages, ss::SSPages},
     solve::issues::{
         Issue, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic,

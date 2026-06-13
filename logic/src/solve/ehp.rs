@@ -2,7 +2,7 @@ use std::{iter::FilterMap, ops::RangeInclusive};
 
 use crate::{
     MAX_STEM, MAX_VERIFY_STEM,
-    data::compare::{S0, algebraic_spheres},
+    data::r#static::{S0, algebraic_spheres},
     domain::{
         e1::E1,
         model::SyntheticSS,
