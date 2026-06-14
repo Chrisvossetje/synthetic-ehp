@@ -245,7 +245,7 @@ fn apply_tau(
 
 
             // TODO : EHP requires >= and AHSS requires > ......
-            if from_g.0 - from_torsion <= to_g.0 && af_diff >= 0 {
+            if from_g.0 - from_torsion <= to_g.0 && af_diff > 0 {
                 pages.push(from, page, (from_g.0, new_from_torsion));
                 pages.push(to, page, (to_g.0, new_to_torsion));
             } else if from_g.0 - from_torsion > to_g.0 {
