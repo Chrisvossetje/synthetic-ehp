@@ -1,8 +1,17 @@
-import { Chart } from "./chart";
+import { Chart } from "../chart/chart";
 import { ehpChart } from "./charts";
-import { getComputedDiffCoeff, getDisplayedGenerator } from "./ehp_chart";
-import { isUsingStableData, viewSettings, get_filtered_data, Category, shouldIncludeKind } from "./logic";
-import { Kind } from "./types";
+import { getComputedDiffCoeff, getDisplayedGenerator } from "./ehpChart";
+import { isUsingStableData } from "../model/dataSource";
+import { shouldIncludeKind, viewSettings } from "../model/settings";
+
+/**
+ * Screenshot / TikZ export.
+ *
+ * Lets the user drag-select a rectangular region of the EHP chart and copies a
+ * standalone TikZ `figure` reproducing that region to the clipboard. It reads
+ * the *displayed* state of each element (visibility, fill, page-filtered
+ * torsion/AF) so the exported figure matches exactly what is on screen.
+ */
 
 // Screenshot state
 let screenshotState: "idle" | "selecting" | "capturing" = "idle";
@@ -26,10 +35,6 @@ function getTikzColor(torsion: number | undefined): string {
     if (torsion === 3) return "green";
     return "black";
 }
-
-// function shouldExportDifferentialKind(kind: Kind): boolean {
-//     return viewSettings.showFakeData || kind !== "Fake";
-// }
 
 /**
  * Start screenshot mode

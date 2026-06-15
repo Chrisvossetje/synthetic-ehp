@@ -1,7 +1,7 @@
 import { select } from "d3-selection";
 import { zoom, zoomIdentity, zoomTransform } from "d3-zoom";
 import { ChartMode } from "./chartMode";
-import { ASS_CHART_CSS, EHP_CHART_CSS } from "./svg_chart_styles";
+import { ASS_CHART_CSS, EHP_CHART_CSS } from "./chartStyles";
 
 export const svgNS = 'http://www.w3.org/2000/svg';
 

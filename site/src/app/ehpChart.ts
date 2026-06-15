@@ -1,27 +1,26 @@
 import { ehpChart } from "./charts";
-import {
-    Category,
-    find,
-    generated_by_name,
-    generates,
-    getActiveData,
-    get_filtered_data,
-    getSelectedGenerator,
-    getSphereLifecycleInfo,
-    isUsingStableData,
-    setSelectedGenerator,
-    setUseStableData,
-    survivesFilteredGenerator,
-    viewSettings,
-    ensureStableDataLoading,
-    shouldIncludeKind
-} from "./logic";
-import { Differential, Kind, SyntheticEHP } from "./types";
-import { buildGeneratorInfoLines, showInfoPanel } from "./ui/info_panel";
+import { Differential, Kind, SyntheticEHP } from "../types";
+import { Category, getSelectedGenerator, setSelectedGenerator, shouldIncludeKind, viewSettings } from "../model/settings";
+import { ensureStableDataLoading, find, getActiveData, isUsingStableData, setUseStableData } from "../model/dataSource";
+import { generated_by_name, generates, getSphereLifecycleInfo } from "../model/names";
+import { computePage, survivesFilteredGenerator, TorsionFiltration } from "../model/spectralSequence";
+import { buildGeneratorInfoLines, showInfoPanel } from "../chart/infoPanel";
 
+/**
+ * EHP chart controller.
+ *
+ * Owns everything specific to the EHP chart: the click handlers (which open the
+ * info panel and drive selection highlighting), filling the chart with the full
+ * dataset once, and re-deriving what is visible whenever the view settings
+ * change. The actual page maths lives in `model/spectralSequence.ts`; this file
+ * only decides what to *show* given the result.
+ */
+
+// Differentials as computed at E∞ for the current view, keyed `from->to`.
+// Used by the line-click handler and the screenshot exporter.
 let computedDiffsByKey: Map<string, Differential> = new Map();
-let displayedDiffsByKey: Map<string, Differential> = new Map();
-let currentFilteredGenerators: Record<string, [number | undefined, number]> = {};
+// The page-filtered [torsion, filtration] of every class currently drawn.
+let currentFilteredGenerators: Record<string, TorsionFiltration> = {};
 
 function cacheComputedDiffs(diffs: Differential[]) {
     computedDiffsByKey.clear();
@@ -34,9 +33,10 @@ function getAllTauMults(data: SyntheticEHP) {
     return [...data.internal_tau_mults, ...data.external_tau_mults];
 }
 
+/** A τ-multiplication is only drawn when both endpoints survive on this page. */
 function shouldDisplayTauMult(
     kind: Kind,
-    gens: Record<string, [number | undefined, number]>,
+    gens: Record<string, TorsionFiltration>,
     from: string,
     to: string
 ): boolean {
@@ -45,19 +45,21 @@ function shouldDisplayTauMult(
     if (!fromEntry || !toEntry) {
         return false;
     }
-
     if (kind === "Real") {
         return survivesFilteredGenerator(fromEntry) && survivesFilteredGenerator(toEntry);
     }
-
     return true;
 }
 
 export function getComputedDiff(from: string, to: string): Differential | undefined {
-    return displayedDiffsByKey.get(`${from}->${to}`) ?? computedDiffsByKey.get(`${from}->${to}`);
+    return computedDiffsByKey.get(`${from}->${to}`);
 }
 
-function getDisplayedDiffCoeff(from: string, to: string): number | undefined {
+/**
+ * The τ-coefficient of a differential as displayed: the gap in Adams filtration
+ * between its endpoints. Returns undefined if either endpoint is not drawn.
+ */
+export function getComputedDiffCoeff(from: string, to: string): number | undefined {
     const fromEntry = currentFilteredGenerators[from];
     const toEntry = currentFilteredGenerators[to];
     if (!fromEntry || !toEntry) {
@@ -66,16 +68,12 @@ function getDisplayedDiffCoeff(from: string, to: string): number | undefined {
     return toEntry[1] - fromEntry[1] - 1;
 }
 
-export function getComputedDiffCoeff(from: string, to: string): number | undefined {
-    return getDisplayedDiffCoeff(from, to);
-}
-
 /**
- * Get the page-filtered [torsion, filtration] for a generator as currently
- * displayed on the chart. Returns undefined if the generator is not alive on
- * the current page. Used by the screenshot export so colors/AF match the chart.
+ * The page-filtered [torsion, filtration] for a generator as currently drawn.
+ * Returns undefined if the generator is not alive on the current page. Used by
+ * the screenshot export so colours/AF match the chart.
  */
-export function getDisplayedGenerator(name: string): [number | undefined, number] | undefined {
+export function getDisplayedGenerator(name: string): TorsionFiltration | undefined {
     return currentFilteredGenerators[name];
 }
 
@@ -106,6 +104,10 @@ export function handleDotClick(dot: string) {
     showInfoPanel(`Generator: ${gen.name}`, lines);
 }
 
+/**
+ * Highlight the selected class (orange), the class that generates it (cyan), and
+ * the family it generates (green). No-op if nothing is selected / on screen.
+ */
 export function applyEhpSelectionHighlight() {
     ehpChart.clear_selection_highlights();
 
@@ -140,7 +142,7 @@ export function handleLineClick(from: string, to: string) {
 
     if (!rawDiff && !computedDiff) return;
 
-    const coeff = getDisplayedDiffCoeff(from, to) ?? rawDiff?.coeff ?? 0;
+    const coeff = getComputedDiffCoeff(from, to) ?? rawDiff?.coeff ?? 0;
     const page = rawDiff?.d ?? computedDiff?.d ?? 0;
 
     const lines = [
@@ -188,18 +190,17 @@ export function handleTauMultClick(from: string, to: string) {
     showInfoPanel("τ Multiplication", lines, extraLines);
 }
 
+/** Load the full dataset into the chart once and wire up click handlers. */
 export function fill_ehp_chart() {
     const activeData = getActiveData();
     if (!activeData) {
         return;
     }
 
-    // Bind click handlers
     ehpChart.dotCallback = handleDotClick;
     ehpChart.lineCallback = handleLineClick;
     ehpChart.tauMultCallback = handleTauMultClick;
 
-    // Set all generators and differentials (complete data set)
     ehpChart.set_all_generators(activeData.generators);
     ehpChart.set_all_differentials(activeData.differentials);
     ehpChart.set_all_multiplications(activeData.multiplications);
@@ -208,9 +209,7 @@ export function fill_ehp_chart() {
     ehpChart.init();
 }
 
-/**
- * Switch between data and data_stable
- */
+/** Flip between `data` and `data_stable`, then rebuild the EHP chart. */
 export async function switchDataSource() {
     const nextUseStableData = !isUsingStableData();
     if (nextUseStableData) {
@@ -218,18 +217,17 @@ export async function switchDataSource() {
     }
     setUseStableData(nextUseStableData);
 
-    // Clear the chart
     ehpChart.clear();
-
-    // Refill with the new data
     fill_ehp_chart();
-
-    // Update the chart with current view settings
     update_ehp_chart();
 }
 
 /**
- * Update the EHP chart with current filter settings
+ * Re-derive what the EHP chart shows from the current view settings.
+ *
+ * Strategy: hide everything, then compute the live classes for the current page
+ * (and, separately, for E∞ to decide which dots are "permanent") and turn the
+ * relevant dots / differentials / multiplications back on.
  */
 export function update_ehp_chart() {
     const activeData = getActiveData();
@@ -237,7 +235,7 @@ export function update_ehp_chart() {
         return;
     }
 
-    // Hide all generators and differentials first
+    // Hide all generators, differentials, multiplications and τ-mults first.
     activeData.generators.forEach((g) => {
         ehpChart.display_dot(g.name, false, false, null, g.af);
     });
@@ -250,28 +248,26 @@ export function update_ehp_chart() {
     getAllTauMults(activeData).forEach((t) => {
         ehpChart.display_tau_mult(t.from, t.to, false);
     });
-    const [gens, _] = get_filtered_data(
-        activeData,
-        viewSettings.category,
-        viewSettings.truncation,
-        viewSettings.page,
-        viewSettings.allDiffs,
-        undefined,
-        false,
-        viewSettings.bottomTruncation
-    );
-    currentFilteredGenerators = gens as Record<string, [number | undefined, number]>;
-    const [perm_classes, diffs] = get_filtered_data(
-        activeData,
-        viewSettings.category,
-        viewSettings.truncation,
-        1000,
-        viewSettings.allDiffs,
-        undefined,
-        false,
-        viewSettings.bottomTruncation
-    );
-    cacheComputedDiffs(diffs);
+
+    // Classes alive on the current page...
+    const gens = computePage(activeData, {
+        category: viewSettings.category,
+        truncation: viewSettings.truncation,
+        bottomTruncation: viewSettings.bottomTruncation,
+        page: viewSettings.page,
+    }).generators;
+    currentFilteredGenerators = gens;
+
+    // ...and the E∞ view, which tells us which classes are permanent and gives
+    // us the resolved differentials to remember for click/screenshot lookups.
+    const permView = computePage(activeData, {
+        category: viewSettings.category,
+        truncation: viewSettings.truncation,
+        bottomTruncation: viewSettings.bottomTruncation,
+        page: 1000,
+    });
+    const perm_classes = permView.generators;
+    cacheComputedDiffs(permView.differentials);
 
     const real_diffs = activeData.differentials.filter((d) => {
         if (!shouldIncludeKind(d.kind)) {
@@ -288,33 +284,18 @@ export function update_ehp_chart() {
         }
         return true;
     });
-    // displayedDiffsByKey.clear();
-    // real_diffs.forEach((d) => {
-    //     const diffPage = d.d ?? Number.POSITIVE_INFINITY;
-    //     if (viewSettings.allDiffs && diffPage < viewSettings.page) {
-    //         return;
-    //     }
-    //     const key = `${d.from}->${d.to}`;
-    //     // const existing = displayedDiffsByKey.get(key);
-    //     // if (!existing) {
-    //     //     displayedDiffsByKey.set(key, d);
-    //     //     return;
-    //     // }
-    //     // const existingPage = existing.d ?? Number.POSITIVE_INFINITY;
-    //     // if (diffPage < existingPage) {
-    //     //     displayedDiffsByKey.set(key, d);
-    //     // }
-    // });
 
+    // Draw the live dots; a filled dot is a permanent cycle (survives to E∞).
     Object.entries(gens).forEach(([name, [torsion, filtration]]) => {
         if (torsion == undefined || torsion > 0) {
             const permanentEntry = perm_classes[name];
-            let perm = permanentEntry != undefined && (permanentEntry[0] == undefined || permanentEntry[0] > 0);
+            const perm = permanentEntry != undefined && (permanentEntry[0] == undefined || permanentEntry[0] > 0);
             ehpChart.display_dot(name, true, perm, torsion ?? null, filtration);
         }
     });
+
     real_diffs.forEach((d) => {
-        let torsion = getDisplayedDiffCoeff(d.from, d.to);
+        let torsion = getComputedDiffCoeff(d.from, d.to);
         if (viewSettings.category != Category.Synthetic) {
             torsion = 0;
         }
@@ -324,35 +305,28 @@ export function update_ehp_chart() {
         ehpChart.display_diff(d.from, d.to, true, torsion);
     });
 
-    // Display multiplications only when both generators are alive
+    // Multiplications: only when both endpoints are alive.
     activeData.multiplications.forEach((m) => {
-        const fromAlive = survivesFilteredGenerator(gens[m.from]);
-        const toAlive = survivesFilteredGenerator(gens[m.to]);
-        if (fromAlive && toAlive) {
+        if (survivesFilteredGenerator(gens[m.from]) && survivesFilteredGenerator(gens[m.to])) {
             ehpChart.display_mult(m.from, m.to, true);
         }
     });
 
-    // Display tau multiplications only when both generators are alive
+    // τ-multiplications: synthetic category only.
     if (viewSettings.category == Category.Synthetic) {
         activeData.internal_tau_mults.forEach((t) => {
-            if (!shouldIncludeKind(t.kind)) {
-                return;
-            }
-            if (!viewSettings.allDiffs && t.page !== viewSettings.page) {
-                return;
-            }
-            if (shouldDisplayTauMult(t.kind, gens as Record<string, [number | undefined, number]>, t.from, t.to)) {
+            if (!shouldIncludeKind(t.kind)) return;
+            if (!viewSettings.allDiffs && t.page !== viewSettings.page) return;
+            if (shouldDisplayTauMult(t.kind, gens, t.from, t.to)) {
                 ehpChart.display_tau_mult(t.from, t.to, true);
             }
         });
 
+        // External τ-mults resolve at E∞, so only show them with All Diffs or E∞.
         if (viewSettings.allDiffs || viewSettings.page > 999) {
             activeData.external_tau_mults.forEach((t) => {
-                if (!shouldIncludeKind(t.kind)) {
-                    return;
-                }
-                if (shouldDisplayTauMult(t.kind, gens as Record<string, [number | undefined, number]>, t.from, t.to)) {
+                if (!shouldIncludeKind(t.kind)) return;
+                if (shouldDisplayTauMult(t.kind, gens, t.from, t.to)) {
                     ehpChart.display_tau_mult(t.from, t.to, true);
                 }
             });

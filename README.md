@@ -12,7 +12,8 @@ The project has two parts:
 - **`site/`** — a TypeScript + [d3](https://d3js.org/) web app that renders the
   exported data as an interactive chart. The rendering is based on the author's
   Ext resolver, which in turn draws on the [sseq](https://github.com/SpectralSequences)
-  project / d3.
+  project / d3. See [`site/src/README.md`](site/src/README.md) for the module
+  architecture (the `model` / `chart` / `app` layering).
 
 The Curtis table data originates from William Balderrama's
 [website](https://williamb.info/lambda/classic-curtis-table.txt) (originally

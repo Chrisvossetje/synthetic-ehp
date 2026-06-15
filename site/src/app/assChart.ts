@@ -1,7 +1,10 @@
-import { Category, find, getActiveData, get_filtered_data, getSelectedGenerator, getSphereLifecycleInfo, setSelectedGenerator, get_induced_name } from "./logic";
 import { assChart } from "./charts";
-import { Differential, Generators } from "./types";
-import { buildGeneratorInfoLines, showInfoPanel } from "./ui/info_panel";
+import { Differential, Generators } from "../types";
+import { Category, getSelectedGenerator, setSelectedGenerator } from "../model/settings";
+import { find, getActiveData } from "../model/dataSource";
+import { get_induced_name, getSphereLifecycleInfo } from "../model/names";
+import { computePage } from "../model/spectralSequence";
+import { buildGeneratorInfoLines, showInfoPanel } from "../chart/infoPanel";
 
 type InferredAssDifferential = {
     sourceBase: string;
@@ -118,17 +121,14 @@ export function update_ass_chart(
     assChart.dotCallback = handleAssDotClick;
     assChart.lineCallback = handleAssLineClick;
 
-    // Compare synthetic and algebraic E_infinity states.
-    const [syntheticClasses, syntheticDiffs] = get_filtered_data(
-        activeData,
-        Category.Synthetic,
+    // The ASS chart is the synthetic E∞ page with external τ-mults resolved.
+    const syntheticClasses = computePage(activeData, {
+        category: Category.Synthetic,
         truncation,
-        1000,
-        true,
-        undefined,
-        true,
-        bottomTruncation
-    );
+        bottomTruncation,
+        page: 1000,
+        applyTauMults: true,
+    }).generators;
 
     // Build ASS nodes/differentials:
     // - Free classes: one black dot.
@@ -188,19 +188,7 @@ export function update_ass_chart(
                 kind: "Real",
                 proof: "Inferred from ASS torsion."
             });
-    
-            // let linked: Differential | undefined;
-            // const exactMatch = syntheticDiffs.find(d => d.to === g.name && d.coeff === syntheticTorsion && d.d === syntheticTorsion + 1);
-            // if (exactMatch) {
-            //     linked = exactMatch;
-            // } else {
-            //     linked = syntheticDiffs.find(d => d.to === g.name && d.coeff === syntheticTorsion);
-            // }
-    
-            // const reason = (linked === undefined && g.torsion !== undefined && g.torsion > 0)
-            //     ? "On E1 page the target of this differential was already torsion"
-            //     : undefined;
-    
+
             inferredAssDifferentials.set(`${sourceName}->${targetName}`, {
                 sourceBase: g.name,
                 targetBase: g.name,

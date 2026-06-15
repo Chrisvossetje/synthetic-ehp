@@ -1,8 +1,8 @@
-import { ToStringMap } from "./stringmap";
-import { SvgChart } from "./svgchart";
-import { Differential, ExternalTauMult, Generators, InternalTauMult, Multiplication } from "./types";
+import { ToStringMap } from "./stringMap";
+import { SvgChart } from "./svgChart";
+import { Differential, ExternalTauMult, Generators, InternalTauMult, Multiplication } from "../types";
 import { ChartMode } from "./chartMode";
-import { svgNS } from "./svgchart";
+import { svgNS } from "./svgChart";
 
 type Point = [number, number];
 
@@ -254,19 +254,12 @@ export class Chart {
         return name.replace(/[^a-zA-Z0-9_-]/g, '_');
     }
 
-    // Escape string for use in HTML attributes
-    escapeHtml(text: string): string {
-        return text.replace(/'/g, '&apos;').replace(/"/g, '&quot;');
-    }
-
     generate_dot(x: number, y: number, name: string, style: string = "") {
         const radius = this.get_dot_radius().toString();
         return `<circle class="generator-dot" id="dot-${name}" cx="${x}" cy="${y}" r="${radius}" style="${style}" onclick="window.chartInstance.handleDotClickEvent('${name}')"/>`;
     }
 
     generate_diff(x1: number, y1: number, x2: number, y2: number, from: string, to: string, style: string = "") {
-        // const escapedFrom = this.escapeHtml(from);
-        // const escapedTo = this.escapeHtml(to);
         return `<line class="differential-line" id="diff-${from}-${to}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="${style}" onclick="window.chartInstance.handleLineClickEvent('${from}', '${to}')"/>`;
     }
 

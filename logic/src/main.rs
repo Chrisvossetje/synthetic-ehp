@@ -25,28 +25,6 @@ const MAX_STEM: i32 = 48;
 const MAX_VERIFY_STEM: i32 = 47;
 
 
-
-// TODO
-// TODO
-// TODO
-// TODO
-// TODO
-// TODO
-
-// STEM 36 
-// AF 12
-
-// Differential
-// From: 7 3 3 6 6 5 3[4]
-// To: 2 4 3 3 3 6 6 5 3[1]
-// Kind: Fake
-// Page: E3
-// Coefficient: τ^1
-
-
-// OH, i just haven't computed AHSS far enough
-
-
 fn main() {
     if 1 != 1 {
         interactive_ahss();
