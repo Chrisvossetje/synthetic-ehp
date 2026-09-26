@@ -1,7 +1,7 @@
 //! [`SyntheticSS`]: the spectral-sequence facts asserted on top of an [`E1`]
 //! page — differentials, internal tau-multiplications (same bidegree) and
 //! external tau-multiplications (same stem). All facts are keyed in `from_to`
-//! to dedupe, and additionally bucketed (by page / y-degree) so that
+//! to dedupe, and additionally bucketed or sorted so that
 //! [`crate::domain::process`] can apply them in the right order.
 
 use std::collections::HashMap;
@@ -39,6 +39,13 @@ pub struct ExtTauMult {
     pub af: i32,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+struct OrderedExtTauMult {
+    // Matches the former bucket traversal: source y, AF, then y difference.
+    key: (i32, i32, i32),
+    tau: ExtTauMult,
+}
+
 // This should always implicitly reference some Model
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SyntheticSS {
@@ -51,11 +58,9 @@ pub struct SyntheticSS {
     pub diffs_page: Vec<Vec<Diff>>,
     pub internal_tau_page: Vec<Vec<IntTauMult>>,
 
-    // This happens at the "final" page
-    // Indexed by the y coordinate of "from"
-    // 2nd index is for the y difference
-    // Third is by the AF thing (Meaning, the "better" the element fits onto the other the earlier it should be applied)
-    pub external_tau_page: Vec<Vec<Vec<Vec<ExtTauMult>>>>,
+    // Applied at the final page. Keep only actual taus, in application order,
+    // rather than allocating a mostly empty cubic array of buckets.
+    external_taus: Vec<OrderedExtTauMult>,
 
     pub from_to: HashMap<FromTo, (Kind, Option<String>)>,
 
@@ -74,13 +79,7 @@ impl SyntheticSS {
             induced_name: None,
             diffs_page: vec![vec![]; (MAX_STEM + 1) as usize],
             internal_tau_page: vec![vec![]; (MAX_STEM + 1) as usize],
-            external_tau_page: vec![
-                vec![
-                    vec![vec![]; (MAX_STEM + 1) as usize];
-                    (MAX_STEM + 1) as usize
-                ];
-                (MAX_STEM + 1) as usize
-            ],
+            external_taus: Vec::new(),
             from_to: HashMap::default(),
             in_diffs: vec![vec![]; len],
             out_diffs: vec![vec![]; len],
@@ -138,13 +137,27 @@ impl SyntheticSS {
                 Kind::Real => {
                     let y_from = model.y(from);
                     let y_to = model.y(to);
-                    self.external_tau_page[y_from as usize][af as usize][(y_from - y_to) as usize]
-                        .push(ExtTauMult { from, to, af });
+                    let key = (y_from, af, y_from - y_to);
+                    // Insert after equal keys: application mutates generator states,
+                    // so the original insertion order within each bucket matters.
+                    let index = self.external_taus.partition_point(|entry| entry.key <= key);
+                    self.external_taus.insert(
+                        index,
+                        OrderedExtTauMult {
+                            key,
+                            tau: ExtTauMult { from, to, af },
+                        },
+                    );
                     self.out_taus[from].push(to);
                 }
                 _ => {}
             }
         }
+    }
+
+    /// Real external taus in application order, preserving insertion order for ties.
+    pub fn external_taus(&self) -> impl Iterator<Item = &ExtTauMult> {
+        self.external_taus.iter().map(|entry| &entry.tau)
     }
 
     pub fn add_diff_name(
@@ -230,5 +243,98 @@ impl SyntheticSS {
             map[elt] = model.get(elt).induced_name.clone();
         }
         map[elt].push((sphere, new_name));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{domain::process::compute_pages, types::Generator};
+
+    fn model(ys: &[i32]) -> E1 {
+        E1::new(
+            ys.iter()
+                .enumerate()
+                .map(|(id, &y)| Generator::new(format!("g{id}"), 10, y, 1, 0, None))
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn external_taus_preserve_bucket_order_and_insertion_order_within_ties() {
+        let model = model(&[4, 1, 2, 6, 4, 6, 4]);
+        let mut data = SyntheticSS::empty(model.clone());
+        for (from, to, af) in [
+            (3, 1, 3),
+            (0, 1, 9),
+            (3, 2, 2),
+            (3, 4, 3),
+            (5, 6, 3),
+            (0, 2, 9),
+            (5, 2, 2),
+        ] {
+            data.add_ext_tau(&model, from, to, af, None, Kind::Real);
+        }
+
+        let order: Vec<_> = data.external_taus().map(|t| (t.from, t.to, t.af)).collect();
+        assert_eq!(
+            order,
+            [
+                (0, 2, 9),
+                (0, 1, 9),
+                (3, 2, 2),
+                (5, 2, 2),
+                (3, 4, 3),
+                (5, 6, 3),
+                (3, 1, 3)
+            ]
+        );
+    }
+
+    #[test]
+    fn external_tau_deduplication_and_non_real_facts_are_unchanged() {
+        let model = model(&[4, 3, 2, 1]);
+        let mut data = SyntheticSS::empty(model.clone());
+        data.add_ext_tau(&model, 0, 1, 2, Some("original".into()), Kind::Real);
+        data.add_ext_tau(&model, 0, 1, 3, Some("duplicate".into()), Kind::Real);
+        data.add_ext_tau(&model, 0, 2, 2, None, Kind::Fake);
+        data.add_ext_tau(&model, 0, 2, 2, None, Kind::Real);
+        data.add_ext_tau(&model, 0, 3, 2, None, Kind::Unknown);
+
+        assert_eq!(
+            data.external_taus().copied().collect::<Vec<_>>(),
+            [ExtTauMult {
+                from: 0,
+                to: 1,
+                af: 2
+            }]
+        );
+        assert_eq!(data.out_taus[0], [1]);
+        assert_eq!(data.from_to[&(0, 1)], (Kind::Real, Some("original".into())));
+        assert_eq!(data.from_to[&(0, 2)].0, Kind::Fake);
+        assert_eq!(data.from_to[&(0, 3)].0, Kind::Unknown);
+    }
+
+    #[test]
+    fn external_tau_chain_is_applied_in_filtration_order() {
+        let model = E1::new(vec![
+            Generator::new("a".into(), 10, 6, 6, 0, None),
+            Generator::new("b".into(), 10, 3, 4, 0, None),
+            Generator::new("c".into(), 10, 1, 2, 0, None),
+        ]);
+        let mut data = SyntheticSS::empty(model.clone());
+        data.generators[0] = Torsion::new(3);
+        data.generators[1] = Torsion::new(3);
+
+        // Although recorded second, b -> c must run first. Applying a -> b
+        // first leaves b with insufficient torsion and makes b -> c invalid.
+        data.add_ext_tau(&model, 0, 1, 5, None, Kind::Real);
+        data.add_ext_tau(&model, 1, 2, 3, None, Kind::Real);
+
+        let (pages, issues) = compute_pages(&data, &model, 0, 6, 10, 10, true);
+        assert!(issues.is_empty(), "{issues:?}");
+        assert_eq!(pages.element_final(0), (6, Torsion::default()));
+        assert_eq!(pages.element_final(1), (4, Torsion::new(1)));
+        assert_eq!(pages.element_final(2), (2, Torsion::new(1)));
     }
 }

@@ -22,6 +22,7 @@ mod routines;
 // AHSS CURTIS DATA IS VALID UNTIL STEM 48
 // EHP curtis data is also valid until STEM 48
 const MAX_STEM: i32 = 48;
+const MAX_EXPORT_STEM: i32 = 44;
 const MAX_VERIFY_STEM: i32 = 47;
 
 
@@ -45,6 +46,12 @@ fn main() {
     // automated_ahss(true);
     
     let ehp = automated_ehp(true);
+
+    // let mut ehp = get_log(false, false).unwrap();
+
+    // let ehp = revert_log_and_remake(0, &mut ehp, &MODEL, &DATA, false);
+
+    
     
     verify_geometric(&ehp);
     export_order_table(&ehp);

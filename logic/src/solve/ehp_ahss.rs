@@ -67,25 +67,19 @@ pub fn set_metastable_range(
     }
 
     // External tau-multiplications whose target is metastable.
-    for esss in &ahss.external_tau_page {
-        for ess in esss {
-            for es in ess {
-                for e in es {
-                    let g_from = &STABLE_MODEL.get(e.from);
-                    let g_to = &STABLE_MODEL.get(e.to);
-                    if in_metastable_range(g_to.y, g_to.stem) {
-                        let (kind, proof) = ahss.from_to.get(&(e.from, e.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting external tau's not done carefully enough.");
-                        ehp.add_ext_tau_name(
-                            &MODEL,
-                            g_from.name.clone(),
-                            g_to.name.clone(),
-                            e.af,
-                            proof.clone().map(|x| format!("(Metastable) - {x}")),
-                            *kind, // TODO! <<
-                        )?;
-                    }
-                }
-            }
+    for e in ahss.external_taus() {
+        let g_from = &STABLE_MODEL.get(e.from);
+        let g_to = &STABLE_MODEL.get(e.to);
+        if in_metastable_range(g_to.y, g_to.stem) {
+            let (kind, proof) = ahss.from_to.get(&(e.from, e.to)).expect("If there is no reference to a proof here (note that internally it can still have no proof), then inserting external tau's not done carefully enough.");
+            ehp.add_ext_tau_name(
+                &MODEL,
+                g_from.name.clone(),
+                g_to.name.clone(),
+                e.af,
+                proof.clone().map(|x| format!("(Metastable) - {x}")),
+                *kind, // TODO! <<
+            )?;
         }
     }
 

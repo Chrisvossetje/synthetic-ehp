@@ -10,7 +10,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    MAX_STEM, data::curtis::MODEL, domain::{e1::E1, model::SyntheticSS, process::compute_pages}, solve::action::Action, types::{Generator, Kind, Torsion}
+    MAX_EXPORT_STEM, MAX_STEM, data::curtis::MODEL, domain::{e1::E1, model::SyntheticSS, process::compute_pages}, solve::action::Action, types::{Generator, Kind, Torsion}
 };
 
 pub fn write_vec_to_file<T: std::fmt::Debug>(vec: &[T], path: &str) -> io::Result<()> {
@@ -97,8 +97,10 @@ pub fn write_typescript_file(
     // Serialize generators to JSON strings
     let gens: Vec<String> = model
         .gens()
-        .iter()
-        .map(|g| serde_json::to_string(g).unwrap())
+        .iter().enumerate()
+        .filter_map(|(index, g)| if g.stem <= MAX_EXPORT_STEM || (g.stem == MAX_EXPORT_STEM + 1 && data.out_diffs[index].len() > 0) {
+            Some(serde_json::to_string(g).unwrap())
+        } else { None })
         .collect();
 
     // Differentials, internal and external tau-multiplications are all stored
@@ -110,6 +112,9 @@ pub fn write_typescript_file(
     for ((from, to), (kind, p)) in &data.from_to {
         let d_y = model.y(*from) - model.y(*to);
         let d_stem = model.stem(*from) - model.stem(*to);
+        if model.get(*to).stem > MAX_EXPORT_STEM {
+            continue;
+        }
         if d_y == 0 {
             int_tau_mults.push(InternalTauMult {
                 from: model.name(*from).to_string(),
@@ -164,7 +169,7 @@ pub fn write_typescript_file(
          export const data{}: SyntheticEHP = {{\n\
          \x20   \"generators\": [\n",
         data_name.to_uppercase(),
-        MAX_STEM,
+        MAX_EXPORT_STEM,
         data_name
     );
 

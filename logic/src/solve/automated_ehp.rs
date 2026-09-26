@@ -953,28 +953,22 @@ pub fn ehp_solver(ahss: &SyntheticSS, log: Option<Vec<Action>>) -> (Vec<Action>,
 
     // Add all external tau's
     // We won't worry about the fake ones
-    for esss in &ahss.external_tau_page {
-        for ess in esss {
-            for es in ess {
-                for e in es {
-                    // Only lift taus whose endpoints both exist in the EHP model.
-                    if MODEL.try_index(STABLE_MODEL.name(e.from)).is_some()
-                        && MODEL.try_index(STABLE_MODEL.name(e.to)).is_some()
-                    {
-                        let (kind, _) = ahss
-                            .from_to
-                            .get(&(e.from, e.to))
-                            .unwrap().clone();
-                        log.push(Action::AddExt {
-                            from: STABLE_MODEL.name(e.from).to_string(),
-                            to: STABLE_MODEL.name(e.to).to_string(),
-                            af: e.af,
-                            kind: kind,
-                            proof: Some("Lifted".to_string()),
-                        });
-                    }
-                }
-            }
+    for e in ahss.external_taus() {
+        // Only lift taus whose endpoints both exist in the EHP model.
+        if MODEL.try_index(STABLE_MODEL.name(e.from)).is_some()
+            && MODEL.try_index(STABLE_MODEL.name(e.to)).is_some()
+        {
+            let (kind, _) = ahss
+                .from_to
+                .get(&(e.from, e.to))
+                .unwrap().clone();
+            log.push(Action::AddExt {
+                from: STABLE_MODEL.name(e.from).to_string(),
+                to: STABLE_MODEL.name(e.to).to_string(),
+                af: e.af,
+                kind: kind,
+                proof: Some("Lifted".to_string()),
+            });
         }
     }
 

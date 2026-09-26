@@ -328,20 +328,14 @@ pub fn compute_ext_taus(
     to_stem: i32,
 ) -> Vec<Issue> {
     let mut issues = vec![];
-    for esss in &data.external_tau_page {
-        for ess in esss {
-            for es in ess {
-                for e in es {
-                    if pages.element_in_pages(e.from)
-                        && pages.element_in_pages(e.to)
-                        && from_stem <= model.stem(e.from)
-                        && model.stem(e.from) <= to_stem
-                    {
-                        if let Err(i) = apply_tau(model, pages, 500, e.af, e.from, e.to) {
-                            issues.push(i);
-                        }
-                    }
-                }
+    for e in data.external_taus() {
+        if pages.element_in_pages(e.from)
+            && pages.element_in_pages(e.to)
+            && from_stem <= model.stem(e.from)
+            && model.stem(e.from) <= to_stem
+        {
+            if let Err(i) = apply_tau(model, pages, 500, e.af, e.from, e.to) {
+                issues.push(i);
             }
         }
     }
