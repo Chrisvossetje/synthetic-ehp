@@ -1,4 +1,5 @@
 import { Generators, SyntheticEHP } from "../types";
+import { setStableTagNames, withAlgebraicNames } from "./tagNames";
 
 /**
  * Data source management.
@@ -15,7 +16,10 @@ import { Generators, SyntheticEHP } from "../types";
 
 let useStableData = false;
 export function isUsingStableData() { return useStableData; }
-export function setUseStableData(value: boolean) { useStableData = value; }
+export function setUseStableData(value: boolean) {
+    useStableData = value;
+    setStableTagNames(value);
+}
 
 let mainData: SyntheticEHP | null = null;
 let stableData: SyntheticEHP | null = null;
@@ -24,7 +28,7 @@ let stableDataLoadPromise: Promise<void> | null = null;
 /** Load the primary dataset and kick off (but don't await) the stable one. */
 export async function initializeData() {
     const mainModule = await import("../data.js");
-    mainData = mainModule.data;
+    mainData = withAlgebraicNames(mainModule.data);
     ensureStableDataLoading();
 }
 
@@ -40,7 +44,7 @@ export function ensureStableDataLoading(): Promise<void> {
     if (!stableDataLoadPromise) {
         stableDataLoadPromise = import("../data_stable.js")
             .then((stableModule) => {
-                stableData = stableModule.data_stable;
+                stableData = withAlgebraicNames(stableModule.data_stable, true);
             })
             .catch((error) => {
                 // Allow a later retry if the import failed.

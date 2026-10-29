@@ -31,6 +31,9 @@ export const viewSettings = {
     bottomTruncation: undefined as number | undefined,
     /** Include classes/differentials whose `kind` is provisional ("Fake", etc.). */
     showFakeData: false,
+    /** Display overlays only; never passed to the page computation. */
+    /** Number of consecutive operators enabled (0=none, 1=h_0, …). */
+    multiplicationCounts: { ehp: 1 },
 };
 
 /**

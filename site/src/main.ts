@@ -1,6 +1,7 @@
 import type { Chart } from "./chart/chart";
 import { initializeData, ensureStableDataLoading, isStableDataReady } from "./model/dataSource";
 import { viewSettings } from "./model/settings";
+import { loadMultiplicationTables } from "./model/multiplicationSource";
 import { ehpChart } from "./app/charts";
 import { fill_ehp_chart, update_ehp_chart } from "./app/ehpChart";
 import { update_ass_chart } from "./app/assChart";
@@ -35,15 +36,14 @@ bootstrap().catch((error) => {
 });
 
 async function bootstrap() {
-    await initializeData();
+    await Promise.all([initializeData(), loadMultiplicationTables()]);
     ensureStableDataLoading();
 
     // Build and draw both charts with the initial view settings.
+    window.chartInstance = ehpChart;
     fill_ehp_chart();
     update_ehp_chart();
     update_ass_chart(viewSettings.truncation, viewSettings.bottomTruncation);
-
-    window.chartInstance = ehpChart;
 
     setupKeyboardControls();
     setupUIControls();

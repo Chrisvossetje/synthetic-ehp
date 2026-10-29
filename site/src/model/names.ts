@@ -44,9 +44,9 @@ function parseSphereFromName(name: string): number | undefined {
 }
 
 /**
- * The induced name to display for `gen` when viewing the chart truncated at the
- * given `sphere`. `induced_name` is a list of `[fromSphere, name]` checkpoints;
- * we return the name in effect at `sphere`.
+ * The induced Curtis representative at the given `sphere`. `induced_name` is a
+ * list of `[fromSphere, name]` checkpoints; translate the returned identifier
+ * with algebraicName before displaying it.
  */
 export function get_induced_name(gen: Generators, sphere: number): string {
     const l = gen.induced_name ?? [[0, gen.name] as [number, string]];

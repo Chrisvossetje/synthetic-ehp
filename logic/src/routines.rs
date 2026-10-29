@@ -4,12 +4,14 @@
 //! `automated_*` routines run the same loop fully unattended via the solvers.
 //! Both replay a saved log first, so a session resumes where it left off.
 
-use std::time::{Duration, Instant};
+use std::{collections::HashMap, format, println, time::{Duration, Instant}, todo, unreachable, vec};
+
+use itertools::Itertools;
 
 use crate::{
-    MAX_STEM, MAX_VERIFY_STEM, data::curtis::{DATA, MODEL, STABLE_DATA, STABLE_MODEL}, domain::model::SyntheticSS, io::{
+    MAX_STEM, MAX_VERIFY_STEM, data::{curtis::{DATA, MODEL, STABLE_DATA, STABLE_MODEL}, naming::{STABLE_NAMES, add_sphere_to_tag, generated_by_name, name_get_tag}}, domain::model::SyntheticSS, io::{
         cli::process_input,
-        export::write_all, import::get_log,
+        export::{write_all, write_tag_translation}, import::get_log,
     }, solve::{
         action::{Action, process_action, revert_log_and_remake}, ahss::find_ahss_issues, automated_ahss::ahss_solver, automated_ehp::ehp_solver, ehp::{apply_ehp_recursively, find_ehp_issues}, ehp_ahss::{ehp_to_ahss_map, set_metastable_range}, solve::auto_deduce
     }
@@ -292,4 +294,145 @@ pub fn automated_ehp(minimal: bool) -> SyntheticSS {
     println!("\nProgram took: {:.2?}\n", start.elapsed());
 
     ehp
+}
+
+
+type NameTranslate = (String, Vec<i32>, i32);
+
+pub fn export_tag_translation() {
+    // First we give names to all stably surviving elements.
+    // Should be initialized manually whenever a bidegree has double elements
+    let mut id_to_stable_name = HashMap::from([
+        (159, "h_1d_0".to_owned()),
+        (175, "h_0^4h_4 + h_1d_0".to_owned()),
+        (255, "f_0".to_owned()),
+        (262, "h_0^2h_2h_4".to_owned()),
+        (484, "h_1Pd_0".to_owned()),
+        (520, "h_0^2i + h_1Pd_0".to_owned()),
+        
+        // Stem 31
+        (1373, "h_1h_4^2".to_owned()),
+        (1420, "h_0^2h_5".to_owned()),
+        (1357, "n".to_owned()),
+        (1415, "h_0^4h_5".to_owned()),
+        (1318, "d_0e_0".to_owned()),
+        (1405, "d_0e_0 + h_0^7h_5".to_owned()),
+        (1306, "h_0d_0e_0".to_owned()),
+        (1397, "h_0^8h_5".to_owned()),
+        (1300, "h_0^2d_0e_0".to_owned()),
+        (1385, "h_0^9h_5".to_owned()),
+        (1301, "h_1P^2d_0".to_owned()),
+        (1354, "h_0^12h_5 + h_1P^2d_0".to_owned()),
+
+        // Stem 37 and rest TODO        
+    ]);
+
+    for (index, m) in MODEL.enumerate() {
+        if m.dies.is_none() && m.stem <= MAX_STEM {
+
+            if !id_to_stable_name.contains_key(&index) {
+                if let Some(l) = STABLE_NAMES.get(&(m.stem,m.af)) {
+                    if l.len() > 1 {
+                        println!("{}, index {index} in ({},{}) stable name could not be determined reliably. Please manually add to id_to_stable_name data,", m.name, m.stem, m.af)
+                    } else {
+                        id_to_stable_name.insert(index, l[0].to_owned());
+                    }
+                } else {
+                    unreachable!("We shouldn't see an element in ({},{}) not visible in Lin's chart.", m.stem, m.af)
+                }
+            }
+        }
+    }
+
+
+    // Unstable EHP to algebraic names
+    let mut id_to_algebraic_name: Vec<Option<NameTranslate>> = vec![None; MODEL.gens().len()]; 
+
+    id_to_algebraic_name[0] = Some(("1".to_owned(), vec![], 0));
+
+
+    for iterate in 0..=(MAX_STEM + 1) {
+        // We shouldn't reallly go by stem, but by diagonal
+        // Else we can't guarantee that a name has been defined in time. 
+        for y in 1..=(MAX_STEM+1) {
+          
+            let stem = iterate + y;
+
+            if stem > MAX_STEM + 1 {
+                continue;
+            }
+
+
+            for index in MODEL.gens_id_in_stem_y(stem, y) {
+                let g = MODEL.get(*index);
+                let tag = name_get_tag(&g.name);
+                let (name, unadmissable) = if tag == "" {
+                    ("1".to_owned(), vec![])
+                } else {
+                    let generator = generated_by_name(tag);
+                    let gen_id = MODEL.get_index(&generator);
+    
+                    if MODEL.get(gen_id).dies.is_none() {
+                        // Get the name of the stable element
+                        let Some(name) = id_to_stable_name.get(&gen_id) else {
+                            // An ambiguous stable basis still needs a manual choice.
+                            continue;
+                        };
+                        (name.clone(), vec![])
+                        
+                    } else {
+                        // Find element which killed this thing
+                        let source_id = DATA.in_diffs[gen_id][0];
+
+                        if let Some((tag, series, sphere)) = &id_to_algebraic_name[source_id] {
+                            let mut new_series = series.clone();
+                            new_series.push(*sphere);
+                            (tag.clone(), new_series)
+                        } else {
+                            // This class depends on an unresolved stable basis choice.
+                            continue;
+                        }
+                    }
+                };
+                id_to_algebraic_name[*index] = Some((name, unadmissable, y));
+            }
+
+        }
+    }    
+
+    let mut translations = std::collections::BTreeMap::new();
+    for (index, name) in id_to_algebraic_name.into_iter().enumerate() {
+        if let Some((tag, series, _sphere)) = name {
+            let curtis_tag = name_get_tag(&MODEL.get(index).name).to_owned();
+            let algebraic_tag =
+            if series.len() > 0 {
+                format!("{tag}<{}>", series.iter().map(|y| y.to_string()).join(", "))
+            } else {
+                tag
+            };
+            if let Some(previous) = translations.insert(curtis_tag.clone(), algebraic_tag.clone()) {
+                assert_eq!(previous, algebraic_tag, "Inconsistent translation for Curtis tag {curtis_tag}");
+            }
+        }
+    }
+    // An AHSS tag is the Curtis word of a stable AEHP element. Read its name
+    // directly from the stable assignments, without the unstable EHP recursion.
+    let mut stable_translations = std::collections::BTreeMap::from([
+        (String::new(), "1".to_owned()),
+    ]);
+    for generator in STABLE_MODEL.gens() {
+        let tag = name_get_tag(&generator.name);
+        if tag.is_empty() {
+            continue;
+        }
+        if let Some(name) = MODEL.try_index(&generated_by_name(tag))
+            .and_then(|index| id_to_stable_name.get(&index))
+        {
+            stable_translations.insert(tag.to_owned(), name.clone());
+        }
+    }
+    write_tag_translation(&translations, &stable_translations)
+        .expect("Could not export website tag translations");
+    println!("Exported {} EHP and {} AHSS tag translations to site/src/tag_translation.ts",
+        translations.len(), stable_translations.len());
 }

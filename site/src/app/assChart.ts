@@ -5,6 +5,8 @@ import { find, getActiveData } from "../model/dataSource";
 import { get_induced_name, getSphereLifecycleInfo } from "../model/names";
 import { computePage } from "../model/spectralSequence";
 import { buildGeneratorInfoLines, showInfoPanel } from "../chart/infoPanel";
+import { multiplicationInfoLines, updateMultiplicationOverlay } from "./multiplications";
+import { algebraicName, algebraicText } from "../model/tagNames";
 
 type InferredAssDifferential = {
     sourceBase: string;
@@ -38,8 +40,9 @@ export function handleAssDotClick(dot: string) {
     if (!gen) return;
 
     // Copy generator name to clipboard
-    navigator.clipboard.writeText(gen.name).then(() => {
-        console.log('Copied to clipboard:', gen.name);
+    const displayName = assChart.generator_label(dot);
+    navigator.clipboard.writeText(displayName).then(() => {
+        console.log('Copied to clipboard:', displayName);
     }).catch(err => {
         console.error('Failed to copy to clipboard:', err);
     });
@@ -49,9 +52,9 @@ export function handleAssDotClick(dot: string) {
         xLabel: "x",
         yLabel: "y",
         moduleLabel: "Torsion",
-    });
+    }, algebraicName);
 
-    showInfoPanel(`Generator: ${gen.name}`, lines);
+    showInfoPanel(`Generator: ${displayName}`, lines, multiplicationInfoLines(assChart, gen.name));
 }
 
 function applyAssSelectionHighlight() {
@@ -75,8 +78,8 @@ export function handleAssLineClick(from: string, to: string) {
     if (!inferred) return;
 
     const lines = [
-        `From: ${inferred.sourceBase}`,
-        `To: ${inferred.targetBase}`,
+        `From: ${assChart.generator_label(from)}`,
+        `To: ${assChart.generator_label(to)}`,
         `Page: d_${inferred.page}`,
         `Coefficient: ${inferred.torsion === 0 ? "1" : "τ^" + inferred.torsion}`,
     ];
@@ -84,15 +87,15 @@ export function handleAssLineClick(from: string, to: string) {
     const extraLines: string[] = [];
     if (inferred.linked) {
         extraLines.push("Linked EHP differential:");
-        extraLines.push(`  ${inferred.linked.from} -> ${inferred.linked.to}`);
+        extraLines.push(`  ${algebraicName(inferred.linked.from)} -> ${algebraicName(inferred.linked.to)}`);
         if ("proof" in inferred.linked) {
-            extraLines.push(`  Proof: ${inferred.linked.proof ?? ""}`);
+            extraLines.push(`  Proof: ${algebraicText(inferred.linked.proof ?? "")}`);
         } else {
             extraLines.push("  AEHP differential");
         }
     }
     if (inferred.reason) {
-        extraLines.push(`Reason: ${inferred.reason}`);
+        extraLines.push(`Reason: ${algebraicText(inferred.reason)}`);
     }
 
     showInfoPanel("ASS Differential", lines, extraLines);
@@ -149,6 +152,7 @@ export function update_ass_chart(
         if (torsion == undefined) {
             gens.push({
                 name: g.name,
+                alg_name: algebraicName(algebraic_name),
                 stem: g.stem,
                 y: filtration,
                 af: filtration,
@@ -164,6 +168,7 @@ export function update_ass_chart(
     
             gens.push({
                 name: sourceName,
+                alg_name: algebraicName(algebraic_name),
                 stem: g.stem,
                 y: filtration,
                 af: filtration,
@@ -173,6 +178,7 @@ export function update_ass_chart(
             });
             gens.push({
                 name: targetName,
+                alg_name: g.alg_name ?? algebraicName(g.name),
                 stem: g.stem + 1,
                 y: targetFiltration,
                 af: targetFiltration,
@@ -214,5 +220,8 @@ export function update_ass_chart(
         assChart.display_diff(d.from, d.to, true, d.coeff);
     });
 
+    const nodeNames = new Map(gens.filter((g) => !g.name.endsWith("__ass_tgt"))
+        .map((g) => [g.name.replace(/__ass_src$/, ""), g.name] as [string, string]));
+    updateMultiplicationOverlay(assChart, activeData.generators, new Set(nodeNames.keys()), "ass", nodeNames);
     applyAssSelectionHighlight();
 }

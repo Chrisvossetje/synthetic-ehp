@@ -31,6 +31,13 @@ export function updateActiveChart() {
     }
 }
 
+/** Cycle the active chart's overlay while retaining the other chart's choice. */
+export function cycleMultiplications() {
+    if (!_isEHPActive) return; // ASS always displays all three operators.
+    viewSettings.multiplicationCounts.ehp = (viewSettings.multiplicationCounts.ehp + 1) % 4;
+    updateActiveChart();
+}
+
 // ---------------------------------------------------------------------------
 // DOM element access
 // ---------------------------------------------------------------------------

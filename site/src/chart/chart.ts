@@ -1,10 +1,27 @@
 import { ToStringMap } from "./stringMap";
 import { SvgChart } from "./svgChart";
-import { Differential, ExternalTauMult, Generators, InternalTauMult, Multiplication } from "../types";
+import { Differential, DisplayMultiplication, ExternalTauMult, Generators, InternalTauMult, Multiplication } from "../types";
 import { ChartMode } from "./chartMode";
 import { svgNS } from "./svgChart";
+import { escapeHtml } from "./text";
 
 type Point = [number, number];
+
+export const MULTIPLICATION_COLOR = "#b0b0b0";
+
+/** Bend grows gently with distance, approaching a cap on long products. */
+export function h0MultiplicationControls(from: Point, to: Point, sameRow: boolean): [Point, Point] {
+    const dx = to[0] - from[0];
+    const dy = to[1] - from[1];
+    const distance = Math.hypot(dx, dy);
+    if (distance === 0) return [from, to];
+    const bend =sameRow ? 0.025 : 0;
+    const controlAt = (t: number): Point => [
+        from[0] + t * dx - bend * dy / distance,
+        from[1] + t * dy + bend * dx / distance,
+    ];
+    return [controlAt(1 / 3), controlAt(2 / 3)];
+}
 
 // TODO: Torsion color now manually rotates
 const TorsionColor = ["black", "#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple",];
@@ -20,12 +37,15 @@ export class Chart {
 
     // All generators and differentials (complete data set)
     public generators: Generators[] = [];
+    private generatorLabels: Map<string, string> = new Map();
+    private generatorRows: Map<string, number> = new Map();
     public differentials: Differential[] = [];
     public multiplications: Multiplication[] = [];
     public tau_mults: (InternalTauMult | ExternalTauMult)[] = [];
+    public displayMultiplications: DisplayMultiplication[] = [];
 
     // Cached element references
-    private dotElements: Map<string, SVGCircleElement> = new Map();
+    private dotElements: Map<string, SVGCircleElement | SVGRectElement> = new Map();
     private labelElements: Map<string, SVGTextElement> = new Map();
     private filtrationElements: Map<string, SVGTextElement> = new Map();
     private diffElements: Map<string, SVGLineElement> = new Map();
@@ -43,6 +63,7 @@ export class Chart {
     public dotCallback?: (name: string) => void;
     public lineCallback?: (from: string, to: string) => void;
     public tauMultCallback?: (from: string, to: string) => void;
+    public multiplicationCallback?: (relation: DisplayMultiplication) => void;
 
     constructor(containerId: string, mode: ChartMode) {
         this.mode = mode;
@@ -62,7 +83,72 @@ export class Chart {
     }
 
     clear() {
+        this.displayMultiplications = [];
         this.svgchart.replace_inner("");
+    }
+
+    /** Replace only the overlay so changing pages/toggles preserves zoom. */
+    set_display_multiplications(relations: DisplayMultiplication[]) {
+        this.displayMultiplications = relations;
+        const contents = this.svgchart.shadowRoot?.getElementById("contents");
+        if (!contents) return;
+        contents.querySelector(".h-multiplications")?.remove();
+        const layer = document.createElementNS(svgNS, "g");
+        layer.setAttribute("class", "h-multiplications");
+        for (const relation of relations) {
+            const from = this.name_to_location.get(relation.from);
+            const to = this.name_to_location.get(relation.to);
+            if (!from || !to) continue;
+            const group = document.createElementNS(svgNS, "g");
+            group.setAttribute("class", `h-multiplication h-multiplication-${relation.operator}`);
+            group.setAttribute("data-from", relation.from);
+            group.setAttribute("data-to", relation.to);
+            group.setAttribute("data-sphere", String(relation.sphere));
+            const title = document.createElementNS(svgNS, "title");
+            title.textContent = `h_${relation.operator} · ${this.generator_label(relation.from)} = ${(relation.displayTargets ?? [this.generator_label(relation.to)]).join(" + ")} (sphere ${relation.sphere})`;
+            group.append(title);
+            const line = document.createElementNS(svgNS, relation.operator === 0 ? "path" : "line");
+            if (relation.operator === 0) {
+                const [c1, c2] = h0MultiplicationControls(from, to,
+                    this.generator_row(relation.from) === this.generator_row(relation.to));
+                line.setAttribute("d", `M ${from[0]} ${from[1]} C ${c1[0]} ${c1[1]} ${c2[0]} ${c2[1]} ${to[0]} ${to[1]}`);
+                line.setAttribute("fill", "none");
+            } else {
+                line.setAttribute("x1", String(from[0]));
+                line.setAttribute("y1", String(from[1]));
+                line.setAttribute("x2", String(to[0]));
+                line.setAttribute("y2", String(to[1]));
+            }
+            const color = this.mode === ChartMode.ASS ? "black" : MULTIPLICATION_COLOR;
+            line.setAttribute("stroke", color);
+            const width = this.mode === ChartMode.ASS ? 0.02 : 0.01;
+            line.setAttribute("stroke-width", String(width));
+            line.setAttribute("pointer-events", "none");
+            const hit = line.cloneNode(true) as SVGPathElement | SVGLineElement;
+            hit.setAttribute("class", "h-multiplication-hit");
+            hit.setAttribute("stroke", "transparent");
+            // Keep the clickable stroke usable at every zoom level.
+            hit.setAttribute("stroke-width", "8");
+            hit.setAttribute("vector-effect", "non-scaling-stroke");
+            hit.setAttribute("stroke-linecap", "round");
+            hit.setAttribute("pointer-events", "stroke");
+            hit.style.cursor = "pointer";
+            group.append(line, hit);
+            group.addEventListener("click", (event) => {
+                event.stopPropagation();
+                this.multiplicationCallback?.(relation);
+            });
+            group.addEventListener("pointerenter", () => {
+                line.setAttribute("stroke", this.mode === ChartMode.ASS ? "black" : "#555");
+                line.setAttribute("stroke-width", String(width * 2.5));
+            });
+            group.addEventListener("pointerleave", () => {
+                line.setAttribute("stroke", color);
+                line.setAttribute("stroke-width", String(width));
+            });
+            layer.append(group);
+        }
+        contents.prepend(layer);
     }
 
     /**
@@ -102,10 +188,20 @@ export class Chart {
     // Set all generators (complete data set)
     set_all_generators(generators: Generators[]) {
         this.generators = generators;
+        this.generatorLabels = new Map(generators.map((gen) => [gen.name, gen.alg_name ?? gen.name]));
+        this.generatorRows = new Map(generators.map((gen) => [gen.name, gen.y]));
         this.maxStem = this.computeMaxStem();
         if (this.mode === ChartMode.EHP) {
             Chart.cachedInvalidCells = null;
         }
+    }
+
+    generator_label(name: string): string {
+        return this.generatorLabels.get(name) ?? name;
+    }
+
+    generator_row(name: string): number | undefined {
+        return this.generatorRows.get(name);
     }
 
     // Set all differentials (complete data set)
@@ -255,8 +351,13 @@ export class Chart {
     }
 
     generate_dot(x: number, y: number, name: string, style: string = "") {
-        const radius = this.get_dot_radius().toString();
-        return `<circle class="generator-dot" id="dot-${name}" cx="${x}" cy="${y}" r="${radius}" style="${style}" onclick="window.chartInstance.handleDotClickEvent('${name}')"/>`;
+        const radius = this.get_dot_radius();
+        const label = /^(1|h_0)\[(\d+)\]$/.exec(this.generator_label(name));
+        const square = label && Number(label[2]) % 2 === (label[1] === "1" ? 0 : 1);
+        const shape = square
+            ? `rect x="${x - radius}" y="${y - radius}" width="${2 * radius}" height="${2 * radius}"`
+            : `circle cx="${x}" cy="${y}" r="${radius}"`;
+        return `<${shape} class="generator-dot" id="dot-${name}" style="${style}" onclick="window.chartInstance.handleDotClickEvent('${name}')"/>`;
     }
 
     generate_diff(x1: number, y1: number, x2: number, y2: number, from: string, to: string, style: string = "") {
@@ -277,7 +378,7 @@ export class Chart {
         const labelX = x - 0.05; // Position to the left
         const labelY = y; // Vertically centered with dot
 
-        return `<text class="generator-label" id="label-${name}" x="${labelX}" y="${labelY}" text-anchor="end" dominant-baseline="middle" onclick="window.chartInstance.handleDotClickEvent('${name}')">${name}</text>`;
+        return `<text class="generator-label" id="label-${name}" x="${labelX}" y="${labelY}" text-anchor="end" dominant-baseline="middle" onclick="window.chartInstance.handleDotClickEvent('${name}')">${escapeHtml(this.generator_label(name))}</text>`;
     }
 
     generate_filtration_label(x: number, y: number, name: string, filtration: number) {
@@ -406,7 +507,7 @@ export class Chart {
 
         // Cache dot, label, and filtration elements for each generator
         this.generators.forEach(gen => {
-            const dotEl = shadowRoot.getElementById(`dot-${gen.name}`) as unknown as SVGCircleElement | null;
+            const dotEl = shadowRoot.getElementById(`dot-${gen.name}`) as unknown as SVGCircleElement | SVGRectElement | null;
             const labelEl = shadowRoot.getElementById(`label-${gen.name}`) as unknown as SVGTextElement | null;
             const filtrationEl = shadowRoot.getElementById(`filtration-${gen.name}`) as unknown as SVGTextElement | null;
 

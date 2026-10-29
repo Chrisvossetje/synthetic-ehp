@@ -1,8 +1,9 @@
-import { Chart } from "../chart/chart";
+import { Chart, h0MultiplicationControls, MULTIPLICATION_COLOR } from "../chart/chart";
 import { ehpChart } from "./charts";
 import { getComputedDiffCoeff, getDisplayedGenerator } from "./ehpChart";
 import { isUsingStableData } from "../model/dataSource";
 import { shouldIncludeKind, viewSettings } from "../model/settings";
+import { algebraicName } from "../model/tagNames";
 
 /**
  * Screenshot / TikZ export.
@@ -159,18 +160,19 @@ export function handleScreenshotPointerUp(event: PointerEvent, chart: Chart) {
  * Format generator name for LaTeX display
  */
 function formatNameForLatex(name: string): string {
-    // Convert unicode infinity in generator names to LaTeX.
-    const withLatexInfinity = name.replace(/∞/g, '\\infty');
+    // Spaces terminate the angle macros before adjacent letters or numbers.
+    const withLatexSymbols = name.replace(/∞/g, '\\infty')
+        .replace(/</g, '\\langle ').replace(/>/g, '\\rangle ');
     // Escape square brackets for LaTeX by wrapping in braces
-    return withLatexInfinity.replace(/\[/g, '{[}').replace(/\]/g, '{]}');
+    return withLatexSymbols.replace(/\[/g, '{[}').replace(/\]/g, '{]}');
 }
 
 function isVisibleSvgElement(element: SVGElement | null): boolean {
     return !!element && element.style.visibility !== "hidden" && element.style.display !== "none";
 }
 
-function getVisibleDotElement(chart: Chart, name: string): SVGCircleElement | null {
-    const element = chart.svgchart.shadowRoot?.getElementById(`dot-${name}`) as unknown as SVGCircleElement | null;
+function getVisibleDotElement(chart: Chart, name: string): SVGCircleElement | SVGRectElement | null {
+    const element = chart.svgchart.shadowRoot?.getElementById(`dot-${name}`) as unknown as SVGCircleElement | SVGRectElement | null;
     return isVisibleSvgElement(element) ? element : null;
 }
 
@@ -295,6 +297,22 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
         tikz += `\\draw[color={rgb,255:red,255;green,165;blue,0},line width=0.4pt${lineStyle}] (${roundCoord(fromLoc[0])},${roundCoord(fromYFlip)}) -- (${roundCoord(toLoc[0])},${roundCoord(toYFlip)});\n`;
     }
 
+    // Multiplication overlays are already resolved/filtered exactly as drawn.
+    for (const mult of chart.displayMultiplications) {
+        const fromLoc = chart.name_to_location.get(mult.from);
+        const toLoc = chart.name_to_location.get(mult.to);
+        if (!fromLoc || !toLoc || !(isPointInSelectedRegion(fromLoc) || isPointInSelectedRegion(toLoc))) continue;
+        const color = MULTIPLICATION_COLOR;
+        const rgb = [1, 3, 5].map((offset) => parseInt(color.slice(offset, offset + 2), 16));
+        let segment = " -- ";
+        if (mult.operator === 0) {
+            const [c1, c2] = h0MultiplicationControls(fromLoc, toLoc,
+                chart.generator_row(mult.from) === chart.generator_row(mult.to));
+            segment = ` .. controls (${roundCoord(c1[0])},${roundCoord(flipY(c1[1]))}) and (${roundCoord(c2[0])},${roundCoord(flipY(c2[1]))}) .. `;
+        }
+        tikz += `\\draw[color={rgb,255:red,${rgb[0]};green,${rgb[1]};blue,${rgb[2]}},line width=0.3pt] (${roundCoord(fromLoc[0])},${roundCoord(flipY(fromLoc[1]))})${segment}(${roundCoord(toLoc[0])},${roundCoord(flipY(toLoc[1]))});\n`;
+    }
+
     // Draw generators (dots)
     const generators = chart.generators.filter(g =>
         g.stem >= xMin && g.stem <= xMax && g.y >= yMin && g.y <= yMax &&
@@ -319,19 +337,22 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
         // Check if the dot is filled (permanent) by looking at the actual SVG element
         const dotElement = getVisibleDotElement(chart, gen.name);
         const isFilled = dotElement && dotElement.style.fill && dotElement.style.fill !== 'white' && dotElement.style.fill !== '';
+        const shape = dotElement?.localName === "rect"
+            ? `(${roundCoord(cx - radius)},${roundCoord(cyFlip - radius)}) rectangle (${roundCoord(cx + radius)},${roundCoord(cyFlip + radius)})`
+            : `(${roundCoord(cx)},${roundCoord(cyFlip)}) circle (${radius})`;
 
         if (isFilled) {
             // Permanent cycle - filled dot
-            tikz += `\\fill[${color}] (${roundCoord(cx)},${roundCoord(cyFlip)}) circle (${radius});\n`;
+            tikz += `\\fill[${color}] ${shape};\n`;
         } else {
             // Non-permanent cycle - hollow dot with colored border
-            tikz += `\\fill[white] (${roundCoord(cx)},${roundCoord(cyFlip)}) circle (${radius});\n`;
-            tikz += `\\draw[${color},line width=0.4] (${roundCoord(cx)},${roundCoord(cyFlip)}) circle (${radius});\n`;
+            tikz += `\\fill[white] ${shape};\n`;
+            tikz += `\\draw[${color},line width=0.4] ${shape};\n`;
         }
 
         // Add generator name label (to the left of the dot, very small)
-        const latexName = formatNameForLatex(gen.name);
-        if (latexName && latexName.length > 0 && latexName.length < 30) {
+        const latexName = formatNameForLatex(gen.alg_name ?? algebraicName(gen.name));
+        if (latexName && latexName.length > 0) {
             tikz += `\\node[anchor=east,scale=0.15,inner sep=0pt] at (${roundCoord(cx - 0.04)},${roundCoord(cyFlip)}) {$${latexName}$};\n`;
         }
 

@@ -5,6 +5,8 @@ import { ensureStableDataLoading, find, getActiveData, isUsingStableData, setUse
 import { generated_by_name, generates, getSphereLifecycleInfo } from "../model/names";
 import { computePage, survivesFilteredGenerator, TorsionFiltration } from "../model/spectralSequence";
 import { buildGeneratorInfoLines, showInfoPanel } from "../chart/infoPanel";
+import { multiplicationInfoLines, updateMultiplicationOverlay } from "./multiplications";
+import { algebraicName, algebraicText } from "../model/tagNames";
 
 /**
  * EHP chart controller.
@@ -88,8 +90,9 @@ export function handleDotClick(dot: string) {
     applyEhpSelectionHighlight();
 
     // Copy generator name to clipboard
-    navigator.clipboard.writeText(gen.name).then(() => {
-        console.log('Copied to clipboard:', gen.name);
+    const displayName = gen.alg_name ?? algebraicName(gen.name);
+    navigator.clipboard.writeText(displayName).then(() => {
+        console.log('Copied to clipboard:', displayName);
     }).catch(err => {
         console.error('Failed to copy to clipboard:', err);
     });
@@ -99,9 +102,9 @@ export function handleDotClick(dot: string) {
         xLabel: "stem",
         yLabel: "y",
         moduleLabel: "Module",
-    });
+    }, algebraicName);
 
-    showInfoPanel(`Generator: ${gen.name}`, lines);
+    showInfoPanel(`Generator: ${displayName}`, lines, multiplicationInfoLines(ehpChart, gen.name));
 }
 
 /**
@@ -146,8 +149,8 @@ export function handleLineClick(from: string, to: string) {
     const page = rawDiff?.d ?? computedDiff?.d ?? 0;
 
     const lines = [
-        `From: ${rawDiff?.from ?? from}`,
-        `To: ${rawDiff?.to ?? to}`,
+        `From: ${algebraicName(rawDiff?.from ?? from)}`,
+        `To: ${algebraicName(rawDiff?.to ?? to)}`,
         `Kind: ${rawDiff?.kind}`,
         `Page: E${page}`,
         `Coefficient: ${coeff === 0 ? '1' : 'τ^' + coeff}`,
@@ -155,7 +158,7 @@ export function handleLineClick(from: string, to: string) {
 
     const extraLines: string[] = [];
     if (rawDiff && "proof" in rawDiff) {
-        extraLines.push(`Proof: ${rawDiff.proof ?? ""}`);
+        extraLines.push(`Proof: ${algebraicText(rawDiff.proof ?? "")}`);
     }
 
     showInfoPanel("Differential", lines, extraLines);
@@ -171,8 +174,8 @@ export function handleTauMultClick(from: string, to: string) {
     if (!tauMult) return;
 
     const lines = [
-        `From: ${tauMult.from}`,
-        `To: ${tauMult.to}`,
+        `From: ${algebraicName(tauMult.from)}`,
+        `To: ${algebraicName(tauMult.to)}`,
         `Kind: ${tauMult.kind}`,
     ];
     if (internalTauMult) {
@@ -184,7 +187,7 @@ export function handleTauMultClick(from: string, to: string) {
 
     const extraLines: string[] = [];
     if ("proof" in tauMult) {
-        extraLines.push(`Proof: ${tauMult.proof ?? ""}`);
+        extraLines.push(`Proof: ${algebraicText(tauMult.proof ?? "")}`);
     }
 
     showInfoPanel("τ Multiplication", lines, extraLines);
@@ -333,5 +336,8 @@ export function update_ehp_chart() {
         }
     }
 
+    updateMultiplicationOverlay(ehpChart, activeData.generators,
+        new Set(Object.keys(gens).filter((name) => survivesFilteredGenerator(gens[name]))), "ehp", undefined,
+        new Set(Object.keys(perm_classes).filter((name) => survivesFilteredGenerator(perm_classes[name]))));
     applyEhpSelectionHighlight();
 }

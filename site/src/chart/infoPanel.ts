@@ -1,4 +1,5 @@
 import { Generators } from "../types";
+import { escapeHtml } from "./text";
 
 type SphereInfo = {
     bornSphere: string;
@@ -24,11 +25,13 @@ function formatTorsion(gen: Generators): string {
 export function buildGeneratorInfoLines(
     gen: Generators,
     sphereInfo: SphereInfo,
-    labels: Partial<GeneratorLabels> = {}
+    labels: Partial<GeneratorLabels> = {},
+    formatName: (name: string) => string = (name) => name
 ): string[] {
     const resolved = { ...defaultLabels, ...labels };
     const lines: string[] = [];
 
+    lines.push(`Curtis tag: ${gen.name}`);
     lines.push(`${resolved.xLabel}: ${gen.stem}`);
     lines.push(`${resolved.yLabel}: ${gen.y}`);
     lines.push(`Adams filtration: ${gen.af}`);
@@ -44,7 +47,7 @@ export function buildGeneratorInfoLines(
     const filteredInducedNames = (gen.induced_name ?? []).filter(([num, _]) => num !== 0);
     if (filteredInducedNames.length > 0) {
         const namesList = filteredInducedNames
-            .map(([sphere, name]) => `${name} (sphere ${sphere})`)
+            .map(([sphere, name]) => `${formatName(name)} (sphere ${sphere})`)
             .join(', ');
         lines.push(`Induced name: ${namesList}`);
     }
@@ -60,12 +63,12 @@ export function showInfoPanel(title: string, lines: string[], extraLines: string
     if (!floatingBox) return;
 
     let content = `<span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>`;
-    content += `<h4>${title}</h4>`;
+    content += `<h4>${escapeHtml(title)}</h4>`;
     content += `<pre style="background-color: #00000000; margin: 0;">`;
-    content += lines.join("\n");
+    content += escapeHtml(lines.join("\n"));
 
     if (extraLines.length > 0) {
-        content += `\n\n${extraLines.join("\n")}`;
+        content += `\n\n${escapeHtml(extraLines.join("\n"))}`;
     }
 
     content += `</pre>`;

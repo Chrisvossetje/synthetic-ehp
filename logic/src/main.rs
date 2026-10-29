@@ -5,6 +5,7 @@
 //!
 //! `MAX_STEM`/`MAX_VERIFY_STEM` bound the range of validity of the Curtis data.
 
+use crate::routines::{export_tag_translation};
 #[allow(unused)]
 use crate::{
     data::curtis::{DATA, MODEL}, io::{
@@ -37,6 +38,8 @@ fn main() {
 
         verify_geometric(&ehp);
         export_order_table(&ehp);
+
+        export_tag_translation();
     }
 
     // let (ahss, _) = interactive_ahss();
@@ -45,7 +48,7 @@ fn main() {
 
     // automated_ahss(true);
     
-    let ehp = automated_ehp(true);
+    let ehp = automated_ehp(false);
 
     // let mut ehp = get_log(false, false).unwrap();
 
@@ -53,6 +56,7 @@ fn main() {
 
     
     
-    verify_geometric(&ehp);
-    export_order_table(&ehp);
+    // verify_geometric(&ehp);
+    // export_order_table(&ehp);
+    // export_tag_translation();
 }

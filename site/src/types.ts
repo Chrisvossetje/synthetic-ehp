@@ -7,6 +7,7 @@ export type Generators = {
     "dies": number,
     "induced_name"?: [number, string][],
     "torsion"?: number,
+    /** Algebraic display label; `name` remains the Curtis identifier. */
     "alg_name"?: string;
     "hom_name"?: string;
 }
@@ -26,6 +27,17 @@ export type Multiplication = {
     "from": string,
     "to": string,
 }
+
+/** A resolved display overlay, independent of spectral-sequence computation. */
+export type DisplayMultiplication = {
+    from: string;
+    to: string;
+    operator: 0 | 1 | 2;
+    sphere: number;
+    targets: readonly string[];
+    displayTargets?: readonly string[];
+    inheritedFrom?: { tag: string; sphere: number };
+};
 
 export type InternalTauMult = {
     "from": string,

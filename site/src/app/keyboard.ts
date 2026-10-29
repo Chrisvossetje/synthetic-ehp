@@ -1,6 +1,7 @@
 import { Category } from "../model/settings";
 import { cancelScreenshot, isScreenshotMode, startScreenshot } from "./screenshot";
 import {
+    cycleMultiplications,
     isEHPActive,
     setCategory,
     setEhpAssMode,
@@ -31,6 +32,7 @@ import {
  *   q / w / e    category Synthetic / Algebraic / Geometric
  *   d            toggle "all differentials"
  *   f            toggle fake data
+ *   m            cycle EHP multiplications (none → h₀ → h₀+h₁ → h₀+h₁+h₂)
  *   j / k / l    decrease / increase / toggle  (sphere or top truncation)
  *   u / i / o    decrease / increase / toggle  bottom truncation (AHSS only)
  *   p            start screenshot/TikZ export (EHP only)
@@ -77,6 +79,7 @@ export function setupKeyboardControls() {
 
             case "d": case "D": toggleAllDiffs(); return;
             case "f": case "F": toggleShowFakeData(); return;
+            case "m": case "M": cycleMultiplications(); return;
 
             case "j": case "J": usingAhss() ? stepTopTruncation(-1) : stepSphere(-1); return;
             case "k": case "K": usingAhss() ? stepTopTruncation(1) : stepSphere(1); return;
