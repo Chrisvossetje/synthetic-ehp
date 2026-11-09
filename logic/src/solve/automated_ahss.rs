@@ -24,15 +24,16 @@ use crate::{
         action::{Action, D_R_REPEATS, process_action, revert_log_and_remake},
         ahss::{ahss_synthetic_e1_issue, get_all_e1_solutions},
         automated::{
-            ALWAYS_PRINT, Commitment, MAX_DEPTH, PARALLEL_DEPTH, TauIssue, classify_tau_issue,
+            ALWAYS_PRINT, Commitment, PARALLEL_DEPTH, TauIssue, classify_tau_issue,
             commit_diff_choice, commit_tau_choice, filter_diff,
         },
         generate::get_a_diff,
         issues::{
             Issue, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic,
         },
+        proof::{ProofChoice, ProofTrace, SearchProof},
         search::{
-            BranchResult, ChoiceResult, GetOut, SpeculativeBranchOutcome, branch_on_speculative_worlds, check_getout, create_getout, empty_getout, signal_parent_getout
+            BranchResult, ChoiceResult, GetOut, SpeculativeBranchOutcome, discover_choice, check_getout, create_getout, empty_getout, signal_parent_getout
         },
         solve::{
             auto_deduce, suggest_tau_solution_algebraic, suggest_tau_solution_generator_synthetic,
@@ -90,136 +91,105 @@ fn iterate_e1_issues(
     top_trunc: i32,
     bot_trunc: i32,
     depth: i32,
+    trace: &mut ProofTrace,
 ) -> Option<BranchResult> {
-    // When a stem's E1 page has ambiguous torsion, `e1_issues` holds the precomputed
-    // candidate assignments. We try each one (cloning the data and continuing the
-    // search), then decide: exactly one survivor → commit it (`None`, "no problem");
-    // two-or-more survivors → can't yet decide (`Open`); none → contradiction.
-    if e1_issues[stem as usize].len() == 0 {
-        None
+    trace.at(getout.position);
+    let candidates = &e1_issues[stem as usize];
+    if candidates.is_empty() {
+        return None;
+    }
+    if depth >= getout.max_depth() {
+        return Some(BranchResult::Open(std::mem::take(trace).open(depth)));
+    }
+    let choice = |index: usize| ProofChoice::E1 {
+        stem,
+        assignments: candidates[index]
+            .0
+            .iter()
+            .copied()
+            .filter(|(id, _)| model.y(*id) == 1)
+            .collect(),
+    };
+    let g = create_getout(getout, candidates.len() as i32, depth);
+    let run = |(index, candidate): (usize, &(Vec<(usize, Torsion)>, Vec<Action>))| {
+        let mut world = data.clone();
+        for &(id, torsion) in &candidate.0 {
+            world.generators[id] = torsion;
+        }
+        ahss_iterate(
+            world,
+            model,
+            alg_ahss,
+            alg_data,
+            e1_issues,
+            g.clone(),
+            log.clone(),
+            stem,
+            top_trunc,
+            bot_trunc,
+            depth + 1,
+        )
+        .assuming(depth + 1, choice(index))
+    };
+    let outcomes: Vec<_> = if depth < PARALLEL_DEPTH {
+        candidates.par_iter().enumerate().map(run).collect()
     } else {
-        if depth >= MAX_DEPTH {
-            return Some(BranchResult::Open);
-        }
-
-        // Run the candidates — in parallel near the top of the tree, sequentially
-        // deeper down. Both arms do the same work; only the iterator differs.
-        let outcomes: Vec<_> = if depth < PARALLEL_DEPTH {
-            let g = create_getout(&getout, e1_issues[stem as usize].len() as i32, depth);
-
-            e1_issues[stem as usize].par_iter().enumerate().map(|(index, x)| {
-                if depth == 0 || ALWAYS_PRINT {
-                    println!("Trying splitting with {index} on stem {stem} | depth {depth}");
-                }
-                let mut data = data.clone();
-
-
-                // Apply possible solution to torsion on E_1 page
-                for j in &x.0 {
-                    data.generators[j.0] = j.1;
-                }
-
-                let res = ahss_iterate(data, model, alg_ahss, alg_data, e1_issues, g.clone(), log.clone(), stem, top_trunc, bot_trunc, depth + 1);
-                if depth == 0 || ALWAYS_PRINT {
-                    println!("Finish splitting with {index} on stem {stem} by {res:?}");
-                }
-                res
-            }).collect()
-        } else {
-            e1_issues[stem as usize].iter().enumerate().map(|(index, x)| {
-                if depth == 0 || ALWAYS_PRINT {
-                    println!("Trying splitting with {index} on stem {stem} | depth {depth}");
-                }
-                let mut data = data.clone();
-
-                // Apply possible solution to torsion on E_1 page
-                for j in &x.0 {
-                    data.generators[j.0] = j.1;
-                }
-
-                let res = ahss_iterate(data, model, alg_ahss, alg_data, e1_issues, getout.clone(), log.clone(), stem, top_trunc, bot_trunc, depth + 1);
-                if depth == 0 || ALWAYS_PRINT {
-                    println!("Finish splitting with {index} on stem {stem} by {res:?}");
-                }
-                res
-            }).collect()
-        };
-
-        if depth == 0 || ALWAYS_PRINT {
-            println!("{outcomes:?}");
-        }
-
-        // `positives` = candidates that were NOT contradicted (still viable);
-        // `opens` = those that ran out of depth without a verdict.
-        let positives = outcomes.iter().fold(0, |acc, r| {
-            if let BranchResult::Contradiction(_) = r {
-                acc
-            } else {
-                acc + 1
-            }
-        });
-
-
-        let opens = outcomes.iter().fold(0, |acc, r| {
-            if let BranchResult::Open = r {
-                acc + 1
-            } else {
-                acc
-            }
-        });
-
-
-        if check_getout(&getout) {
-            return Some(BranchResult::Cancelled);
-        }
-
-        // Exactly one viable candidate: commit it (log its actions at depth 0 and
-        // write its torsion into `data`) and report "no issue".
-        if positives == 1 {
-            for (index, r) in outcomes.into_iter().enumerate() {
-                if let BranchResult::Contradiction(_) = r {
-
-                }  else {
-                    if depth == 0 {
-                        let actions = e1_issues[stem as usize][index].1.clone();
-                        for a in actions {
-                            if depth == 0 || ALWAYS_PRINT {
-                                if let Action::SetE1 { tag, torsion, proof: _ } = &a {
-                                    println!("Set E1 torsion {index}: {} | {:?}", tag, torsion);
-                                }
-                            }
-                            log.lock().unwrap().push(a);
-                        }
-                    }
-
-                    for j in &e1_issues[stem as usize][index].0 {
-                        if (depth == 0 || ALWAYS_PRINT) && model.get(j.0).y == 1 {
-                            println!("Set E1 torsion {index}: {} | {:?}", model.get(j.0).name, j.1);
-                        }
-                        data.generators[j.0] = j.1;
-                    }
-                    return None;
-                }
-            }
-        } else if opens >= 2 {
-            if depth == 0 || ALWAYS_PRINT {
-                println!("We have {opens} opens");
-
-                for (index, j) in outcomes.iter().enumerate() {
-                    if let BranchResult::Open = j {
-                        println!("{index} | {:?}", e1_issues[stem as usize][index].1)
-                    }
-                }
-            }
-            return Some(BranchResult::Open)
-        }
-
-        // signal_parent_getout(getout, depth);
-        return Some(BranchResult::Contradiction(
-            format!(
-                "We have {positives} positives and {opens} opens. Which means we can't decide on E1 stuff :("
-            )
+        candidates.iter().enumerate().map(run).collect()
+    };
+    if check_getout(getout) {
+        return Some(BranchResult::Cancelled(
+            std::mem::take(trace).cancelled(depth),
         ));
+    }
+    let viable: Vec<_> = outcomes
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| !matches!(r, BranchResult::Contradiction(_)))
+        .map(|(i, _)| i)
+        .collect();
+    let refutations: Vec<_> = outcomes
+        .iter()
+        .filter_map(|r| match r {
+            BranchResult::Contradiction(proof) => Some(proof.clone()),
+            _ => None,
+        })
+        .collect();
+    let proof =
+        (!refutations.is_empty()).then(|| SearchProof::cases(depth, getout.position, refutations));
+    if let [index] = viable.as_slice() {
+        let index = *index;
+        if let Some(proof) = &proof {
+            trace.resolved(depth, choice(index), proof);
+        } else {
+            trace.known(depth, choice(index), "unique E1 assignment");
+        }
+        if depth == 0 {
+            for mut action in candidates[index].1.clone() {
+                if let Some(proof) = &proof
+                    && let Action::SetE1 { proof: text, .. } = &mut action
+                {
+                    *text = proof.describe(model);
+                }
+                log.lock().unwrap().push(action);
+            }
+        }
+        for &(id, torsion) in &candidates[index].0 {
+            data.generators[id] = torsion;
+        }
+        return None;
+    }
+    if viable.is_empty() {
+        signal_parent_getout(getout, depth);
+        return Some(BranchResult::Contradiction(
+            std::mem::take(trace).contradiction_by(depth, proof.unwrap()),
+        ));
+    }
+    if outcomes.iter().any(|r| matches!(r, BranchResult::Open(_))) {
+        Some(BranchResult::Open(std::mem::take(trace).open(depth)))
+    } else {
+        Some(BranchResult::Cancelled(
+            std::mem::take(trace).cancelled(depth),
+        ))
     }
 }
 
@@ -236,28 +206,30 @@ fn ahss_iterate(
     mut bot_trunc: i32,
     depth: i32,
 ) -> BranchResult {
+    let mut trace = ProofTrace::default();
     // The solver sweeps (stem, top_trunc) outward. Each iteration tries to make
     // progress at the current cell; once nothing is left to do there it advances
     // the truncation/stem at the bottom of the loop. We never recurse here —
     // recursion happens inside try_diff/try_tau when a choice must be guessed.
     loop {
+        trace.at(getout.position);
         // Depth-0 (the real run) stops once it has verified the whole range;
         // deeper speculative branches stop at MAX_DEPTH and report Open (no
         // contradiction found, so the guess that spawned them stays plausible).
         if depth == 0 && stem >= MAX_VERIFY_STEM {
-            return BranchResult::Open;
+            return BranchResult::Open(trace.open(depth));
         }
 
-        if depth > MAX_DEPTH || stem >= MAX_STEM {
+        if depth > getout.max_depth() || getout.past_frontier() || stem >= MAX_STEM {
             if ALWAYS_PRINT {
                 println!("DEPTH REACHED");
             }
-            return BranchResult::Open;
+            return BranchResult::Open(trace.open(depth));
         }
 
         // A sibling branch already decided this subtree; bail out early.
         if check_getout(&getout) {
-            return BranchResult::Cancelled;
+            return BranchResult::Cancelled(trace.cancelled(depth));
         }
 
         // 1. Propose the next plausible differential at this cell and try it.
@@ -266,26 +238,22 @@ fn ahss_iterate(
             let option = get_a_diff(&data, model, top_trunc, bot_trunc, stem);
 
             if let Some(d) = option {
-                if depth >= MAX_DEPTH {
-                    return BranchResult::Open;
+                if depth >= getout.max_depth() {
+                    return BranchResult::Open(trace.open(depth));
                 }
                 match try_diff(
-                    &mut data,
-                    model,
-                    alg_ahss,
-                    alg_data,
-                    e1_issues,
-                    &getout,
-                    &log,
-                    stem,
-                    top_trunc,
-                    bot_trunc,
-                    depth,
-                    d,
+                    &mut data, model, alg_ahss, alg_data, e1_issues, &getout, &log, stem,
+                    top_trunc, bot_trunc, depth, d, &mut trace,
                 ) {
+                    ChoiceResult::Contradiction(proof) => {
+                        signal_parent_getout(&mut getout, depth);
+                        return BranchResult::Contradiction(trace.contradiction_by(depth, proof));
+                    }
                     ChoiceResult::Chosen => continue,
-                    ChoiceResult::Open => return BranchResult::Open,
-                    ChoiceResult::Cancelled => return BranchResult::Cancelled,
+                    ChoiceResult::Open => return BranchResult::Open(trace.open(depth)),
+                    ChoiceResult::Cancelled => {
+                        return BranchResult::Cancelled(trace.cancelled(depth));
+                    }
                 }
             }
         }
@@ -297,16 +265,21 @@ fn ahss_iterate(
             Ok(tau_issue) => tau_issue,
             Err(is) => {
                 signal_parent_getout(&mut getout, depth);
-                return BranchResult::Contradiction(is);
+                return BranchResult::Contradiction(trace.contradiction(depth, is));
             }
         };
 
         if let Some((synthetic, mut issues)) = potential_tau_thing {
             // Ask the matching suggester for a concrete tau to try.
             let option = match synthetic {
-                TauIssue::AlgTauIssue => {
-                    suggest_tau_solution_algebraic(&data, model, &mut issues, top_trunc, bot_trunc, stem)
-                }
+                TauIssue::AlgTauIssue => suggest_tau_solution_algebraic(
+                    &data,
+                    model,
+                    &mut issues,
+                    top_trunc,
+                    bot_trunc,
+                    stem,
+                ),
                 TauIssue::SynTauGeneratorIssue => suggest_tau_solution_generator_synthetic(
                     &data,
                     model,
@@ -326,32 +299,29 @@ fn ahss_iterate(
             };
 
             if let Some(d) = option {
-                if depth >= MAX_DEPTH {
-                    return BranchResult::Open;
+                if depth >= getout.max_depth() {
+                    return BranchResult::Open(trace.open(depth));
                 }
                 match try_tau(
-                    &mut data,
-                    model,
-                    alg_ahss,
-                    alg_data,
-                    e1_issues,
-                    &getout,
-                    &log,
-                    stem,
-                    top_trunc,
-                    bot_trunc,
-                    depth,
-                    d,
+                    &mut data, model, alg_ahss, alg_data, e1_issues, &getout, &log, stem,
+                    top_trunc, bot_trunc, depth, d, &mut trace,
                 ) {
+                    ChoiceResult::Contradiction(proof) => {
+                        signal_parent_getout(&mut getout, depth);
+                        return BranchResult::Contradiction(trace.contradiction_by(depth, proof));
+                    }
                     ChoiceResult::Chosen => continue,
-                    ChoiceResult::Open => return BranchResult::Open,
-                    ChoiceResult::Cancelled => return BranchResult::Cancelled,
+                    ChoiceResult::Open => return BranchResult::Open(trace.open(depth)),
+                    ChoiceResult::Cancelled => {
+                        return BranchResult::Cancelled(trace.cancelled(depth));
+                    }
                 }
             } else {
                 // We know a tau is needed but couldn't construct one: dead end.
                 signal_parent_getout(&mut getout, depth);
-                return BranchResult::Contradiction(format!(
-                    "Issue at RP{bot_trunc}_{top_trunc}: {issues:?}"
+                return BranchResult::Contradiction(trace.contradiction(
+                    depth,
+                    format!("Issue at RP{bot_trunc}_{top_trunc}: {issues:?}"),
                 ));
             }
         }
@@ -368,6 +338,7 @@ fn ahss_iterate(
                 }
                 data.add_diff(model, from, to, None, Kind::Algebraic);
             }
+            getout.position += 1;
             bot_trunc -= 1;
             continue;
         }
@@ -375,6 +346,7 @@ fn ahss_iterate(
         // 4. This stem's truncations are exhausted. Advance: either climb to the
         //    next top_trunc, or roll over to the next stem and first resolve any
         //    E1-page torsion ambiguities it introduces.
+        getout.position += 1;
         if top_trunc == stem + 1 {
             stem += 1;
             top_trunc = 2;
@@ -392,6 +364,7 @@ fn ahss_iterate(
                 top_trunc,
                 bot_trunc,
                 depth,
+                &mut trace,
             ) {
                 return r;
             }
@@ -399,7 +372,6 @@ fn ahss_iterate(
             top_trunc += 1;
             bot_trunc = top_trunc - 1;
         }
-
 
         if depth == 0 {
             println!("Current stem: {stem} | top_trunc: {top_trunc}");
@@ -420,6 +392,7 @@ fn try_diff(
     bot_trunc: i32,
     depth: i32,
     d: Diff,
+    trace: &mut ProofTrace,
 ) -> ChoiceResult {
     let (from_name, to_name) = model.get_names(d.from, d.to);
 
@@ -428,10 +401,7 @@ fn try_diff(
 
     if let Some(kind) = filter {
         if ALWAYS_PRINT || depth == 0 {
-            println!(
-                "Finished diff by: {} | {} -> {kind:?}",
-                from_name, to_name
-            );
+            println!("Finished diff by: {} | {} -> {kind:?}", from_name, to_name);
         }
         if depth == 0 {
             log.lock().unwrap().push(Action::AddDiff {
@@ -441,6 +411,11 @@ fn try_diff(
                 kind,
             });
         }
+        trace.known(
+            depth,
+            ProofChoice::FilteredDiff(d, kind),
+            format!("{kind:?}"),
+        );
         data.add_diff(model, d.from, d.to, None, kind);
         return ChoiceResult::Chosen;
     }
@@ -452,44 +427,27 @@ fn try_diff(
     // Otherwise guess: explore two cloned worlds, one where the differential is
     // Real and one where it is Fake, each continuing the search one level deeper.
     // Whichever world hits a contradiction rules out that choice for the other.
-    let g = create_getout(getout, 2, depth);
-
-    let with = || {
-        let mut with_data = data.clone();
-
+    let run = |world: usize, control: GetOut| {
+        let mut world_data = data.clone();
+        let kind = if world == 0 { Kind::Real } else { Kind::Fake };
         let action = Action::AddDiff {
-            from: model.name(d.from).to_string(),
-            to: model.name(d.to).to_string(),
-            kind: Kind::Real,
-            proof: Some("".to_string())
+            from: from_name.clone(),
+            to: to_name.clone(),
+            kind,
+            proof: None,
         };
-
-        let _ = process_action(&mut with_data, model, &action, true);
-
+        if kind == Kind::Real {
+            process_action(&mut world_data, model, &action, true).unwrap();
+        } else {
+            world_data.add_diff(model, d.from, d.to, None, kind);
+        }
         ahss_iterate(
-            with_data,
+            world_data,
             model,
             alg_ahss,
             alg_data,
             e1_issues,
-            g.clone(),
-            log.clone(),
-            stem,
-            top_trunc,
-            bot_trunc,
-            depth + 1,
-        )
-    };
-    let without = || {
-        let mut without_data = data.clone();
-        without_data.add_diff(model, d.from, d.to, Some("".to_string()), Kind::Fake);
-        ahss_iterate(
-            without_data,
-            model,
-            alg_ahss,
-            alg_data,
-            e1_issues,
-            g.clone(),
+            control,
             log.clone(),
             stem,
             top_trunc,
@@ -498,14 +456,20 @@ fn try_diff(
         )
     };
 
-    // Left = "with" (Real), Right = "without" (Fake). The loser's contradiction
-    // becomes the winner's proof; if neither is contradicted we leave it Unknown.
-    match branch_on_speculative_worlds(depth, with, without) {
+    match discover_choice(
+        depth,
+        getout,
+        [ProofChoice::Diff(d, true), ProofChoice::Diff(d, false)],
+        run,
+    ) {
+        SpeculativeBranchOutcome::Contradiction(proof) => ChoiceResult::Contradiction(proof),
         SpeculativeBranchOutcome::ChooseRight(e) => {
+            trace.resolved(depth, ProofChoice::Diff(d, false), &e);
             commit_diff_choice(data, model, log, depth, d, Commitment::Fake(e), true);
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::ChooseLeft(e) => {
+            trace.resolved(depth, ProofChoice::Diff(d, true), &e);
             commit_diff_choice(data, model, log, depth, d, Commitment::Real(e), true);
             ChoiceResult::Chosen
         }
@@ -546,6 +510,7 @@ fn try_tau(
     bot_trunc: i32,
     depth: i32,
     d: ExtTauMult,
+    trace: &mut ProofTrace,
 ) -> ChoiceResult {
     let (from_name, to_name) = model.get_names(d.from, d.to);
 
@@ -556,58 +521,24 @@ fn try_tau(
         );
     }
 
-    let g = create_getout(getout, 2, depth);
-
-    let with = || {
-        let mut with_data = data.clone();
-
+    let run = |world: usize, control: GetOut| {
+        let mut world_data = data.clone();
+        let kind = if world == 0 { Kind::Real } else { Kind::Fake };
         let action = Action::AddExt {
-            from: model.name(d.from).to_string(),
-            to: model.name(d.to).to_string(),
+            from: from_name.clone(),
+            to: to_name.clone(),
             af: d.af,
-            kind: Kind::Real,
-            proof: None
+            kind,
+            proof: None,
         };
-
-        let _ = process_action(&mut with_data, model, &action, true);
-
-
+        process_action(&mut world_data, model, &action, true).unwrap();
         ahss_iterate(
-            with_data,
+            world_data,
             model,
             alg_ahss,
             alg_data,
             e1_issues,
-            g.clone(),
-            log.clone(),
-            stem,
-            top_trunc,
-            bot_trunc,
-            depth + 1,
-        )
-    };
-    let without = || {
-        let mut without_data = data.clone();
-
-        let action = Action::AddExt {
-            from: model.name(d.from).to_string(),
-            to: model.name(d.to).to_string(),
-            af: d.af,
-            kind: Kind::Fake,
-            proof: None
-        };
-
-        let _ = process_action(&mut without_data, model, &action, true);
-
-
-
-        ahss_iterate(
-            without_data,
-            model,
-            alg_ahss,
-            alg_data,
-            e1_issues,
-            g.clone(),
+            control,
             log.clone(),
             stem,
             top_trunc,
@@ -616,12 +547,20 @@ fn try_tau(
         )
     };
 
-    match branch_on_speculative_worlds(depth, with, without) {
+    match discover_choice(
+        depth,
+        getout,
+        [ProofChoice::Tau(d, true), ProofChoice::Tau(d, false)],
+        run,
+    ) {
+        SpeculativeBranchOutcome::Contradiction(proof) => ChoiceResult::Contradiction(proof),
         SpeculativeBranchOutcome::ChooseRight(e) => {
+            trace.resolved(depth, ProofChoice::Tau(d, false), &e);
             commit_tau_choice(data, model, log, depth, d, Commitment::Fake(e), true);
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::ChooseLeft(e) => {
+            trace.resolved(depth, ProofChoice::Tau(d, true), &e);
             commit_tau_choice(data, model, log, depth, d, Commitment::Real(e), true);
             ChoiceResult::Chosen
         }
@@ -635,7 +574,6 @@ fn try_tau(
         SpeculativeBranchOutcome::Cancelled => ChoiceResult::Cancelled,
     }
 }
-
 
 pub fn ahss_solve_e1_issues(ahss: &SyntheticSS, model: &E1, log: &mut Vec<Action>) -> Vec<Vec<(Vec<(usize, Torsion)>, Vec<Action>)>> {
     let mut stem_sols = vec![vec![]; (MAX_STEM + 1) as usize];

@@ -9,7 +9,9 @@
     "minify_alt": "esbuild ./site/src/main.ts --bundle --loader:.txt=text --outdir=./_site --entry-names=index --chunk-names=chunks/[name]-[hash] --splitting --format=esm --target=es2016 --minify",
     "watch": "npm run init && esbuild ./site/src/main.ts --bundle --loader:.txt=text --outdir=./_site --entry-names=index --chunk-names=chunks/[name]-[hash] --splitting --format=esm --target=es2016 --watch",
     "typecheck": "tsc -p ./site/src",
-    "test": "npm run typecheck"
+    "test:multiplications": "node --test tests/multiplicationDisplay.test.mjs",
+    "test:spectral-sequence": "node --test tests/spectralSequence.test.mjs",
+    "test": "npm run typecheck && npm run test:multiplications && npm run test:spectral-sequence"
   },
   "dependencies": {
     "@types/d3": "^7.4.3",

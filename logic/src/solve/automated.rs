@@ -34,6 +34,7 @@ use crate::{
             Issue, algebraic_issue_is_fixable_by_tau_extensions,
             synthetic_issue_is_tau_structure_issue,
         },
+        proof::SearchProof,
     },
     types::Kind,
 };
@@ -59,8 +60,8 @@ pub enum TauIssue {
 /// (with a proof), it is fake/disproven (with a refutation), or both worlds
 /// stayed open so we record it as unknown.
 pub enum Commitment {
-    Real(String),
-    Fake(String),
+    Real(SearchProof),
+    Fake(SearchProof),
     Unknown,
 }
 
@@ -81,28 +82,42 @@ pub fn commit_diff_choice(
 
     match commitment {
         Commitment::Fake(proof) => {
+            let summary = (depth == 0 || ALWAYS_PRINT).then(|| proof.summary());
+            let proof = (depth == 0 || ALWAYS_PRINT).then(|| proof.describe(model));
             if ALWAYS_PRINT || depth == 0 {
-                println!("Disproven diff: {} | {} by {proof}", from_name, to_name);
+                println!(
+                    "Disproven diff: {} | {} by {}",
+                    from_name,
+                    to_name,
+                    summary.as_deref().unwrap()
+                );
             }
             if depth == 0 {
                 log.lock().unwrap().push(Action::AddDiff {
                     from: from_name,
                     to: to_name,
-                    proof: Some(proof.clone()),
+                    proof: proof.clone(),
                     kind: Kind::Fake,
                 });
             }
-            data.add_diff(model, d.from, d.to, Some(proof), Kind::Fake);
+            data.add_diff(model, d.from, d.to, proof, Kind::Fake);
         }
         Commitment::Real(proof) => {
+            let summary = (depth == 0 || ALWAYS_PRINT).then(|| proof.summary());
+            let proof = (depth == 0 || ALWAYS_PRINT).then(|| proof.describe(model));
             if ALWAYS_PRINT || depth == 0 {
-                println!("Proven diff: {} | {} | {:?}", from_name, to_name, proof);
+                println!(
+                    "Proven diff: {} | {} by {}",
+                    from_name,
+                    to_name,
+                    summary.as_deref().unwrap()
+                );
             }
             if depth == 0 {
                 log.lock().unwrap().push(Action::AddDiff {
                     from: from_name.clone(),
                     to: to_name.clone(),
-                    proof: Some(proof.clone()),
+                    proof: proof.clone(),
                     kind: Kind::Real,
                 });
             }
@@ -111,11 +126,11 @@ pub fn commit_diff_choice(
                     from: model.name(d.from).to_string(),
                     to: model.name(d.to).to_string(),
                     kind: Kind::Real,
-                    proof: Some(proof),
+                    proof,
                 };
                 let _ = process_action(data, model, &action, true);
             } else {
-                data.add_diff(model, d.from, d.to, Some(proof), Kind::Real);
+                data.add_diff(model, d.from, d.to, proof, Kind::Real);
             }
         }
         Commitment::Unknown => {
@@ -152,34 +167,48 @@ pub fn commit_tau_choice(
 
     match commitment {
         Commitment::Fake(proof) => {
+            let summary = (depth == 0 || ALWAYS_PRINT).then(|| proof.summary());
+            let proof = (depth == 0 || ALWAYS_PRINT).then(|| proof.describe(model));
             if ALWAYS_PRINT || depth == 0 {
-                println!("Disproven tau: {} | {} by {proof}", from_name, to_name);
+                println!(
+                    "Disproven tau: {} | {} by {}",
+                    from_name,
+                    to_name,
+                    summary.as_deref().unwrap()
+                );
             }
             if depth == 0 {
                 log.lock().unwrap().push(Action::AddExt {
                     from: from_name,
                     to: to_name,
                     af: d.af,
-                    proof: Some(proof.clone()),
+                    proof: proof.clone(),
                     kind: Kind::Fake,
                 });
             }
-            apply_tau_fact(data, model, d, Kind::Fake, ahss);
+            apply_tau_fact(data, model, d, Kind::Fake, proof, ahss);
         }
         Commitment::Real(proof) => {
+            let summary = (depth == 0 || ALWAYS_PRINT).then(|| proof.summary());
+            let proof = (depth == 0 || ALWAYS_PRINT).then(|| proof.describe(model));
             if ALWAYS_PRINT || depth == 0 {
-                println!("Proven tau: {} | {} by {proof}", from_name, to_name);
+                println!(
+                    "Proven tau: {} | {} by {}",
+                    from_name,
+                    to_name,
+                    summary.as_deref().unwrap()
+                );
             }
             if depth == 0 {
                 log.lock().unwrap().push(Action::AddExt {
                     from: from_name,
                     to: to_name,
                     af: d.af,
-                    proof: Some(proof.clone()),
+                    proof: proof.clone(),
                     kind: Kind::Real,
                 });
             }
-            apply_tau_fact(data, model, d, Kind::Real, ahss);
+            apply_tau_fact(data, model, d, Kind::Real, proof, ahss);
         }
         Commitment::Unknown => {
             if ALWAYS_PRINT || depth == 0 {
@@ -201,18 +230,25 @@ pub fn commit_tau_choice(
 
 /// Apply a real/fake tau to the data: through [`process_action`] in AHSS mode
 /// (so James periodicity fans it out) or directly otherwise.
-fn apply_tau_fact(data: &mut SyntheticSS, model: &E1, d: ExtTauMult, kind: Kind, ahss: bool) {
+fn apply_tau_fact(
+    data: &mut SyntheticSS,
+    model: &E1,
+    d: ExtTauMult,
+    kind: Kind,
+    proof: Option<String>,
+    ahss: bool,
+) {
     if ahss {
         let action = Action::AddExt {
             from: model.name(d.from).to_string(),
             to: model.name(d.to).to_string(),
             af: d.af,
             kind,
-            proof: None,
+            proof,
         };
         let _ = process_action(data, model, &action, true);
     } else {
-        data.add_ext_tau(model, d.from, d.to, d.af, None, kind);
+        data.add_ext_tau(model, d.from, d.to, d.af, proof, kind);
     }
 }
 
@@ -295,5 +331,69 @@ pub fn classify_tau_issue(
         Err(format!(
             "{alg_context} there is no way to fix the algebraic convergence issues with tau extensions. {issues:?}"
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{solve::proof::ProofTrace, types::Generator};
+
+    fn model() -> E1 {
+        E1::new(vec![
+            Generator::new("source".into(), 10, 4, 2, 0, None),
+            Generator::new("target".into(), 10, 2, 1, 0, None),
+        ])
+    }
+
+    #[test]
+    fn tau_proof_is_preserved_in_both_the_log_and_exported_model() {
+        let model = model();
+        for real in [false, true] {
+            let mut data = SyntheticSS::empty(model.clone());
+            let log = Arc::new(Mutex::new(vec![]));
+            let proof = ProofTrace::default().contradiction(1, "bad convergence".into());
+            let text = proof.describe(&model);
+            let commitment = if real {
+                Commitment::Real(proof)
+            } else {
+                Commitment::Fake(proof)
+            };
+            commit_tau_choice(
+                &mut data,
+                &model,
+                &log,
+                0,
+                ExtTauMult {
+                    from: 0,
+                    to: 1,
+                    af: 2,
+                },
+                commitment,
+                false,
+            );
+            assert_eq!(data.from_to[&(0, 1)].1.as_deref(), Some(text.as_str()));
+            assert!(matches!(&log.lock().unwrap()[0],
+                Action::AddExt { proof: Some(proof), .. } if proof == &text));
+        }
+    }
+
+    #[test]
+    fn speculative_commits_do_not_copy_formatted_proofs_into_cloned_worlds() {
+        let model = model();
+        let mut data = SyntheticSS::empty(model.clone());
+        let log = Arc::new(Mutex::new(vec![]));
+        let proof = ProofTrace::default().contradiction(2, "bad convergence".into());
+        commit_diff_choice(
+            &mut data,
+            &model,
+            &log,
+            1,
+            Diff { from: 0, to: 1 },
+            Commitment::Real(proof),
+            false,
+        );
+        assert_eq!(data.from_to[&(0, 1)], (Kind::Real, None));
+        assert!(log.lock().unwrap().is_empty());
     }
 }

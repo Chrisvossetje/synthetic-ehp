@@ -144,29 +144,33 @@ function mapBetweenGenerators(
 }
 
 /**
- * Apply a τ-multiplication `from -> to`. A τ-multiplication merges the torsion
- * orders of the two classes (the target is consumed). Returns `null` when it
- * does not apply.
+ * Apply Rust's τ-tower extension rule, retaining any overlap in the target.
+ * Returns `null` when the extension does not apply.
  */
 function applyTauMultiplication(
     from: GeneratorState,
-    to: GeneratorState
+    to: GeneratorState,
+    af: number = 0
 ): { from: GeneratorState; to: GeneratorState } | null {
     if (!torsionAlive(from.torsion) || !torsionAlive(to.torsion)) {
         return null;
     }
-    if (from.torsion === undefined) {
+    if (from.torsion === undefined || from.af < af) {
         return null;
     }
-    // The source must sit exactly one τ-tower step below the target.
-    if (from.af - from.torsion !== to.af) {
+    const afDiff = from.af - to.af;
+    if (afDiff < 0 || from.torsion < afDiff) {
+        return null;
+    }
+    // A target already contained in the source's tower cannot extend it.
+    if (to.torsion !== undefined && from.torsion >= to.torsion + afDiff) {
         return null;
     }
 
-    const newFromTorsion = to.torsion !== undefined ? from.torsion + to.torsion : undefined;
+    const newFromTorsion = to.torsion !== undefined ? to.torsion + afDiff : undefined;
     return {
         from: { af: from.af, torsion: newFromTorsion },
-        to: { af: to.af, torsion: 0 },
+        to: { af: to.af, torsion: from.torsion - afDiff },
     };
 }
 
@@ -176,6 +180,15 @@ function buildYByName(data: SyntheticEHP): Record<string, number> {
         yByName[g.name] = g.y;
     });
     return yByName;
+}
+
+/** Process lower source AF first, breaking ties with lower target AF. */
+function differentialsByAF(data: SyntheticEHP): Differential[] {
+    const afByName = new Map(data.generators.map((g) => [g.name, g.af]));
+    const af = (name: string) => afByName.get(name) ?? Infinity;
+    return [...data.differentials].sort((a, b) =>
+        af(a.from) - af(b.from) || af(a.to) - af(b.to)
+    );
 }
 
 /** The page a differential fires on: explicit `d`, else inferred from `y`s. */
@@ -246,7 +259,7 @@ function buildSyntheticTimeline(
 
     // Bucket differentials and internal τ-multiplications by the page they act.
     const diffsByPage: Differential[][] = Array.from({ length: MAX_STEM + 1 }, () => []);
-    data.differentials.forEach((diff) => {
+    differentialsByAF(data).forEach((diff) => {
         if (!shouldIncludeKind(diff.kind)) return;
         const diffPage = getDiffPage(diff, yByName);
         if (diffPage === undefined || !Number.isFinite(diffPage)) return;
@@ -312,7 +325,7 @@ function buildSyntheticTimeline(
             const fromState = currentState[tm.from];
             const toState = currentState[tm.to];
             if (!fromState || !toState) continue;
-            const updated = applyTauMultiplication(fromState, toState);
+            const updated = applyTauMultiplication(fromState, toState, tm.af);
             if (!updated) continue;
             currentState[tm.from] = updated.from;
             currentState[tm.to] = updated.to;
@@ -401,7 +414,7 @@ function computeClassicalPage(data: SyntheticEHP, query: PageQuery): PageView {
     });
 
     const differentials: Differential[] = [];
-    for (const diff of data.differentials) {
+    for (const diff of differentialsByAF(data)) {
         if (diff.kind !== "Real" && diff.kind !== "Algebraic") {
             continue;
         }

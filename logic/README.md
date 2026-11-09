@@ -62,6 +62,67 @@ the repo root and into `site/src/`):
   exactly where it left off; reverting truncates the log.
 - `../curtis_table*.txt` debug dumps and a LaTeX-style order table.
 
+Discovered proofs save two views in the action log's existing string proof
+field. The website's TypeScript export includes only the compact implication
+chain, without the appended full tree. Existing proof strings without a full
+tree section are exported unchanged.
+
+- **Full proof tree:** every established choice in the refutation, its supporting
+  subproofs, explored sibling results, and the bounded companion search. Shared
+  subproofs use numbered references, retaining assumptions and step ordering.
+- **Reduced proof tree:** `reduce_proof_tree(&full)` uses both branches to find
+  common conclusions, then exports only the refutation root and its support.
+  Shared conclusions and other differentials originating from the root
+  assumption's source are removed, along with subproofs used only by those
+  conclusions. Case splits whose every branch ends in the identical
+  contradiction are replaced by that contradiction, including nested splits.
+  Different errors and open or cancelled branches keep their case split.
+  Conditional facts from nested guesses never become common facts merely because
+  they were encountered. The JSON omitted-premise ledger links common facts to
+  both original derivations in the unchanged full tree.
+
+The reducer is a pure tree transformation; it does not rerun discovery. Export
+the actual reduced graph as JSON, or render its remaining nodes as text:
+
+```rust
+let reduced = reduce_proof_tree(&full);
+std::fs::write("reduced.txt", reduced.describe(&MODEL))?;
+export_reduced_proof_tree(&full, std::fs::File::create("reduced.json")?)?;
+```
+
+These functions live in `solve::proof`. JSON choices contain generator IDs from
+the same E1 model; the text renderer resolves their names. Reduced node IDs are
+local to the exported graph, with `full_tree_id` linking back to the original.
+The compact text starts directly with the root assumption, followed by `->`
+lines for newly asserted facts and the resulting contradiction. It hides routine
+exclusions and supporting refutations, which remain available in the graph and
+full tree. Distinct terminal cases remain visible. The ledger and traversal
+metadata are omitted from the text.
+
+For each depth-zero binary discovery, the solver reruns the surviving world
+from the same initial data, assuming that alternative without using the newly
+proved verdict. The companion has fresh cancellation flags and is bounded by
+both the rejected refutation's maximum successful depth and its furthest
+traversal position (including supporting subproofs). Nested discoveries retain
+full trees without starting further companions. If both alternatives contradict
+current assumptions, that contradiction propagates upwards without choosing one.
+
+Reduction changes only the displayed explanation. The full tree remains the
+record of justification. Shared conclusions are not claimed to be a minimum
+set of premises, and an undiscovered conclusion is not evidence of independence.
+Existing saved proofs stay unchanged until their facts are rediscovered.
+
+To check discovery performance, recompute through EHP stem 25 from the manual
+facts (using the saved AHSS answer), without writing generated files:
+
+```sh
+cargo test --release benchmark_ehp_stem_25 -- --ignored --nocapture
+```
+
+Prefix the command with `EHP_SHOW_PROOF=1` to print both views of an example
+stem 25 differential proof. The benchmark also checks all produced facts against
+the saved verdicts.
+
 ## How it fits together (`src/`)
 
 The crate is split into four areas, each with module-level docs:
@@ -89,6 +150,7 @@ The crate is split into four areas, each with module-level docs:
   - `generate.rs` / `solve.rs` — proposing candidate facts and auto-deducing
     forced solutions.
   - `search.rs` — parallel speculative branch-and-bound primitives (rayon).
+  - `proof.rs` — shared full proof trees and paired-search reduction.
   - `automated_ahss.rs` / `automated_ehp.rs` — the unattended solvers.
 
 - **`io/`** — `cli.rs` (interactive terminal menu), `export.rs` (serialization

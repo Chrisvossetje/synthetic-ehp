@@ -37,6 +37,8 @@ export type DisplayMultiplication = {
     targets: readonly string[];
     displayTargets?: readonly string[];
     inheritedFrom?: { tag: string; sphere: number };
+    /** Recorded real tau extensions supporting a historical cross-row product. */
+    tauExtensions?: readonly { from: string; to: string }[];
 };
 
 export type InternalTauMult = {
@@ -50,6 +52,7 @@ export type InternalTauMult = {
 export type ExternalTauMult = {
     "from": string,
     "to": string,
+    "af": number,
     "kind": "Real" | "Fake" | "Unknown";
     "proof"?: string,
 }

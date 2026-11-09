@@ -4,7 +4,7 @@
             "from": "9 7 7 7[6]",
             "to": "7 3 6 6 5 3[5]",
             "kind": "Unknown",
-            "proof": "This differential can clearly not be true by naturality with AHSS. However not all impossible AHSS differentials are correctly lifted as impossible to the EHP solver. TODO"
+            "proof": "This differential does not exist. It requires two things; understanding that the d_1 = tilde 2 multiplication for double suspensions. Then one can figure out whether there is a hidden two extension from 7 7 7[9] to 3 6 6 5 3[7]. We know that 3 6 6 5 3[7] h_2 = 3 3 6 6 5 3[7] and that 7 7[9]h_3 = 7 7 7[9]. If 7 7 7[9] h_0 = tau 3 6 6 5 3[7] then we would get that (7 7[9]h_3 h_0 h_2 = tau 3 6 6 5 3[7] h_2 = tau 3 3 6 6 5 3[7]), but we also have that by associtiviy and commutativity of stable elements that (h_3 h_2 = 0)."
         }
     }
     ,

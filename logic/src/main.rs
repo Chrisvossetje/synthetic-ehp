@@ -48,7 +48,8 @@ fn main() {
 
     // automated_ahss(true);
     
-    let ehp = automated_ehp(false);
+    let ehp = automated_ehp(true);
+    // interactive_ehp();
 
     // let mut ehp = get_log(false, false).unwrap();
 

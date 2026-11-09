@@ -1,4 +1,4 @@
-import type { DisplayMultiplication, Generators } from "../types";
+import type { DisplayMultiplication, ExternalTauMult, Generators, InternalTauMult } from "../types";
 import type { MultiplicationTables } from "./multiplicationSource";
 import { lookupMultiplication, MultiplicationOperator, MultiplicationResult, MultiplicationTable, normalizeMultiplicationTag } from "./multiplicationTable";
 import { algebraicMultiplicationTag } from "./tagNames";
@@ -10,6 +10,7 @@ export interface DisplayMultiplicationInfo {
     result: MultiplicationResult | undefined;
     unresolved: string[];
     inheritedFrom?: { tag: string; sphere: number };
+    tauExtensions?: DisplayMultiplication["tauExtensions"];
 }
 
 /** The leading Curtis index is stored in the EHP name's brackets. */
@@ -81,10 +82,11 @@ function firstSupportingSphere(
 }
 
 /**
- * Resolve metadata against the actual visible nodes. h_0 keeps every accessible
- * summand; other operators require the complete sum. Cross-row h_0 products
- * additionally require both endpoints to survive to E-infinity. h_1/h_2
- * require two survivors even on the same row.
+ * Keep accessible same-row terms from every applicable checkpoint, even when
+ * later checkpoints change the product. Recorded real tau extensions can also
+ * retain earlier cross-row h_0 products on their visible representatives.
+ * Otherwise cross-row products require two E-infinity survivors; h_1/h_2
+ * additionally require the complete sum to resolve.
  * With no sphere cutoff, both charts use the final covered sphere, so later
  * checkpoints (including stable products) are visible. No tau coefficients
  * are inferred.
@@ -100,6 +102,8 @@ export function resolveDisplayMultiplications(
         survivingNames?: ReadonlySet<string>;
         /** Logical chart rows, before dot offsets (ASS uses Adams filtration). */
         rows?: ReadonlyMap<string, number>;
+        /** Real extensions support products hidden by later algebraic zeros. */
+        tauMults?: readonly (InternalTauMult | ExternalTauMult)[];
     } = {}
 ): { lines: DisplayMultiplication[]; info: DisplayMultiplicationInfo[] } {
     const lines: DisplayMultiplication[] = [];
@@ -107,6 +111,39 @@ export function resolveDisplayMultiplications(
     const generatorsByName = new Map(generators.map((gen) => [gen.name, gen]));
     const survivors = options.survivingNames ?? visibleNames;
     const rowOf = (gen: Generators) => options.rows?.get(gen.name) ?? (mode === "ehp" ? gen.y : gen.af);
+    type TauMult = InternalTauMult | ExternalTauMult;
+    const tauFrom = new Map<string, TauMult[]>();
+    const tauNodes = new Set<string>();
+    const tauRelations: TauMult[] = [];
+    for (const relation of options.tauMults ?? []) {
+        const from = generatorsByName.get(relation.from);
+        const to = generatorsByName.get(relation.to);
+        if (relation.kind !== "Real" || !from || !to) continue;
+        if (sphere !== undefined && (from.y >= sphere || to.y >= sphere)) continue;
+        const outgoing = tauFrom.get(from.name) ?? [];
+        outgoing.push(relation);
+        tauFrom.set(from.name, outgoing);
+        tauNodes.add(from.name);
+        tauNodes.add(to.name);
+        tauRelations.push(relation);
+    }
+    const tauPaths = new Map<string, Map<string, TauMult[]>>();
+    const tauPath = (from: string, to: string): TauMult[] | undefined => {
+        let paths = tauPaths.get(from);
+        if (!paths) {
+            paths = new Map([[from, []]]);
+            const queue = [from];
+            for (let i = 0; i < queue.length; i++) {
+                for (const relation of tauFrom.get(queue[i]) ?? []) {
+                    if (paths.has(relation.to)) continue;
+                    paths.set(relation.to, [...paths.get(queue[i])!, relation]);
+                    queue.push(relation.to);
+                }
+            }
+            tauPaths.set(from, paths);
+        }
+        return paths.get(to);
+    };
     const indices = new Map<number, Map<string, Generators[]>>();
     const aliasesBySphere = new Map<number, Map<string, Set<string>>>();
     const indexAt = (n: number) => {
@@ -146,6 +183,70 @@ export function resolveDisplayMultiplications(
             const eligible = (gen: Generators) => gen.stem === expectedStem
                 && (mode === "ass" || (operator === 0 && rowOf(source) === rowOf(gen))
                     || (survivors.has(source.name) && survivors.has(gen.name)));
+            // A later zero or changed representative does not remove the
+            // multiplication on the original row while its dots remain alive.
+            const original = { ...source, induced_name: [] };
+            const originalTag = multiplicationTag(original, n);
+            const checkpoints = originalTag === undefined ? undefined : table.checkpoints.get(originalTag);
+            const rowProducts: {
+                sphere: number;
+                result: MultiplicationResult | undefined;
+                inheritedFrom?: { tag: string; sphere: number };
+            }[] = checkpoints
+                ? checkpoints.filter((entry) => entry.sphere <= n)
+                : [{ sphere: n, ...productAtSphere(table, original, n) }];
+            for (const rowProduct of rowProducts) {
+                const { result } = rowProduct;
+                if (result?.kind !== "sum") continue;
+                const rowTargets = result.targets.map((tag) => {
+                    const [bracket, ...word] = tag.split(" ");
+                    return generatorsByName.get(`${word.join(" ")}[${bracket}]`);
+                });
+                const targets = rowTargets.filter((target): target is Generators => !!target
+                    && visibleNames.has(target.name) && target.stem === expectedStem
+                    && rowOf(target) === rowOf(source));
+                const proofs = new Map<string, TauMult[]>();
+                if (operator === 0 && tauRelations.length) {
+                    for (let i = 0; i < result.targets.length; i++) {
+                        const originalTarget = rowTargets[i];
+                        if (!originalTarget || rowOf(originalTarget) === rowOf(source)
+                            || !tauNodes.has(originalTarget.name)) continue;
+                        const candidates = (indexAt(n).get(result.targets[i]) ?? []).filter((target) =>
+                            target.stem === expectedStem && rowOf(target) !== rowOf(source)
+                            && tauPath(target.name, originalTarget.name) !== undefined);
+                        // Prefer the representative above the other matches in
+                        // the recorded tau tower, rather than the older dot.
+                        const preferred = candidates.filter((candidate) => !candidates.some((other) =>
+                            other !== candidate && tauPath(other.name, candidate.name) !== undefined));
+                        if (preferred.length !== 1) continue;
+                        const target = preferred[0];
+                        const path = tauPath(target.name, originalTarget.name)!;
+                        proofs.set(target.name, path.length ? path : tauRelations.filter((relation) =>
+                            relation.from === target.name || relation.to === target.name));
+                        targets.push(target);
+                    }
+                }
+                if (!targets.length) continue;
+                const support = checkpoints
+                    ? Math.max(rowProduct.sphere, source.born, ...targets.map((target) => target.born))
+                    : firstSupportingSphere(table, original, n, result, targets);
+                const inheritedFrom = rowProduct.inheritedFrom;
+                const proofRelations: TauMult[] = [];
+                for (const path of proofs.values()) proofRelations.push(...path);
+                const tauExtensions = [...new Map(proofRelations.map((relation) =>
+                    [JSON.stringify([relation.from, relation.to]), relation])).values()];
+                info.push({ source: source.name, operator, sphere: support, result,
+                    unresolved: result.targets.filter((tag, i) => !targets.includes(rowTargets[i])
+                        && !targets.some((target) => proofs.has(target.name) && multiplicationTag(target, n) === tag)),
+                    ...(tauExtensions.length ? { tauExtensions } : {}),
+                    ...(inheritedFrom ? { inheritedFrom } : {}) });
+                for (const target of targets) {
+                    lines.push({ from: source.name, to: target.name, operator, sphere: support,
+                        targets: result.targets,
+                        ...(proofs.has(target.name) ? { tauExtensions: proofs.get(target.name) } : {}),
+                        ...(inheritedFrom ? { inheritedFrom } : {}) });
+                }
+            }
             // The added diagonal h_0 classes have no Curtis-table tag.
             // Add their products alongside, rather than replacing, table data.
             const bottomCell = operator === 0 ? /^\[(\d*[13579])\]$/.exec(source.name) : null;
@@ -196,7 +297,14 @@ export function resolveDisplayMultiplications(
             }
         }
     }
-    return { lines, info };
+    // Prefer the current table metadata when it describes an edge already
+    // retained from an earlier checkpoint; draw each edge only once.
+    const uniqueLines = new Map(lines.map((line) => [JSON.stringify([line.from, line.to, line.operator]), line]));
+    const uniqueInfo = new Map(info.map((entry) => [JSON.stringify([
+        entry.source, entry.operator, entry.sphere, resultKey(entry.result), entry.inheritedFrom, entry.tauExtensions,
+        [...entry.unresolved].sort(),
+    ]), entry]));
+    return { lines: [...uniqueLines.values()], info: [...uniqueInfo.values()] };
 }
 
 export function formatMultiplicationResult(result: MultiplicationResult | undefined): string {

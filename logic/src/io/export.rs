@@ -3,14 +3,14 @@
 //! (`write_log`), and a LaTeX-style order table (`export_order_table`).
 
 use std::{
-    collections::BTreeMap, fs::File, io::{self, Write}, path::{Path, PathBuf}
+    collections::{BTreeMap, HashMap}, fs::File, io::{self, Write}, path::{Path, PathBuf}
 };
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    MAX_EXPORT_STEM, MAX_STEM, data::curtis::MODEL, domain::{e1::E1, model::SyntheticSS, process::compute_pages}, solve::action::Action, types::{Generator, Kind, Torsion}
+    MAX_EXPORT_STEM, MAX_STEM, data::curtis::MODEL, domain::{e1::E1, model::SyntheticSS, process::compute_pages}, solve::{action::Action, proof::compact_proof_text}, types::{Generator, Kind, Torsion}
 };
 
 pub fn write_vec_to_file<T: std::fmt::Debug>(vec: &[T], path: &str) -> io::Result<()> {
@@ -130,6 +130,9 @@ pub fn write_typescript_file(
     let mut differentials = vec![];
     let mut int_tau_mults = vec![];
     let mut ext_tau_mults = vec![];
+    let ext_tau_metadata: HashMap<_, _> = data.external_taus().enumerate()
+        .map(|(order, tau)| ((model.name(tau.from), model.name(tau.to)), (tau.af, order)))
+        .collect();
 
     for ((from, to), (kind, p)) in &data.from_to {
         let d_y = model.y(*from) - model.y(*to);
@@ -137,21 +140,24 @@ pub fn write_typescript_file(
         if model.get(*to).stem > MAX_EXPORT_STEM {
             continue;
         }
+        // Logs retain the complete derivation; the website gets the compact chain.
+        let proof = p.as_deref().map(compact_proof_text).map(str::to_owned);
         if d_y == 0 {
             int_tau_mults.push(InternalTauMult {
                 from: model.name(*from).to_string(),
                 to: model.name(*to).to_string(),
                 kind: *kind,
-                proof: p.clone(),
+                proof,
                 page: 2, // TODO : This is not generic enough but good enough for our range
             });
         } else if d_stem == 0 {
             ext_tau_mults.push(ExternalTauMult {
                 from: model.name(*from).to_string(),
                 to: model.name(*to).to_string(),
-                af: 0,
+                af: ext_tau_metadata.get(&(model.name(*from), model.name(*to)))
+                    .map(|&(af, _)| af).unwrap_or(0),
                 kind: *kind,
-                proof: p.clone(),
+                proof,
             });
         } else {
             differentials.push(Differential {
@@ -159,10 +165,14 @@ pub fn write_typescript_file(
                 to: model.name(*to).to_string(),
                 d: model.y(*from) - model.y(*to),
                 kind: *kind,
-                proof: p.clone(),
+                proof,
             });
         }
     }
+
+    // Preserve Rust's application order, including insertion order within ties.
+    ext_tau_mults.sort_by_key(|tau| ext_tau_metadata.get(&(tau.from.as_str(), tau.to.as_str()))
+        .map(|&(_, order)| order).unwrap_or(usize::MAX));
 
     // Serialize differentials to JSON strings
     let diffs: Vec<String> = differentials
@@ -302,5 +312,86 @@ fn add_final_diagonal(model: &mut E1, data: &mut SyntheticSS ) {
         data.out_taus.push(vec![]);
         
         data.add_diff(model, size, size+1, None, Kind::Algebraic);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{domain::model::Diff, solve::proof::{ProofChoice, ProofTrace, reduce_proof_tree}};
+
+    #[test]
+    fn website_preserves_external_tau_thresholds_and_application_order() {
+        let model = E1::new(vec![
+            Generator::new("a".into(), 10, 6, 6, 0, None),
+            Generator::new("b".into(), 10, 3, 4, 0, None),
+            Generator::new("c".into(), 10, 1, 2, 0, None),
+            Generator::new("d".into(), 10, 3, 4, 0, None),
+        ]);
+        let mut data = SyntheticSS::empty(model.clone());
+        data.add_ext_tau(&model, 0, 3, 5, None, Kind::Real);
+        data.add_ext_tau(&model, 0, 1, 5, None, Kind::Real);
+        data.add_ext_tau(&model, 1, 2, 3, None, Kind::Real);
+        let path = std::env::temp_dir().join(format!("synthetic-ehp-tau-export-{}.ts", std::process::id()));
+        write_typescript_file(path.to_str().unwrap(), "", &data, &model).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::remove_file(path).unwrap();
+        let exported: serde_json::Value = serde_json::from_str(
+            text.split_once("export const data: SyntheticEHP = ").unwrap().1,
+        ).unwrap();
+        let taus: Vec<_> = exported["external_tau_mults"].as_array().unwrap().iter()
+            .map(|tau| (tau["from"].as_str().unwrap(), tau["to"].as_str().unwrap(), tau["af"].as_i64().unwrap()))
+            .collect();
+        assert_eq!(taus, [("b", "c", 3), ("a", "d", 5), ("a", "b", 5)]);
+    }
+
+    #[test]
+    fn website_exports_compact_proofs_for_differentials_and_taus_without_changing_saved_proofs() {
+        let model = E1::new(vec![
+            Generator::new("source".into(), 10, 4, 2, 0, None),
+            Generator::new("diff target".into(), 9, 2, 3, 0, None),
+            Generator::new("int target".into(), 10, 4, 4, 0, None),
+            Generator::new("ext target".into(), 10, 2, 3, 0, None),
+            Generator::new("legacy target".into(), 9, 1, 3, 0, None),
+            Generator::new("unknown target".into(), 9, 0, 3, 0, None),
+        ]);
+        let proof = ProofTrace::default()
+            .contradiction(1, "incompatible convergence".into())
+            .assuming(1, ProofChoice::Diff(Diff { from: 0, to: 1 }, false));
+        let saved = proof.describe(&model);
+        let compact = reduce_proof_tree(&proof).describe(&model);
+        let mut data = SyntheticSS::empty(model.clone());
+        data.add_diff(&model, 0, 1, Some(saved.clone()), Kind::Real);
+        data.add_int_tau(0, 2, 2, Some(saved.clone()), Kind::Real);
+        data.add_ext_tau(&model, 0, 3, 2, Some(saved.clone()), Kind::Real);
+        data.add_diff(&model, 0, 4, Some("By a known theorem".into()), Kind::Fake);
+        data.add_diff(&model, 0, 5, None, Kind::Unknown);
+
+        let path = std::env::temp_dir().join(format!("synthetic-ehp-compact-export-{}.ts", std::process::id()));
+        write_typescript_file(path.to_str().unwrap(), "", &data, &model).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::remove_file(path).unwrap();
+        assert!(!text.contains("Full proof tree"));
+        let exported: serde_json::Value = serde_json::from_str(
+            text.split_once("export const data: SyntheticEHP = ").unwrap().1,
+        ).unwrap();
+        for (collection, target) in [
+            ("differentials", "diff target"),
+            ("internal_tau_mults", "int target"),
+            ("external_tau_mults", "ext target"),
+        ] {
+            let fact = exported[collection].as_array().unwrap().iter()
+                .find(|fact| fact["from"] == "source" && fact["to"] == target).unwrap();
+            assert_eq!(fact["proof"].as_str(), Some(compact.as_str()));
+        }
+        let diffs = exported["differentials"].as_array().unwrap();
+        let legacy = diffs.iter().find(|fact| fact["to"] == "legacy target").unwrap();
+        assert_eq!(legacy["proof"], "By a known theorem");
+        let unknown = diffs.iter().find(|fact| fact["to"] == "unknown target").unwrap();
+        assert!(unknown.get("proof").is_none());
+        for to in 1..=3 {
+            assert_eq!(data.from_to[&(0, to)].1.as_deref(), Some(saved.as_str()));
+        }
+        assert!(saved.contains("Full proof tree"));
     }
 }

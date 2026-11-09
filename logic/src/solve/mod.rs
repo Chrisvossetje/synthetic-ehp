@@ -23,5 +23,6 @@ pub mod ehp;
 pub mod ehp_ahss;
 pub mod generate;
 pub mod issues;
+pub mod proof;
 pub mod search;
 pub mod solve;

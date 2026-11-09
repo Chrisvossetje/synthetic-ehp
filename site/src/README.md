@@ -141,12 +141,26 @@ in the popup.
 The manually added `1[2n+1] -> h_0[2n+1]` diagonal products supplement the
 table lookup. They retain separate product metadata, so table products such as
 `1[3] -> h_1[2]` remain available alongside them.
+Same-row products retain every accessible term from applicable table
+checkpoints on the original representatives, even if a later checkpoint is
+zero or changes the product. For example, the sphere-4 relation
+`h_2[3] -> h_0h_2[3]` remains drawn while both dots are visible. This applies to
+all enabled operators and preserves partial sums. Each edge is drawn once,
+with current table metadata preferred when it also supplies that edge.
+In synthetic views, recorded real τ extensions also retain earlier cross-row
+h₀ products when a later algebraic checkpoint becomes zero. Targets resolve
+to the visible induced representative above the older name in the τ tower;
+ambiguous representatives remain undrawn. For example, the sphere-7 product
+`h_1g[6] -> Pd_0[5]` is retained through the τ extensions involving
+`h_0^3e_0[10]`, `Pd_0[5]`, and its older representative `h_0h_2g[4]`.
+Popups include the recorded extension used to resolve the product. Provisional
+extensions and extensions outside the sphere cutoff provide no such support.
 For h₀ sums, each accessible term is drawn even when other terms are hidden or
-unresolved. Cross-row h₀ lines require both endpoints to survive to E∞;
-same-row h₀ lines require only that both dots are visible on the current page.
+unresolved. Other cross-row h₀ lines require both endpoints to survive to E∞;
+same-row lines require only that both dots are visible on the current page.
 Rows use EHP degree in EHP mode and displayed Adams filtration in ASS mode.
-h₁ and h₂ require two permanent classes even on the same row, and still require
-every term to resolve. ASS displays all resolved operators on its actual class
+h₁ and h₂ cross-row products require two permanent classes and every term to
+resolve. ASS displays all resolved operators on its actual class
 nodes. Solid lines denote
 each term; clicking a line displays the full product and sphere. Clicking
 a class always lists all known nonzero h₀/h₁/h₂ products, independently of the
@@ -163,5 +177,6 @@ names so they remain available after regeneration.
 
 Malformed rows, duplicate sources, unordered/duplicate checkpoints, and
 checkpoints beyond the stated coverage fail with filename/line diagnostics.
-Run `npm run test:multiplications` to test parsing, bounds, sums, and checkpoint
-lookup against all three complete files. `npm test` also runs these checks.
+Run `npm run test:multiplications` to audit visible same-row checkpoint terms
+against all three complete files and test partial sums, filtering, and the
+coexistence of manual and imported products. `npm test` also runs these checks.
