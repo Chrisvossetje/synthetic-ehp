@@ -1,6 +1,7 @@
 {
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.24.0",
+    "typescript": "^5.9.3"
   },
   "scripts": {
     "init": "rm -r -f ./_site && rm -r -f ./site/pkg && cp -r ./site/static ./_site",
