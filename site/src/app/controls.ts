@@ -1,7 +1,7 @@
 import { Category, viewSettings } from "../model/settings";
-import { isUsingStableData } from "../model/dataSource";
+import { ensureStableDataLoading, isStableDataReady, isUsingStableData, setUseStableData } from "../model/dataSource";
 import { assChart, ehpChart } from "./charts";
-import { switchDataSource, update_ehp_chart } from "./ehpChart";
+import { update_ehp_chart } from "./ehpChart";
 import { update_ass_chart } from "./assChart";
 import { applyTruncationFromControls, syncSphereControlsFromState, TruncationControls } from "./truncation";
 
@@ -60,7 +60,7 @@ export function getTruncationControls(): TruncationControls | null {
 
 /** Whether the AHSS data source is selected (vs. the sphere/EHP view). */
 export function usingAhss(): boolean {
-    return !!byId<HTMLInputElement>("data-source-switch")?.checked;
+    return isUsingStableData();
 }
 
 // ---------------------------------------------------------------------------
@@ -117,10 +117,7 @@ export function toggleShowFakeData() { setShowFakeData(!viewSettings.showFakeDat
 /** Flip the data-source switch and run its change handler (keyboard `s`). */
 export function toggleDataSource() {
     const sw = byId<HTMLInputElement>("data-source-switch");
-    if (sw) {
-        sw.checked = !sw.checked;
-        sw.dispatchEvent(new Event("change"));
-    }
+    sw?.click();
 }
 
 // --- Truncation steppers / toggles ----------------------------------------
@@ -132,6 +129,7 @@ export function toggleDataSource() {
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 function applyAndUpdate(mode: "ahss" | "sphere") {
+    if ((mode === "ahss") !== usingAhss()) return;
     const controls = getTruncationControls();
     if (!controls) return;
     applyTruncationFromControls(mode, controls, viewSettings);
@@ -223,10 +221,9 @@ export function syncViewControlsForDataSource(updateChart = true) {
     const sphereControls = byId<HTMLDivElement>("sphere-controls");
     const fakeControls = byId<HTMLDivElement>("fake-controls");
     const showFakeCheckbox = byId<HTMLInputElement>("show-fake-checkbox");
-    const dataSourceSwitch = byId<HTMLInputElement>("data-source-switch");
     const controls = getTruncationControls();
 
-    if (!dataSourceSwitch || !truncationControls || !sphereControls || !fakeControls || !showFakeCheckbox || !controls) {
+    if (!truncationControls || !sphereControls || !fakeControls || !showFakeCheckbox || !controls) {
         return;
     }
 
@@ -235,7 +232,7 @@ export function syncViewControlsForDataSource(updateChart = true) {
     fakeControls.style.pointerEvents = "auto";
     showFakeCheckbox.disabled = false;
 
-    if (dataSourceSwitch.checked) {
+    if (usingAhss()) {
         truncationControls.style.display = "flex";
         sphereControls.style.display = "none";
         syncSphereControlsFromState(controls, viewSettings, true);
@@ -285,6 +282,17 @@ export function setupUIControls() {
     const categorySelect = byId<HTMLSelectElement>("ss-category");
     categorySelect?.addEventListener("change", () => setCategory(parseInt(categorySelect.value)));
 
+    const tagSelect = byId<HTMLSelectElement>("tag-notation");
+    if (tagSelect) {
+        tagSelect.value = viewSettings.tagNotation;
+        tagSelect.addEventListener("change", () => {
+            viewSettings.tagNotation = tagSelect.value === "curtis" ? "curtis" : "adams";
+            const infoPanel = byId("floatingBox");
+            if (infoPanel) infoPanel.style.display = "none";
+            updateActiveChart();
+        });
+    }
+
     const controls = getTruncationControls();
     if (controls) {
         // AHSS top/bottom truncation: act on change, debounce while typing.
@@ -311,11 +319,20 @@ export function setupUIControls() {
 
     const dataSourceSwitch = byId<HTMLInputElement>("data-source-switch");
     dataSourceSwitch?.addEventListener("change", async () => {
+        const toAhss = dataSourceSwitch.checked;
         dataSourceSwitch.disabled = true;
-        await switchDataSource();
-        dataSourceSwitch.checked = isUsingStableData();
-        dataSourceSwitch.disabled = false;
-        syncViewControlsForDataSource();
+        try {
+            if (toAhss && !isStableDataReady()) {
+                await ensureStableDataLoading();
+            }
+            setUseStableData(toAhss);
+            syncViewControlsForDataSource();
+        } catch (error) {
+            console.error("Failed to switch data sources", error);
+        } finally {
+            dataSourceSwitch.checked = isUsingStableData();
+            dataSourceSwitch.disabled = false;
+        }
     });
 
     syncViewControlsForDataSource();

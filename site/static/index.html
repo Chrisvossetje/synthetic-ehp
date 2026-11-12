@@ -89,6 +89,11 @@
         <option value = 2>Geometric</option>
       </select>
       <div style="width: 10px;"></div>
+      <select style="width: 150px; margin: 0px;" aria-label="Tag notation" id="tag-notation">
+        <option value="adams" selected>Adams tag</option>
+        <option value="curtis">Curtis tag</option>
+      </select>
+      <div style="width: 10px;"></div>
       <div id="sphere-controls" style="display: flex; align-items: center; width: 300px;">
         <label style="margin: 0px; margin-left: auto;">Sphere:
           <input type="checkbox" name="valid" id="sphere-truncation-checkbox"/>
@@ -121,7 +126,8 @@
     <span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>
     <h4>Legend</h4>
     <pre style="background-color: #00000000; margin: 0;">
-A filled dot represents a class which survives the spectral sequence.
+The dot border shows torsion on the selected page. The fill shows torsion on E∞.
+White fill means the class dies before E∞.
 
 Coloring for dots:
 

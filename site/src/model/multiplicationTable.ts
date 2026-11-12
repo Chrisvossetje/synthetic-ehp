@@ -127,7 +127,14 @@ export function lookupMultiplication(
         throw new Error("Lookup sphere must be a nonnegative safe integer");
     }
     if (sphere > table.maxSphere) return undefined;
-    const entries = table.checkpoints.get(normalizeMultiplicationTag(sourceTag));
+    return lookupMultiplicationCheckpoint(table.checkpoints.get(normalizeMultiplicationTag(sourceTag)), sphere);
+}
+
+/** Read an already selected series of checkpoints within the table's coverage. */
+export function lookupMultiplicationCheckpoint(
+    entries: readonly MultiplicationCheckpoint[] | undefined,
+    sphere: number
+): MultiplicationResult | undefined {
     if (!entries) return undefined;
     // Find the final checkpoint <= sphere.
     let low = 0;

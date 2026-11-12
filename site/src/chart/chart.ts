@@ -1,13 +1,20 @@
 import { ToStringMap } from "./stringMap";
 import { SvgChart } from "./svgChart";
 import { Differential, DisplayMultiplication, ExternalTauMult, Generators, InternalTauMult, Multiplication } from "../types";
+import { displayName } from "../model/tagNames";
+import { viewSettings } from "../model/settings";
 import { ChartMode } from "./chartMode";
 import { svgNS } from "./svgChart";
 import { escapeHtml } from "./text";
+import { renderAdamsTag } from "./tagMath";
 
 type Point = [number, number];
 
 export const MULTIPLICATION_COLOR = "#b0b0b0";
+
+export function tagLabelDirection(row: number): -1 | 1 {
+    return row % 2 === 0 ? 1 : -1;
+}
 
 /** Bend grows gently with distance, approaching a cap on long products. */
 export function h0MultiplicationControls(from: Point, to: Point, sameRow: boolean): [Point, Point] {
@@ -23,12 +30,21 @@ export function h0MultiplicationControls(from: Point, to: Point, sameRow: boolea
     return [controlAt(1 / 3), controlAt(2 / 3)];
 }
 
-// TODO: Torsion color now manually rotates
-const TorsionColor = ["black", "#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple","#0080ff", "red", "mediumseagreen", "cyan", "purple",];
+const TORSION_COLORS = ["#0080ff", "#ff0000", "#3cb371", "#00ffff", "#800080"];
+
+function torsionColor(order: number | undefined): string {
+    return order && order > 0 ? TORSION_COLORS[(order - 1) % TORSION_COLORS.length] : "black";
+}
+
+type DotDisplay = {
+    currentTorsion?: number;
+    /** Zero means the class dies. Undefined means it survives as a free module. */
+    finalTorsion?: number;
+    filtration?: number;
+    initialFiltration?: number;
+};
 
 export class Chart {
-    private static cachedInvalidCells: string | null = null;
-
     public svgchart: SvgChart;
     private maxStem: number = 32;
 
@@ -37,8 +53,8 @@ export class Chart {
 
     // All generators and differentials (complete data set)
     public generators: Generators[] = [];
-    private generatorLabels: Map<string, string> = new Map();
-    private generatorRows: Map<string, number> = new Map();
+    private generatorsByName = new Map<string, Generators>();
+    private tauPowers = new Map<string, number>();
     public differentials: Differential[] = [];
     public multiplications: Multiplication[] = [];
     public tau_mults: (InternalTauMult | ExternalTauMult)[] = [];
@@ -46,7 +62,7 @@ export class Chart {
 
     // Cached element references
     private dotElements: Map<string, SVGCircleElement | SVGRectElement> = new Map();
-    private labelElements: Map<string, SVGTextElement> = new Map();
+    private labelElements: Map<string, SVGForeignObjectElement> = new Map();
     private filtrationElements: Map<string, SVGTextElement> = new Map();
     private diffElements: Map<string, SVGLineElement> = new Map();
     private multElements: Map<string, SVGLineElement> = new Map();
@@ -159,19 +175,7 @@ export class Chart {
         if (container) {
             container.style.display = 'block';
             // Trigger resize and reapply zoom after showing to ensure proper dimensions
-            setTimeout(() => {
-                if (this.currentBounds) {
-                    // Reapply size settings now that the element is visible
-                    this.svgchart.set_size(
-                        this.currentBounds[0],
-                        this.currentBounds[1],
-                        this.currentBounds[2],
-                        this.currentBounds[3]
-                    );
-                } else {
-                    this.svgchart.onResize();
-                }
-            }, 0);
+            setTimeout(() => this.svgchart.onResize(), 0);
         }
     }
 
@@ -188,20 +192,28 @@ export class Chart {
     // Set all generators (complete data set)
     set_all_generators(generators: Generators[]) {
         this.generators = generators;
-        this.generatorLabels = new Map(generators.map((gen) => [gen.name, gen.alg_name ?? gen.name]));
-        this.generatorRows = new Map(generators.map((gen) => [gen.name, gen.y]));
+        this.generatorsByName = new Map(generators.map((gen) => [gen.name, gen]));
+        this.tauPowers.clear();
         this.maxStem = this.computeMaxStem();
-        if (this.mode === ChartMode.EHP) {
-            Chart.cachedInvalidCells = null;
-        }
+    }
+
+    generator_tag(name: string): string {
+        const gen = this.generatorsByName.get(name);
+        const representative = this.mode === ChartMode.ASS ? gen?.induced_name?.[0]?.[1] : undefined;
+        return displayName(representative ?? name, gen?.alg_name);
+    }
+
+    generator_tau_power(name: string): number {
+        return this.tauPowers.get(name) ?? 0;
     }
 
     generator_label(name: string): string {
-        return this.generatorLabels.get(name) ?? name;
+        const power = this.generator_tau_power(name);
+        return (power ? `τ^${power} ` : "") + this.generator_tag(name);
     }
 
     generator_row(name: string): number | undefined {
-        return this.generatorRows.get(name);
+        return this.generatorsByName.get(name)?.y;
     }
 
     // Set all differentials (complete data set)
@@ -219,8 +231,8 @@ export class Chart {
         this.tau_mults = tau_mults;
     }
 
-    private get_dot_radius(): number {
-        return this.mode === ChartMode.ASS ? 0.07 : 0.022;
+    get_dot_radius(): number {
+        return this.mode === ChartMode.ASS ? 0.064 : 0.02;
     }
 
     clear_selection_highlights() {
@@ -253,7 +265,11 @@ export class Chart {
         contents.prepend(ring);
     }
 
-    display_dot(gen_name: string, display: boolean, permanent: boolean, torsion: number | null, filtration?: number) {
+    display_dot(
+        gen_name: string,
+        display: boolean,
+        { currentTorsion, finalTorsion, filtration, initialFiltration = this.generatorsByName.get(gen_name)?.af }: DotDisplay = {}
+    ) {
         const el = this.dotElements.get(gen_name);
         const labelEl = this.labelElements.get(gen_name);
         const filtrationEl = this.filtrationElements.get(gen_name);
@@ -261,27 +277,40 @@ export class Chart {
         if (!el) return;
 
         if (filtrationEl && filtration !== undefined) {
-            filtrationEl.textContent = filtration.toString();
+            const value = filtration.toString();
+            if (filtrationEl.textContent !== value) filtrationEl.textContent = value;
         }
 
         if (display) {
+            el.style.fill = finalTorsion === 0 ? "white" : torsionColor(finalTorsion);
+            if (this.mode !== ChartMode.ASS) {
+                el.style.stroke = torsionColor(currentTorsion);
+            }
+            if (filtration !== undefined && initialFiltration !== undefined && filtration !== initialFiltration) {
+                // Each factor of τ lowers Adams filtration by one.
+                this.tauPowers.set(gen_name, initialFiltration - filtration);
+            } else {
+                this.tauPowers.delete(gen_name);
+            }
             el.style.visibility = "";
-            if (labelEl) labelEl.style.visibility = "";
-            if (filtrationEl) filtrationEl.style.visibility = "";
+            if (labelEl) {
+                const label = this.generator_label(gen_name);
+                const content = labelEl.firstElementChild!;
+                const hasMath = content.firstElementChild?.localName === "math";
+                if (labelEl.getAttribute("aria-label") !== label || hasMath !== (viewSettings.tagNotation === "adams")) {
+                    content.innerHTML = this.generator_label_markup(gen_name, label);
+                    labelEl.setAttribute("aria-label", label);
+                }
+                labelEl.style.display = "";
+            }
+            if (filtrationEl) filtrationEl.style.display = "";
         } else {
+            this.tauPowers.delete(gen_name);
             el.style.visibility = "hidden";
-            if (labelEl) labelEl.style.visibility = "hidden";
-            if (filtrationEl) filtrationEl.style.visibility = "hidden";
+            if (labelEl) labelEl.style.display = "none";
+            if (filtrationEl) filtrationEl.style.display = "none";
         }
 
-        if (torsion == null) {torsion = 0};
-        if (permanent) {
-            el.style.fill = TorsionColor[torsion];
-            el.style.stroke = "";
-        } else {
-            el.style.fill = "white";
-            el.style.stroke = TorsionColor[torsion];
-        }
     }
 
     display_diff(diff_from: string, diff_to: string, display: boolean, torsion: number | null = null) {
@@ -296,8 +325,7 @@ export class Chart {
             el.style.visibility = "hidden";
         }
 
-        if (torsion == null) {torsion = 0};
-        el.style.stroke = TorsionColor[torsion];
+        el.style.stroke = torsionColor(torsion ?? undefined);
     }
 
     display_mult(mult_from: string, mult_to: string, display: boolean) {
@@ -352,7 +380,7 @@ export class Chart {
 
     generate_dot(x: number, y: number, name: string, style: string = "") {
         const radius = this.get_dot_radius();
-        const label = /^(1|h_0)\[(\d+)\]$/.exec(this.generator_label(name));
+        const label = /^(1|h_0)\[(\d+)\]$/.exec(this.generatorsByName.get(name)?.alg_name ?? name);
         const square = label && Number(label[2]) % 2 === (label[1] === "1" ? 0 : 1);
         const shape = square
             ? `rect x="${x - radius}" y="${y - radius}" width="${2 * radius}" height="${2 * radius}"`
@@ -373,20 +401,28 @@ export class Chart {
         return `<line class="tau-mult-line" id="tau-mult-${from}-${to}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="${style}" onclick="window.chartInstance.handleTauMultClickEvent('${from}', '${to}')"/>`;
     }
 
-    generate_label(x: number, y: number, name: string) {
-        // Position the label to the left of the dot using SVG text
-        const labelX = x - 0.05; // Position to the left
-        const labelY = y; // Vertically centered with dot
-
-        return `<text class="generator-label" id="label-${name}" x="${labelX}" y="${labelY}" text-anchor="end" dominant-baseline="middle" onclick="window.chartInstance.handleDotClickEvent('${name}')">${escapeHtml(this.generator_label(name))}</text>`;
+    private generator_label_markup(name: string, label: string): string {
+        if (viewSettings.tagNotation === "adams") return renderAdamsTag(label);
+        const power = this.generator_tau_power(name);
+        const prefix = power ? `τ<sup>${power}</sup> ` : "";
+        return `<span>${prefix}${escapeHtml(this.generator_tag(name))}</span>`;
     }
 
-    generate_filtration_label(x: number, y: number, name: string, filtration: number) {
-        // Position the label to the right of the dot using SVG text
-        const labelX = x + 0.05; // Position to the right
-        const labelY = y; // Vertically centered with dot
+    generate_label(x: number, y: number, name: string, direction: -1 | 1, visible: boolean) {
+        const labelX = x + 0.05 * direction;
+        const width = 288;
+        const left = direction === -1;
+        const label = visible ? this.generator_label(name) : "";
+        const labelAttribute = visible ? `aria-label="${escapeHtml(label)}"` : 'style="display:none"';
+        const markup = visible ? this.generator_label_markup(name, label) : "";
+        // Lay out the math at normal CSS font sizes, then scale it into chart units.
+        return `<foreignObject class="generator-label" id="label-${name}" x="${left ? -width : 0}" y="-14" width="${width}" height="28" transform="translate(${labelX},${y}) scale(0.0033333333)" ${labelAttribute} onclick="window.chartInstance.handleDotClickEvent('${name}')"><div xmlns="http://www.w3.org/1999/xhtml" class="generator-label-content${left ? " align-left" : ""}">${markup}</div></foreignObject>`;
+    }
 
-        return `<text class="generator-filtration-label" id="filtration-${name}" x="${labelX}" y="${labelY}" text-anchor="start" dominant-baseline="middle" onclick="window.chartInstance.handleDotClickEvent('${name}')">${filtration}</text>`;
+    generate_filtration_label(x: number, y: number, name: string, filtration: number, tagDirection: -1 | 1) {
+        const labelX = x - 0.05 * tagDirection;
+        const anchor = tagDirection === -1 ? "start" : "end";
+        return `<text class="generator-filtration-label" id="filtration-${name}" x="${labelX}" y="${y}" text-anchor="${anchor}" dominant-baseline="middle" onclick="window.chartInstance.handleDotClickEvent('${name}')">${filtration}</text>`;
     }
 
     generate_stable_line(): string {
@@ -421,10 +457,6 @@ export class Chart {
         if (this.mode !== ChartMode.EHP) {
             return "";
         }
-        if (Chart.cachedInvalidCells) {
-            return Chart.cachedInvalidCells;
-        }
-
         // Use MAX_STEM + extra padding for bounds
         let maxX = this.maxStem + 3;
         let maxY = this.maxStem + 3;
@@ -450,17 +482,15 @@ export class Chart {
             }
         }
 
-        Chart.cachedInvalidCells = cells;
         return cells;
     }
 
-    init() {
-        let dots = this.init_dots();
+    init(visibleNames?: ReadonlySet<string>) {
+        let dots = this.init_dots(visibleNames);
         let lines = this.init_diffs();
         let mults = this.init_multiplications();
         let tauMults = this.init_tau_mults();
         let stableLine = this.generate_stable_line();
-        let invalidCells = this.generate_invalid_cells();
 
         // Use fixed bounds for predictable zoom/pan behavior.
         // ASS has much smaller y-range (Adams filtration), while EHP uses full stem range.
@@ -479,11 +509,9 @@ export class Chart {
             this.currentBounds[3] !== newBounds[3]) {
             this.svgchart.set_size(minx, maxx, miny, maxy);
             this.currentBounds = newBounds;
-        }
-
-        // Populate invalid cells group (for EHP mode)
-        if (this.mode === ChartMode.EHP && this.svgchart.invalidCells) {
-            this.svgchart.invalidCells.innerHTML = invalidCells;
+            if (this.svgchart.invalidCells) {
+                this.svgchart.invalidCells.innerHTML = this.generate_invalid_cells();
+            }
         }
 
         // Render in order: stable line (background), lines, mults, tau mults, dots (foreground)
@@ -508,7 +536,7 @@ export class Chart {
         // Cache dot, label, and filtration elements for each generator
         this.generators.forEach(gen => {
             const dotEl = shadowRoot.getElementById(`dot-${gen.name}`) as unknown as SVGCircleElement | SVGRectElement | null;
-            const labelEl = shadowRoot.getElementById(`label-${gen.name}`) as unknown as SVGTextElement | null;
+            const labelEl = shadowRoot.getElementById(`label-${gen.name}`) as unknown as SVGForeignObjectElement | null;
             const filtrationEl = shadowRoot.getElementById(`filtration-${gen.name}`) as unknown as SVGTextElement | null;
 
             if (dotEl) this.dotElements.set(gen.name, dotEl);
@@ -547,7 +575,7 @@ export class Chart {
         });
     }
 
-    init_dots(): string {
+    init_dots(visibleNames?: ReadonlySet<string>): string {
         this.name_to_location.clear();
 
         // Group ALL generators by their (x,y) coordinates
@@ -597,11 +625,12 @@ export class Chart {
                 this.name_to_location.set(gen.name, [x, y]);
 
                 dots += this.generate_dot(x, y, gen.name, "") + "\n";
+                const tagDirection = tagLabelDirection(gen.y);
                 if (this.showNames) {
-                    labels += this.generate_label(x, y, gen.name) + "\n";
+                    labels += this.generate_label(x, y, gen.name, tagDirection, visibleNames?.has(gen.name) ?? true) + "\n";
                 }
                 if (this.showFiltration) {
-                    filtrationLabels += this.generate_filtration_label(x, y, gen.name, gen.af) + "\n";
+                    filtrationLabels += this.generate_filtration_label(x, y, gen.name, gen.af, tagDirection) + "\n";
                 }
             });
         });

@@ -88,8 +88,10 @@ subscript, until the relevant manual stable assignments are supplied.
 `model/tagNames.ts` supplies display names in `alg_name` when either dataset
 loads. The original `name` and induced representatives remain Curtis identifiers
 for page computations, relations, family highlighting, and multiplication-table
-lookup. Labels, tooltips, product/proof text, clipboard names, and TikZ exports
-use algebraic names. A clicked class's details include its original Curtis tag.
+lookup. The tag dropdown switches labels, tooltips, product and proof text,
+clipboard names, and TikZ exports between Adams and Curtis notation. A class
+whose displayed Adams filtration differs from its original value has a τ
+prefix with exponent equal to the original filtration minus the displayed one.
 Angle notation is escaped as text in both SVG labels and the info panel; TikZ
 exports convert it to `\langle` and `\rangle`.
 

@@ -25,6 +25,7 @@ export const viewSettings = {
     /** Current page; `1000` is used throughout as a stand-in for E∞. */
     page: 1,
     category: Category.Synthetic,
+    tagNotation: "adams" as "adams" | "curtis",
     /** Top truncation (inclusive max `y`); `undefined` means "no top cutoff". */
     truncation: undefined as number | undefined,
     /** Bottom truncation (inclusive min `y`); `undefined` means "no bottom cutoff". */

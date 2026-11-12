@@ -24,12 +24,12 @@ export function setUseStableData(value: boolean) {
 let mainData: SyntheticEHP | null = null;
 let stableData: SyntheticEHP | null = null;
 let stableDataLoadPromise: Promise<void> | null = null;
+const generatorsByDataset = new WeakMap<SyntheticEHP, Map<string, Generators>>();
 
-/** Load the primary dataset and kick off (but don't await) the stable one. */
+/** Load the primary dataset. */
 export async function initializeData() {
     const mainModule = await import("../data.js");
     mainData = withAlgebraicNames(mainModule.data);
-    ensureStableDataLoading();
 }
 
 /**
@@ -70,5 +70,15 @@ export function getMainData(): SyntheticEHP | null {
 
 /** Look up a generator by name in the active dataset. */
 export function find(name: string): Generators | undefined {
-    return getActiveData()?.generators.find((g) => g.name === name);
+    const data = getActiveData();
+    if (!data) return undefined;
+    let generators = generatorsByDataset.get(data);
+    if (!generators) {
+        generators = new Map();
+        for (const generator of data.generators) {
+            if (!generators.has(generator.name)) generators.set(generator.name, generator);
+        }
+        generatorsByDataset.set(data, generators);
+    }
+    return generators.get(name);
 }

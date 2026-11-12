@@ -4,6 +4,7 @@ import { ChartMode } from "./chartMode";
 import { ASS_CHART_CSS, EHP_CHART_CSS } from "./chartStyles";
 
 export const svgNS = 'http://www.w3.org/2000/svg';
+const STARTING_ZOOM_FACTOR = 1.2;
 
 // Code originated from: https://github.com/SpectralSequences/sseq/
 // exact file at https://github.com/SpectralSequences/sseq/tree/master/svg-chart/chart.js
@@ -117,9 +118,13 @@ export class SvgChart extends HTMLElement {
         this.minY = Math.max(0, miny - SvgChart.GRID_MARGIN);
         this.maxY = this.mode === ChartMode.ASS ? maxy + 0.5 : maxy + SvgChart.GRID_MARGIN;
 
-        // Resize/re-anchor is handled centrally in onResize.
         this.updateAssBigGridOffset();
-        this.onResize();
+        // Changing chart coordinates leaves the measured viewport size intact.
+        if (this.svg.hasAttribute('viewBox')) {
+            this.applyZoomBounds(false);
+        } else {
+            this.onResize();
+        }
     }
 
     private updateAssBigGridOffset() {
@@ -390,14 +395,14 @@ this.svg.innerHTML =
         return zoomIdentity.translate(x, y).scale(k);
     }
 
-    private getDefaultAnchoredTransform(min_k: number) {
+    private getDefaultAnchoredTransform(scale: number) {
         // Left edge is fixed for both modes.
-        const x = -this.minX * min_k;
+        const x = -this.minX * scale;
         // EHP anchors at top; ASS anchors at bottom so extra space appears above.
         const y = this.mode === ChartMode.ASS
-            ? -this.maxY * min_k + this.height
-            : -this.minY * min_k;
-        return zoomIdentity.translate(x, y).scale(min_k);
+            ? -this.maxY * scale + this.height
+            : -this.minY * scale;
+        return zoomIdentity.translate(x, y).scale(scale);
     }
 
     /**
@@ -417,13 +422,9 @@ this.svg.innerHTML =
             return;
         }
 
+        const firstLayout = !this.svg.hasAttribute('viewBox');
         this.height = size.height - SvgChart.MARGIN;
         this.width = size.width - SvgChart.MARGIN;
-
-        const min_k = Math.min(
-            this.width / (this.maxX - this.minX),
-            this.height / (this.maxY - this.minY),
-        );
 
         if (this.mode === ChartMode.ASS) {
             // ASS reserves margin on the left and bottom (not top).
@@ -437,8 +438,6 @@ this.svg.innerHTML =
                 `${-SvgChart.MARGIN} ${-SvgChart.MARGIN} ${size.width} ${size.height}`,
             );
         }
-
-        this.zoom.constrain((transform: any) => this.constrainTransform(transform, min_k));
 
         // xBlock covers the top margin area (where x-axis labels go)
         this.xBlock.setAttribute('width', size.width.toString());
@@ -461,11 +460,21 @@ this.svg.innerHTML =
             this.bottomBorder.setAttribute('y2', this.height.toString());
         }
 
+        this.applyZoomBounds(firstLayout);
+    }
+
+    private applyZoomBounds(firstLayout: boolean) {
+        const min_k = Math.min(
+            this.width / (this.maxX - this.minX),
+            this.height / (this.maxY - this.minY),
+        );
+        this.zoom.constrain((transform: any) => this.constrainTransform(transform, min_k));
+
         // Reapply a valid constrained transform after resize.
         // ASS always refits to the bottom-left anchor; EHP preserves user location when possible.
         const currentTransform = zoomTransform(this.svg);
-        const targetTransform = this.mode === ChartMode.ASS
-            ? this.getDefaultAnchoredTransform(min_k)
+        const targetTransform = firstLayout || this.mode === ChartMode.ASS
+            ? this.getDefaultAnchoredTransform(min_k * STARTING_ZOOM_FACTOR)
             : this.constrainTransform(currentTransform, min_k);
         this.zoom.transform(this.select, this.constrainTransform(targetTransform, min_k));
     }

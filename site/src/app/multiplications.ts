@@ -5,7 +5,7 @@ import { formatMultiplicationResult, resolveDisplayMultiplications, DisplayMulti
 import { getMultiplicationTables } from "../model/multiplicationSource";
 import { MultiplicationOperator } from "../model/multiplicationTable";
 import { Category, viewSettings } from "../model/settings";
-import { algebraicMultiplicationTag, algebraicName } from "../model/tagNames";
+import { displayMultiplicationTag, displayName } from "../model/tagNames";
 
 const infoByChart = new WeakMap<Chart, DisplayMultiplicationInfo[]>();
 
@@ -45,7 +45,7 @@ export function updateMultiplicationOverlay(
         ...line,
         from: nodeNames?.get(line.from) ?? line.from,
         to: nodeNames?.get(line.to) ?? line.to,
-        displayTargets: line.targets.map(algebraicMultiplicationTag),
+        displayTargets: line.targets.map(displayMultiplicationTag),
     })));
 }
 
@@ -53,10 +53,10 @@ export function multiplicationInfoLines(chart: Chart, name: string): string[] {
     return (infoByChart.get(chart) ?? []).filter((entry) => entry.source === name
         && entry.result?.kind === "sum" && entry.result.targets.length > 0).map((entry) =>
         `h_${entry.operator}${entry.result ? ` (sphere ${entry.sphere})` : ""}: ${formatMultiplicationResult(entry.result)}`
-        + (entry.inheritedFrom ? `\n  Inherited from ${algebraicMultiplicationTag(entry.inheritedFrom.tag)} at sphere ${entry.inheritedFrom.sphere}` : "")
+        + (entry.inheritedFrom ? `\n  Inherited from ${displayMultiplicationTag(entry.inheritedFrom.tag)} at sphere ${entry.inheritedFrom.sphere}` : "")
         + (entry.tauExtensions ? `\n  Via τ extensions: ${entry.tauExtensions.map((relation) =>
-            `${algebraicName(relation.from)} → ${algebraicName(relation.to)}`).join(", ")}` : "")
-        + (entry.unresolved.length ? `\n  Undrawn terms: ${entry.unresolved.map(algebraicMultiplicationTag).join(", ")}` : "")
+            `${displayName(relation.from)} → ${displayName(relation.to)}`).join(", ")}` : "")
+        + (entry.unresolved.length ? `\n  Undrawn terms: ${entry.unresolved.map(displayMultiplicationTag).join(", ")}` : "")
     );
 }
 
@@ -65,10 +65,10 @@ function handleMultiplicationClick(chart: Chart, relation: DisplayMultiplication
         `From: ${chart.generator_label(relation.from)}`,
         `Line to: ${chart.generator_label(relation.to)}`,
         `Sphere: ${relation.sphere}`,
-        `Product: ${(relation.displayTargets ?? relation.targets.map(algebraicMultiplicationTag)).join(" + ")}`,
-        ...(relation.inheritedFrom ? [`Inherited from ${algebraicMultiplicationTag(relation.inheritedFrom.tag)} at sphere ${relation.inheritedFrom.sphere}`] : []),
+        `Product: ${(relation.displayTargets ?? relation.targets.map(displayMultiplicationTag)).join(" + ")}`,
+        ...(relation.inheritedFrom ? [`Inherited from ${displayMultiplicationTag(relation.inheritedFrom.tag)} at sphere ${relation.inheritedFrom.sphere}`] : []),
         ...(relation.tauExtensions ? [`Via τ extensions: ${relation.tauExtensions.map((extension) =>
-            `${algebraicName(extension.from)} → ${algebraicName(extension.to)}`).join(", ")}`] : []),
+            `${displayName(extension.from)} → ${displayName(extension.to)}`).join(", ")}`] : []),
         ...(relation.targets.length > 1 ? ["Each line is a term of this sum."] : []),
     ], ["Table relation displayed on the current page."]);
 }

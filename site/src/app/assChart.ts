@@ -6,7 +6,7 @@ import { get_induced_name, getSphereLifecycleInfo } from "../model/names";
 import { computePage } from "../model/spectralSequence";
 import { buildGeneratorInfoLines, showInfoPanel } from "../chart/infoPanel";
 import { multiplicationInfoLines, updateMultiplicationOverlay } from "./multiplications";
-import { algebraicName, algebraicText } from "../model/tagNames";
+import { algebraicName, displayName, displayText } from "../model/tagNames";
 
 type InferredAssDifferential = {
     sourceBase: string;
@@ -40,9 +40,9 @@ export function handleAssDotClick(dot: string) {
     if (!gen) return;
 
     // Copy generator name to clipboard
-    const displayName = assChart.generator_label(dot);
-    navigator.clipboard.writeText(displayName).then(() => {
-        console.log('Copied to clipboard:', displayName);
+    const label = assChart.generator_label(dot);
+    navigator.clipboard.writeText(label).then(() => {
+        console.log('Copied to clipboard:', label);
     }).catch(err => {
         console.error('Failed to copy to clipboard:', err);
     });
@@ -52,9 +52,9 @@ export function handleAssDotClick(dot: string) {
         xLabel: "x",
         yLabel: "y",
         moduleLabel: "Torsion",
-    }, algebraicName);
+    }, displayName, assChart.generator_row(dot));
 
-    showInfoPanel(`Generator: ${displayName}`, lines, multiplicationInfoLines(assChart, gen.name));
+    showInfoPanel("Generator", lines, multiplicationInfoLines(assChart, gen.name), label);
 }
 
 function applyAssSelectionHighlight() {
@@ -87,15 +87,15 @@ export function handleAssLineClick(from: string, to: string) {
     const extraLines: string[] = [];
     if (inferred.linked) {
         extraLines.push("Linked EHP differential:");
-        extraLines.push(`  ${algebraicName(inferred.linked.from)} -> ${algebraicName(inferred.linked.to)}`);
+        extraLines.push(`  ${displayName(inferred.linked.from)} -> ${displayName(inferred.linked.to)}`);
         if ("proof" in inferred.linked) {
-            extraLines.push(`  Proof: ${algebraicText(inferred.linked.proof ?? "")}`);
+            extraLines.push(`  Proof: ${displayText(inferred.linked.proof ?? "")}`);
         } else {
             extraLines.push("  AEHP differential");
         }
     }
     if (inferred.reason) {
-        extraLines.push(`Reason: ${algebraicText(inferred.reason)}`);
+        extraLines.push(`Reason: ${displayText(inferred.reason)}`);
     }
 
     showInfoPanel("ASS Differential", lines, extraLines);
@@ -138,6 +138,7 @@ export function update_ass_chart(
     // - Torsion classes: two black dots with a colored differential between them.
     const gens: Generators[] = [];
     const diffs: Differential[] = [];
+    const initialFiltrations = new Map<string, number>();
     Object.entries(syntheticClasses).forEach(([name, [torsion, filtration]]) => {
         if (!(torsion == undefined || torsion > 0)) {
             return;
@@ -147,16 +148,17 @@ export function update_ass_chart(
         if (!g) return;
         
         const algebraicSphere = truncation === undefined ? 0 : truncation - 1;
-        let algebraic_name = get_induced_name(g, algebraicSphere);
+        const representative = get_induced_name(g, algebraicSphere);
 
         if (torsion == undefined) {
+            initialFiltrations.set(g.name, g.af);
             gens.push({
                 name: g.name,
-                alg_name: algebraicName(algebraic_name),
+                alg_name: algebraicName(representative),
                 stem: g.stem,
                 y: filtration,
                 af: filtration,
-                induced_name: [[0, algebraic_name]],
+                induced_name: [[0, representative]],
                 born: g.born,
                 dies: g.dies,
             });
@@ -165,14 +167,17 @@ export function update_ass_chart(
             const sourceName = `${g.name}__ass_src`;
             const targetName = `${g.name}__ass_tgt`;
             const targetFiltration = filtration - (torsion + 1);
+            initialFiltrations.set(sourceName, g.af);
+            // The inferred target already has the Bockstein's filtration offset.
+            initialFiltrations.set(targetName, g.af - (torsion + 1));
     
             gens.push({
                 name: sourceName,
-                alg_name: algebraicName(algebraic_name),
+                alg_name: algebraicName(representative),
                 stem: g.stem,
                 y: filtration,
                 af: filtration,
-                induced_name: [[0, algebraic_name]],
+                induced_name: [[0, representative]],
                 born: g.born,
                 dies: g.dies,
             });
@@ -212,7 +217,10 @@ export function update_ass_chart(
 
     // ASS dots are always black in this presentation.
     gens.forEach((gen) => {
-        assChart.display_dot(gen.name, true, true, 0, gen.af);
+        assChart.display_dot(gen.name, true, {
+            filtration: gen.af,
+            initialFiltration: initialFiltrations.get(gen.name),
+        });
     });
 
     // Differential color encodes the torsion exponent.

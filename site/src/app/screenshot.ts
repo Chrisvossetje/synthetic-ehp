@@ -1,17 +1,16 @@
-import { Chart, h0MultiplicationControls, MULTIPLICATION_COLOR } from "../chart/chart";
+import { Chart, h0MultiplicationControls, MULTIPLICATION_COLOR, tagLabelDirection } from "../chart/chart";
 import { ehpChart } from "./charts";
 import { getComputedDiffCoeff, getDisplayedGenerator } from "./ehpChart";
 import { isUsingStableData } from "../model/dataSource";
 import { shouldIncludeKind, viewSettings } from "../model/settings";
-import { algebraicName } from "../model/tagNames";
 
 /**
  * Screenshot / TikZ export.
  *
  * Lets the user drag-select a rectangular region of the EHP chart and copies a
  * standalone TikZ `figure` reproducing that region to the clipboard. It reads
- * the *displayed* state of each element (visibility, fill, page-filtered
- * torsion/AF) so the exported figure matches exactly what is on screen.
+ * the displayed visibility, dot colors, and Adams filtration so the exported
+ * figure matches the chart.
  */
 
 // Screenshot state
@@ -35,6 +34,13 @@ function getTikzColor(torsion: number | undefined): string {
     if (torsion === 2) return "red";
     if (torsion === 3) return "green";
     return "black";
+}
+
+function getTikzDotColor(cssColor: string): string {
+    const rgb = cssColor.startsWith("#")
+        ? [1, 3, 5].map((offset) => parseInt(cssColor.slice(offset, offset + 2), 16))
+        : /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(cssColor)?.slice(1);
+    return rgb ? `{rgb,255:red,${rgb[0]};green,${rgb[1]};blue,${rgb[2]}}` : cssColor;
 }
 
 /**
@@ -315,49 +321,38 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
 
     // Draw generators (dots)
     const generators = chart.generators.filter(g =>
-        g.stem >= xMin && g.stem <= xMax && g.y >= yMin && g.y <= yMax &&
-        getVisibleDotElement(chart, g.name)
+        g.stem >= xMin && g.stem <= xMax && g.y >= yMin && g.y <= yMax
     );
 
     for (const gen of generators) {
         const location = chart.name_to_location.get(gen.name);
-        if (!location) continue;
+        const dotElement = getVisibleDotElement(chart, gen.name);
+        if (!location || !dotElement) continue;
 
         const [cx, cy] = location;
         const cyFlip = flipY(cy);
-        // Use the page-filtered torsion/filtration as currently displayed on the
-        // chart, not the static generator data, so higher pages render correct
-        // colors and AF values. Fall back to the static data if unavailable.
-        const displayed = getDisplayedGenerator(gen.name);
-        const torsion = displayed ? displayed[0] : gen.torsion;
-        const af = displayed ? displayed[1] : gen.af;
-        const color = getTikzColor(torsion);
-        const radius = 0.022; // Match SVG radius of 0.022 in chart units
+        const af = getDisplayedGenerator(gen.name)?.[1] ?? gen.af;
+        const border = getTikzDotColor(dotElement.style.stroke);
+        const fill = getTikzDotColor(dotElement.style.fill);
+        const radius = chart.get_dot_radius();
 
-        // Check if the dot is filled (permanent) by looking at the actual SVG element
-        const dotElement = getVisibleDotElement(chart, gen.name);
-        const isFilled = dotElement && dotElement.style.fill && dotElement.style.fill !== 'white' && dotElement.style.fill !== '';
-        const shape = dotElement?.localName === "rect"
+        const shape = dotElement.localName === "rect"
             ? `(${roundCoord(cx - radius)},${roundCoord(cyFlip - radius)}) rectangle (${roundCoord(cx + radius)},${roundCoord(cyFlip + radius)})`
             : `(${roundCoord(cx)},${roundCoord(cyFlip)}) circle (${radius})`;
 
-        if (isFilled) {
-            // Permanent cycle - filled dot
-            tikz += `\\fill[${color}] ${shape};\n`;
-        } else {
-            // Non-permanent cycle - hollow dot with colored border
-            tikz += `\\fill[white] ${shape};\n`;
-            tikz += `\\draw[${color},line width=0.4] ${shape};\n`;
-        }
+        tikz += `\\filldraw[draw=${border},fill=${fill},line width=0.4pt] ${shape};\n`;
 
-        // Add generator name label (to the left of the dot, very small)
-        const latexName = formatNameForLatex(gen.alg_name ?? algebraicName(gen.name));
+        const tagDirection = tagLabelDirection(gen.y);
+        const tagAnchor = tagDirection === -1 ? "east" : "west";
+        const afAnchor = tagDirection === -1 ? "west" : "east";
+        const power = chart.generator_tau_power(gen.name);
+        const tag = formatNameForLatex(chart.generator_tag(gen.name));
+        const latexName = (power ? `\\tau^{${power}}\\,` : "") + tag;
         if (latexName && latexName.length > 0) {
-            tikz += `\\node[anchor=east,scale=0.15,inner sep=0pt] at (${roundCoord(cx - 0.04)},${roundCoord(cyFlip)}) {$${latexName}$};\n`;
+            tikz += `\\node[anchor=${tagAnchor},scale=0.15,inner sep=0pt] at (${roundCoord(cx + 0.04 * tagDirection)},${roundCoord(cyFlip)}) {$${latexName}$};\n`;
         }
 
-        // Add adams filtration (to the right of the dot, very small)
-        tikz += `\\node[anchor=west,scale=0.15,gray,inner sep=0pt] at (${roundCoord(cx + 0.04)},${roundCoord(cyFlip)}) {${af}};\n`;
+        tikz += `\\node[anchor=${afAnchor},scale=0.15,gray,inner sep=0pt] at (${roundCoord(cx - 0.04 * tagDirection)},${roundCoord(cyFlip)}) {${af}};\n`;
     }
 
     tikz += "\\end{scope}\n";

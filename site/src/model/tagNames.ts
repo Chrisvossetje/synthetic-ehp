@@ -1,5 +1,6 @@
 import { STABLE_TAG_TRANSLATIONS, TAG_TRANSLATIONS } from "../tag_translation";
 import type { SyntheticEHP } from "../types";
+import { viewSettings } from "./settings";
 
 type TagTranslations = Readonly<Record<string, string>>;
 let activeTranslations: TagTranslations = TAG_TRANSLATIONS;
@@ -33,6 +34,12 @@ export function algebraicName(name: string): string {
     return translateName(name, activeTranslations);
 }
 
+export function displayName(name: string, translated?: string): string {
+    return viewSettings.tagNotation === "curtis"
+        ? name.replace(/__ass_(src|tgt)$/, "")
+        : translated ?? algebraicName(name);
+}
+
 function translateName(name: string, translations: TagTranslations): string {
     const base = name.replace(/__ass_(src|tgt)$/, "");
     const match = /^(.*?)\[(\d+)\]$/.exec(base);
@@ -40,18 +47,19 @@ function translateName(name: string, translations: TagTranslations): string {
 }
 
 /** Multiplication tables put the sphere first: #(7 5 3) means 5 3[7]. */
-export function algebraicMultiplicationTag(tag: string): string {
+export function displayMultiplicationTag(tag: string): string {
     const normalized = tag.replace(/^#\(|\)$/g, "").trim();
     const [sphere, ...indices] = normalized.split(/\s+/);
-    return algebraicName(`${indices.join(" ")}[${sphere}]`);
+    return displayName(`${indices.join(" ")}[${sphere}]`);
 }
 
-/** Translate names embedded in a raw proof, without interpreting it as HTML. */
-export function algebraicText(text: string): string {
+/** Format names embedded in a raw proof, without interpreting it as HTML. */
+export function displayText(text: string): string {
+    if (viewSettings.tagNotation === "curtis") return text;
     return text.replace(
         /#\((\d+(?:\s+\d+)*)\)|(^|[\s("'=,:;+>−-])((?:\d+(?:[ \t]+\d+)*)?\[\d+\])/g,
         (_match, tableTag: string | undefined, prefix: string, name: string) =>
-            tableTag !== undefined ? algebraicMultiplicationTag(tableTag) : prefix + algebraicName(name)
+            tableTag !== undefined ? displayMultiplicationTag(tableTag) : prefix + algebraicName(name)
     );
 }
 

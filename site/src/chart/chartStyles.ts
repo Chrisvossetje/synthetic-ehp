@@ -1,4 +1,35 @@
+const GENERATOR_LABEL_CSS = `
+.generator-label {
+    pointer-events: none;
+    overflow: visible;
+}
+
+.generator-label-content {
+    content-visibility: auto;
+    display: flex;
+    align-items: center;
+    height: 100%;
+    color: black;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.generator-label-content.align-left {
+    justify-content: flex-end;
+}
+
+.generator-label-content > * {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.generator-label-content > span {
+    font-family: monospace;
+}
+`;
+
 export const EHP_CHART_CSS = `
+${GENERATOR_LABEL_CSS}
 :host { display: block; }
 .struct { stroke: black; fill: none; stroke-width: 0.03; }
 
@@ -11,7 +42,7 @@ export const EHP_CHART_CSS = `
 
 .generator-dot:hover {
     fill: #555;
-    r: 0.03;
+    r: 0.027;
     filter: drop-shadow(0 0 0.08 rgba(0,0,0,0.4));
 }
 
@@ -35,15 +66,6 @@ export const EHP_CHART_CSS = `
 
 .differential-line:active {
     stroke: #777 !important;
-}
-
-/* Generator label styles */
-.generator-label {
-    pointer-events: auto;
-    cursor: pointer;
-    font-size: 0.04px;
-    fill: #000;
-    font-family: monospace;
 }
 
 /* Filtration label styles */
@@ -92,6 +114,7 @@ export const EHP_CHART_CSS = `
 `;
 
 export const ASS_CHART_CSS = `
+${GENERATOR_LABEL_CSS}
 :host { display: block; }
 .struct { stroke: black; fill: none; stroke-width: 0.04; }
 
@@ -104,7 +127,7 @@ export const ASS_CHART_CSS = `
 
 .generator-dot:hover {
     fill: #555;
-    r: 0.085;
+    r: 0.077;
     filter: drop-shadow(0 0 0.1 rgba(0,0,0,0.4));
 }
 
@@ -128,16 +151,6 @@ export const ASS_CHART_CSS = `
 
 .differential-line:active {
     stroke: #777 !important;
-}
-
-/* Generator label styles - LARGER */
-.generator-label {
-    pointer-events: auto;
-    cursor: pointer;
-    font-size: 0.06px;
-    fill: #000;
-    font-family: monospace;
-    font-weight: bold;
 }
 
 /* Filtration label styles - LARGER */

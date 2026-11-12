@@ -1,4 +1,6 @@
 import { Generators } from "../types";
+import { viewSettings } from "../model/settings";
+import { renderAdamsTag } from "./tagMath";
 import { escapeHtml } from "./text";
 
 type SphereInfo = {
@@ -26,20 +28,17 @@ export function buildGeneratorInfoLines(
     gen: Generators,
     sphereInfo: SphereInfo,
     labels: Partial<GeneratorLabels> = {},
-    formatName: (name: string) => string = (name) => name
+    formatName: (name: string) => string = (name) => name,
+    filtration = gen.af
 ): string[] {
     const resolved = { ...defaultLabels, ...labels };
     const lines: string[] = [];
 
-    lines.push(`Curtis tag: ${gen.name}`);
     lines.push(`${resolved.xLabel}: ${gen.stem}`);
     lines.push(`${resolved.yLabel}: ${gen.y}`);
-    lines.push(`Adams filtration: ${gen.af}`);
+    lines.push(`Adams filtration: ${filtration}`);
     lines.push(`${resolved.moduleLabel}: ${formatTorsion(gen)}`);
 
-    if (gen.alg_name) {
-        lines.push(`Algebraic name: ${gen.alg_name}`);
-    }
     if (gen.hom_name) {
         lines.push(`Homotopy name: ${gen.hom_name}`);
     }
@@ -58,12 +57,15 @@ export function buildGeneratorInfoLines(
     return lines;
 }
 
-export function showInfoPanel(title: string, lines: string[], extraLines: string[] = []) {
+export function showInfoPanel(title: string, lines: string[], extraLines: string[] = [], tag?: string) {
     const floatingBox = document.getElementById('floatingBox');
     if (!floatingBox) return;
 
     let content = `<span class="close-btn" onclick="document.getElementById('floatingBox').style.display='none'">x</span>`;
-    content += `<h4>${escapeHtml(title)}</h4>`;
+    const tagMarkup = tag === undefined ? "" : ": " + (
+        viewSettings.tagNotation === "adams" ? renderAdamsTag(tag) : escapeHtml(tag)
+    );
+    content += `<h4>${escapeHtml(title)}${tagMarkup}</h4>`;
     content += `<pre style="background-color: #00000000; margin: 0;">`;
     content += escapeHtml(lines.join("\n"));
 

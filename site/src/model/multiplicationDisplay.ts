@@ -1,7 +1,7 @@
 import type { DisplayMultiplication, ExternalTauMult, Generators, InternalTauMult } from "../types";
 import type { MultiplicationTables } from "./multiplicationSource";
-import { lookupMultiplication, MultiplicationOperator, MultiplicationResult, MultiplicationTable, normalizeMultiplicationTag } from "./multiplicationTable";
-import { algebraicMultiplicationTag } from "./tagNames";
+import { lookupMultiplicationCheckpoint, MultiplicationOperator, MultiplicationResult, MultiplicationTable, normalizeMultiplicationTag } from "./multiplicationTable";
+import { displayMultiplicationTag } from "./tagNames";
 
 export interface DisplayMultiplicationInfo {
     source: string;
@@ -23,12 +23,21 @@ export function multiplicationTag(gen: Generators, sphere: number): string | und
             latestSphere = fromSphere;
         }
     }
+    return tagFromName(name);
+}
+
+const tagsByName = new Map<string, string | undefined>();
+
+function tagFromName(name: string): string | undefined {
+    if (tagsByName.has(name)) return tagsByName.get(name);
     const match = /^(.*?)\[(\d+)\]$/.exec(name);
-    if (!match) return undefined;
-    // The exporter also includes formal infinity classes such as
-    // "1(∞)[2]"; these are not Curtis representatives in the tables.
-    if (match[1].trim() && !/^\d+(?:\s+\d+)*$/.test(match[1].trim())) return undefined;
-    return normalizeMultiplicationTag(`${match[2]} ${match[1]}`);
+    // Formal infinity classes such as "1(∞)[2]" have no Curtis representative.
+    const word = match?.[1].trim();
+    const tag = match && (!word || /^\d+(?:\s+\d+)*$/.test(word))
+        ? normalizeMultiplicationTag(`${match[2]} ${word}`)
+        : undefined;
+    tagsByName.set(name, tag);
+    return tag;
 }
 
 function resultKey(result: MultiplicationResult | undefined): string {
@@ -40,19 +49,23 @@ function firstTableSphere(table: MultiplicationTable, tag: string, result: Multi
 }
 
 /** Query at a sphere; the file's coverage limit is only an internal lookup bound. */
-function productAtSphere(table: MultiplicationTable, source: Generators, sphere: number): {
+function productAtSphere(table: MultiplicationTable, tag: string | undefined, sphere: number): {
     result: MultiplicationResult | undefined;
     inheritedFrom?: { tag: string; sphere: number };
 } {
-    const tag = multiplicationTag(source, sphere);
-    const result = tag === undefined ? undefined : lookupMultiplication(table, tag, sphere);
-    if (tag !== undefined && sphere <= table.maxSphere && !table.checkpoints.has(tag)) {
+    if (tag === undefined) return { result: undefined };
+    if (!Number.isSafeInteger(sphere) || sphere < 0) {
+        throw new Error("Lookup sphere must be a nonnegative safe integer");
+    }
+    if (sphere > table.maxSphere) return { result: undefined };
+    const entries = table.checkpoints.get(tag);
+    if (!entries) {
         // Missing full tags inherit stable tail products, keeping outer indices.
         // Explicit zero/unknown entries and uncovered checkpoints always win.
         const tokens = tag.split(" ");
         for (let start = 1; start < tokens.length; start++) {
             const tail = tokens.slice(start).join(" ");
-            const stable = lookupMultiplication(table, tail, table.maxSphere);
+            const stable = lookupMultiplicationCheckpoint(table.checkpoints.get(tail), table.maxSphere);
             if (stable?.kind !== "sum") continue;
             const prefix = tokens.slice(0, start).join(" ");
             return {
@@ -61,7 +74,7 @@ function productAtSphere(table: MultiplicationTable, source: Generators, sphere:
             };
         }
     }
-    return { result };
+    return { result: lookupMultiplicationCheckpoint(entries, sphere) };
 }
 
 /** Earliest support for this product with the current endpoint representatives. */
@@ -71,12 +84,15 @@ function firstSupportingSphere(
 ): number {
     if (!result) return querySphere;
     const sourceTag = multiplicationTag(source, querySphere);
+    const entries = sourceTag === undefined ? undefined : table.checkpoints.get(sourceTag);
+    const expected = resultKey(result);
     const targetTags = targets.map((target) => multiplicationTag(target, querySphere));
     const lowerBound = Math.max(1, source.born, ...targets.map((target) => target.born));
     for (let sphere = lowerBound; sphere <= Math.min(querySphere, table.maxSphere); sphere++) {
         if (multiplicationTag(source, sphere) !== sourceTag) continue;
         if (targets.some((target, index) => multiplicationTag(target, sphere) !== targetTags[index])) continue;
-        if (resultKey(productAtSphere(table, source, sphere).result) === resultKey(result)) return sphere;
+        // An inherited product is constant while the source tag is unchanged.
+        if (!entries || resultKey(lookupMultiplicationCheckpoint(entries, sphere)) === expected) return sphere;
     }
     return querySphere;
 }
@@ -160,7 +176,7 @@ export function resolveDisplayMultiplications(
                 index.set(effectiveTag, candidates);
                 // Original names are a fallback only: an old name can now be
                 // the current representative of a different visible class.
-                const originalTag = multiplicationTag({ ...gen, induced_name: [] }, n);
+                const originalTag = tagFromName(gen.name);
                 if (originalTag !== undefined) {
                     const names = aliases.get(originalTag) ?? new Set<string>();
                     names.add(effectiveTag);
@@ -185,8 +201,7 @@ export function resolveDisplayMultiplications(
                     || (survivors.has(source.name) && survivors.has(gen.name)));
             // A later zero or changed representative does not remove the
             // multiplication on the original row while its dots remain alive.
-            const original = { ...source, induced_name: [] };
-            const originalTag = multiplicationTag(original, n);
+            const originalTag = tagFromName(source.name);
             const checkpoints = originalTag === undefined ? undefined : table.checkpoints.get(originalTag);
             const rowProducts: {
                 sphere: number;
@@ -194,7 +209,7 @@ export function resolveDisplayMultiplications(
                 inheritedFrom?: { tag: string; sphere: number };
             }[] = checkpoints
                 ? checkpoints.filter((entry) => entry.sphere <= n)
-                : [{ sphere: n, ...productAtSphere(table, original, n) }];
+                : [{ sphere: n, ...productAtSphere(table, originalTag, n) }];
             for (const rowProduct of rowProducts) {
                 const { result } = rowProduct;
                 if (result?.kind !== "sum") continue;
@@ -229,7 +244,7 @@ export function resolveDisplayMultiplications(
                 if (!targets.length) continue;
                 const support = checkpoints
                     ? Math.max(rowProduct.sphere, source.born, ...targets.map((target) => target.born))
-                    : firstSupportingSphere(table, original, n, result, targets);
+                    : firstSupportingSphere(table, { ...source, induced_name: [] }, n, result, targets);
                 const inheritedFrom = rowProduct.inheritedFrom;
                 const proofRelations: TauMult[] = [];
                 for (const path of proofs.values()) proofRelations.push(...path);
@@ -262,12 +277,15 @@ export function resolveDisplayMultiplications(
                         sphere: support, targets });
                 }
             }
-            const product = productAtSphere(table, source, n);
+            const product = productAtSphere(table, multiplicationTag(source, n), n);
             const { result } = product;
             const entry: DisplayMultiplicationInfo = { source: source.name, operator,
-                sphere: firstSupportingSphere(table, source, n, result, []), ...product, unresolved: [] };
+                sphere: n, ...product, unresolved: [] };
             info.push(entry);
-            if (result?.kind !== "sum") continue;
+            if (result?.kind !== "sum") {
+                entry.sphere = firstSupportingSphere(table, source, n, result, []);
+                continue;
+            }
             const targets: Generators[] = [];
             for (const targetTag of result.targets) {
                 const index = indexAt(n);
@@ -311,5 +329,5 @@ export function formatMultiplicationResult(result: MultiplicationResult | undefi
     if (!result) return "no data";
     if (result.kind === "zero") return "0";
     if (result.kind === "unknown") return "?";
-    return result.targets.map(algebraicMultiplicationTag).join(" + ");
+    return result.targets.map(displayMultiplicationTag).join(" + ");
 }
