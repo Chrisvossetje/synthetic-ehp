@@ -18,9 +18,9 @@ import { displayName, displayText } from "../model/tagNames";
  * only decides what to *show* given the result.
  */
 
-// Differentials as computed at E∞ for the current view, keyed `from->to`.
-// Used by the line-click handler and the screenshot exporter.
-let computedDiffsByKey: Map<string, Differential> = new Map();
+// Resolved differentials for the line-click handler, keyed `from->to`.
+const computedDiffsByKey = new Map<string, Differential>();
+let differentialCoefficients: ReadonlyMap<Differential, number> = new Map();
 // The page-filtered [torsion, filtration] of every class currently drawn.
 let currentFilteredGenerators: Record<string, TorsionFiltration> = {};
 let chartData: SyntheticEHP | null = null;
@@ -56,19 +56,6 @@ function shouldDisplayTauMult(
 
 export function getComputedDiff(from: string, to: string): Differential | undefined {
     return computedDiffsByKey.get(`${from}->${to}`);
-}
-
-/**
- * The τ-coefficient of a differential as displayed: the gap in Adams filtration
- * between its endpoints. Returns undefined if either endpoint is not drawn.
- */
-export function getComputedDiffCoeff(from: string, to: string): number | undefined {
-    const fromEntry = currentFilteredGenerators[from];
-    const toEntry = currentFilteredGenerators[to];
-    if (!fromEntry || !toEntry) {
-        return undefined;
-    }
-    return toEntry[1] - fromEntry[1] - 1;
 }
 
 /**
@@ -144,7 +131,7 @@ export function handleLineClick(from: string, to: string) {
 
     if (!rawDiff && !computedDiff) return;
 
-    const coeff = getComputedDiffCoeff(from, to) ?? rawDiff?.coeff ?? 0;
+    const coeff = rawDiff ? differentialCoefficients.get(rawDiff) ?? 0 : 0;
     const page = rawDiff?.d ?? computedDiff?.d ?? 0;
 
     const lines = [
@@ -246,6 +233,7 @@ export function update_ehp_chart() {
     const permView = query.page === 1000 ? currentView : computePage(activeData, { ...query, page: 1000 });
     const perm_classes = permView.generators;
     cacheComputedDiffs(permView.differentials);
+    differentialCoefficients = currentView.differentialCoefficients;
 
     const real_diffs = activeData.differentials.filter((d) => {
         if (!shouldIncludeKind(d.kind)) {
@@ -278,14 +266,10 @@ export function update_ehp_chart() {
     });
 
     real_diffs.forEach((d) => {
-        let torsion = getComputedDiffCoeff(d.from, d.to);
-        if (viewSettings.category != Category.Synthetic) {
-            torsion = 0;
-        }
         if (viewSettings.category === Category.Algebraic && d.kind !== "Algebraic") {
             return;
         }
-        ehpChart.display_diff(d.from, d.to, true, torsion);
+        ehpChart.display_diff(d.from, d.to, true, differentialCoefficients.get(d));
     });
 
     // Multiplications: only when both endpoints are alive.

@@ -1,6 +1,6 @@
 import { Chart, h0MultiplicationControls, MULTIPLICATION_COLOR, tagLabelDirection } from "../chart/chart";
 import { ehpChart } from "./charts";
-import { getComputedDiffCoeff, getDisplayedGenerator } from "./ehpChart";
+import { getDisplayedGenerator } from "./ehpChart";
 import { isUsingStableData } from "../model/dataSource";
 import { shouldIncludeKind, viewSettings } from "../model/settings";
 
@@ -25,18 +25,7 @@ function roundCoord(x: number): string {
     return (Math.round(x * 1000) / 1000).toString();
 }
 
-/**
- * Convert torsion/color to TikZ color
- */
-function getTikzColor(torsion: number | undefined): string {
-    if (torsion === undefined || torsion === 0) return "black";
-    if (torsion === 1) return "blue";
-    if (torsion === 2) return "red";
-    if (torsion === 3) return "green";
-    return "black";
-}
-
-function getTikzDotColor(cssColor: string): string {
+function getTikzColor(cssColor: string): string {
     const rgb = cssColor.startsWith("#")
         ? [1, 3, 5].map((offset) => parseInt(cssColor.slice(offset, offset + 2), 16))
         : /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(cssColor)?.slice(1);
@@ -251,32 +240,20 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
     tikz += `\\draw[color={rgb,255:red,255;green,107;blue,0},line width=0.4pt,dash pattern=on 2pt off 1pt] ${stablePath};\n`;
 
     // Draw differentials first (so they're behind dots)
-    const differentials = chart.differentials.filter(d => {
-        if (!shouldIncludeKind(d.kind)) {
-            return false;
-        }
-        if (!getVisibleDiffElement(chart, d.from, d.to)) {
-            return false;
-        }
-
-        const fromLoc = chart.name_to_location.get(d.from);
-        const toLoc = chart.name_to_location.get(d.to);
-        if (!fromLoc || !toLoc) return false;
-
-        return isPointInSelectedRegion(fromLoc) || isPointInSelectedRegion(toLoc);
-    });
-
-    for (const diff of differentials) {
+    for (const diff of chart.differentials) {
+        if (!shouldIncludeKind(diff.kind)) continue;
+        const line = getVisibleDiffElement(chart, diff.from, diff.to);
+        if (!line) continue;
         const fromLoc = chart.name_to_location.get(diff.from);
         const toLoc = chart.name_to_location.get(diff.to);
         if (!fromLoc || !toLoc) continue;
+        if (!isPointInSelectedRegion(fromLoc) && !isPointInSelectedRegion(toLoc)) continue;
 
-        const computedCoeff = getComputedDiffCoeff(diff.from, diff.to);
-        const color = getTikzColor(computedCoeff ?? diff.coeff);
+        const color = getTikzColor(line.style.stroke);
         const lineStyle = (diff.kind === "Algebraic" || diff.kind === "Real") ?  "": ",dotted";
         const fromYFlip = flipY(fromLoc[1]);
         const toYFlip = flipY(toLoc[1]);
-        tikz += `\\draw[${color},line width=0.4pt${lineStyle}] (${roundCoord(fromLoc[0])},${roundCoord(fromYFlip)}) -- (${roundCoord(toLoc[0])},${roundCoord(toYFlip)});\n`;
+        tikz += `\\draw[color=${color},line width=0.4pt${lineStyle}] (${roundCoord(fromLoc[0])},${roundCoord(fromYFlip)}) -- (${roundCoord(toLoc[0])},${roundCoord(toYFlip)});\n`;
     }
 
     // Draw tau extensions with the same visibility/page/fake filtering as the chart.
@@ -332,8 +309,8 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
         const [cx, cy] = location;
         const cyFlip = flipY(cy);
         const af = getDisplayedGenerator(gen.name)?.[1] ?? gen.af;
-        const border = getTikzDotColor(dotElement.style.stroke);
-        const fill = getTikzDotColor(dotElement.style.fill);
+        const border = getTikzColor(dotElement.style.stroke);
+        const fill = getTikzColor(dotElement.style.fill);
         const radius = chart.get_dot_radius();
 
         const shape = dotElement.localName === "rect"

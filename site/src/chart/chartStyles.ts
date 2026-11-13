@@ -55,17 +55,12 @@ ${GENERATOR_LABEL_CSS}
     stroke: #555;
     stroke-width: 0.008;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: stroke-width 0.15s ease, filter 0.15s ease;
 }
 
 .differential-line:hover {
-    stroke: #666 !important;
     stroke-width: 0.016 !important;
     filter: drop-shadow(0 0 0.08 rgba(0,0,0,0.4));
-}
-
-.differential-line:active {
-    stroke: #777 !important;
 }
 
 /* Filtration label styles */
@@ -140,17 +135,12 @@ ${GENERATOR_LABEL_CSS}
     stroke: #555;
     stroke-width: 0.014;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: stroke-width 0.15s ease, filter 0.15s ease;
 }
 
 .differential-line:hover {
-    stroke: #666 !important;
     stroke-width: 0.028 !important;
     filter: drop-shadow(0 0 0.1 rgba(0,0,0,0.4));
-}
-
-.differential-line:active {
-    stroke: #777 !important;
 }
 
 /* Filtration label styles - LARGER */

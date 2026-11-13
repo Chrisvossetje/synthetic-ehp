@@ -52,6 +52,8 @@ export interface PageQuery {
 export interface PageView {
     generators: Record<string, TorsionFiltration>;
     differentials: Differential[];
+    /** Synthetic τ-exponents on the acting pages, keyed by the original differential. */
+    differentialCoefficients: ReadonlyMap<Differential, number>;
 }
 
 type GeneratorState = {
@@ -70,6 +72,7 @@ type SyntheticTimeline = {
     generatorNames: string[];
     pagesByGenerator: Record<string, GeneratorPageState[]>;
     allDiffs: Differential[];
+    differentialCoefficients: ReadonlyMap<Differential, number>;
 };
 
 // ---------------------------------------------------------------------------
@@ -284,6 +287,7 @@ function buildSyntheticTimeline(
     });
 
     const allDiffs: Differential[] = [];
+    const differentialCoefficients = new Map<Differential, number>();
 
     // Walk the pages in order, applying τ-multiplications then differentials.
     for (let p = 0; p <= MAX_STEM; p++) {
@@ -303,6 +307,12 @@ function buildSyntheticTimeline(
             const fromState = currentState[diff.from];
             const toState = currentState[diff.to];
             if (!fromState || !toState) continue;
+
+            // Read E_p after its τ-multiplications and before any d_p updates take effect.
+            // Also color displayed candidates that do not update the timeline.
+            const fromAF = getStateAtPage(pagesByGenerator[diff.from], p).af;
+            const toAF = getStateAtPage(pagesByGenerator[diff.to], p).af;
+            differentialCoefficients.set(diff, toAF - fromAF - 1);
 
             const mapped = mapBetweenGenerators(fromState, toState);
             if (!mapped) continue;
@@ -334,7 +344,7 @@ function buildSyntheticTimeline(
         }
     }
 
-    return { generatorNames, pagesByGenerator, allDiffs };
+    return { generatorNames, pagesByGenerator, allDiffs, differentialCoefficients };
 }
 
 /**
@@ -379,7 +389,7 @@ function computeSyntheticPage(data: SyntheticEHP, query: PageQuery): PageView {
     });
 
     const differentials = timeline.allDiffs.filter((d) => d.d !== undefined && d.d < query.page);
-    return { generators, differentials };
+    return { generators, differentials, differentialCoefficients: timeline.differentialCoefficients };
 }
 
 // ---------------------------------------------------------------------------
@@ -446,7 +456,7 @@ function computeClassicalPage(data: SyntheticEHP, query: PageQuery): PageView {
         }
     }
 
-    return { generators, differentials };
+    return { generators, differentials, differentialCoefficients: new Map() };
 }
 
 // ---------------------------------------------------------------------------

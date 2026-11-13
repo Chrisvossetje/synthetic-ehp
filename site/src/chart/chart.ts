@@ -313,19 +313,18 @@ export class Chart {
 
     }
 
-    display_diff(diff_from: string, diff_to: string, display: boolean, torsion: number | null = null) {
+    display_diff(diff_from: string, diff_to: string, display: boolean, coeff?: number) {
         const key = `${diff_from}-${diff_to}`;
         const el = this.diffElements.get(key);
 
         if (!el) return;
 
         if (display) {
+            el.style.stroke = torsionColor(coeff);
             el.style.visibility = "";
         } else {
             el.style.visibility = "hidden";
         }
-
-        el.style.stroke = torsionColor(torsion ?? undefined);
     }
 
     display_mult(mult_from: string, mult_to: string, display: boolean) {
