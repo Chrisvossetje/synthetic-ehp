@@ -36,6 +36,28 @@ function getAllTauMults(data: SyntheticEHP) {
     return [...data.internal_tau_mults, ...data.external_tau_mults];
 }
 
+/** Keep the earliest eligible hit per target, even when showing future pages. */
+function geometricDifferentials(diffs: Differential[], page: number, allDiffs: boolean): Differential[] {
+    const incoming = new Map<string, { diff: Differential; page: number }>();
+    for (const diff of diffs) {
+        let diffPage = diff.d;
+        if (diffPage === undefined) {
+            const from = find(diff.from);
+            const to = find(diff.to);
+            if (!from || !to) continue;
+            diffPage = from.y - to.y;
+        }
+        if (diffPage < page || (!allDiffs && diffPage !== page)) continue;
+
+        const current = incoming.get(diff.to);
+        if (!current || diffPage < current.page ||
+            (diffPage === current.page && diff.kind === "Real" && current.diff.kind !== "Real")) {
+            incoming.set(diff.to, { diff, page: diffPage });
+        }
+    }
+    return Array.from(incoming.values(), ({ diff }) => diff);
+}
+
 /** A τ-multiplication is only drawn when both endpoints survive on this page. */
 function shouldDisplayTauMult(
     kind: Kind,
@@ -235,21 +257,26 @@ export function update_ehp_chart() {
     cacheComputedDiffs(permView.differentials);
     differentialCoefficients = currentView.differentialCoefficients;
 
-    const real_diffs = activeData.differentials.filter((d) => {
+    const eligibleDiffs = activeData.differentials.filter((d) => {
         if (!shouldIncludeKind(d.kind)) {
             return false;
         }
         if (!gens[d.from] || gens[d.from][0] === 0 || !gens[d.to] || gens[d.to][0] === 0) {
             return false;
         }
-        if (!viewSettings.allDiffs && d.d != viewSettings.page) {
-            return false;
-        }
-        if (d.d && d.d < viewSettings.page) {
-            return false;
-        }
         return true;
     });
+    const displayedDiffs = query.category === Category.Geometric
+        ? geometricDifferentials(eligibleDiffs, query.page, viewSettings.allDiffs)
+        : eligibleDiffs.filter((d) => {
+            if (!viewSettings.allDiffs && d.d != viewSettings.page) {
+                return false;
+            }
+            if (d.d && d.d < viewSettings.page) {
+                return false;
+            }
+            return true;
+        });
 
     activeData.generators.forEach(({ name }) => {
         const entry = gens[name];
@@ -265,7 +292,7 @@ export function update_ehp_chart() {
         });
     });
 
-    real_diffs.forEach((d) => {
+    displayedDiffs.forEach((d) => {
         if (viewSettings.category === Category.Algebraic && d.kind !== "Algebraic") {
             return;
         }
