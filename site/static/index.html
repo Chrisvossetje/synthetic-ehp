@@ -33,11 +33,17 @@
 
     <div style="width: 10px;"></div>
 
-    <div id="fake-controls" style="display: flex; border-radius: 10px; background-color: rgb(220 220 220 / 50%); align-items: center; padding: 4px; height: 41.25px;">
+    <div style="display: flex; border-radius: 10px; background-color: rgb(220 220 220 / 50%); align-items: center; padding: 4px;">
       <div style="width: 10px;"></div>
-      <label style="margin: 0px;">Fakes
-        <input type="checkbox" name="show-fake" id="show-fake-checkbox"/>
-      </label>
+      <label for="fake-data-mode" style="margin: 0px;">Fakes</label>
+      <div style="width: 10px;"></div>
+      <select id="fake-data-mode" name="fake-data-mode" style="width: auto; margin: 0px;">
+        <option value="none" selected>None</option>
+        <option value="all">All</option>
+        <option value="unnecessary-and-invisible">Unnecessary + Invisible</option>
+        <option value="unnecessary">Unnecessary</option>
+        <option value="invisible">Invisible</option>
+      </select>
       <div style="width: 10px;"></div>
     </div>
 

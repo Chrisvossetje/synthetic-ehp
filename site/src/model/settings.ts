@@ -18,6 +18,8 @@ export enum Category {
     Geometric,
 }
 
+export type FakeDataMode = "none" | "all" | "unnecessary-and-invisible" | "unnecessary" | "invisible";
+
 /** Everything that influences how the active chart is rendered. */
 export const viewSettings = {
     /** Show every differential at once instead of only the current page's. */
@@ -30,20 +32,22 @@ export const viewSettings = {
     truncation: undefined as number | undefined,
     /** Bottom truncation (inclusive min `y`); `undefined` means "no bottom cutoff". */
     bottomTruncation: undefined as number | undefined,
-    /** Include classes/differentials whose `kind` is provisional ("Fake", etc.). */
-    showFakeData: false,
+    fakeDataMode: "none" as FakeDataMode,
     /** Display overlays only; never passed to the page computation. */
     /** Number of consecutive operators enabled (0=none, 1=h_0, …). */
     multiplicationCounts: { ehp: 1 },
 };
 
-/**
- * Whether a differential/class of the given `kind` should be considered at all.
- * "Real" / "Unknown" / "Algebraic" are always real data; everything else is
- * only included when the user opts in via the "Fakes" toggle.
- */
+/** Include baseline data and any provisional kinds enabled by the Fakes filter. */
 export function shouldIncludeKind(kind: Kind): boolean {
-    return viewSettings.showFakeData || kind === "Real" || kind === "Unknown" || kind === "Algebraic";
+    const { fakeDataMode } = viewSettings;
+    if (fakeDataMode === "all" || kind === "Real" || kind === "Unknown" || kind === "Algebraic") {
+        return true;
+    }
+    if (kind === "Unnecessary" || kind === "Unneccessary") {
+        return fakeDataMode === "unnecessary" || fakeDataMode === "unnecessary-and-invisible";
+    }
+    return kind === "Invisible" && (fakeDataMode === "invisible" || fakeDataMode === "unnecessary-and-invisible");
 }
 
 // Selection is shared across modes and data sources: clicking a class in the

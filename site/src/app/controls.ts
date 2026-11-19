@@ -1,4 +1,4 @@
-import { Category, viewSettings } from "../model/settings";
+import { Category, FakeDataMode, viewSettings } from "../model/settings";
 import { ensureStableDataLoading, isStableDataReady, isUsingStableData, setUseStableData } from "../model/dataSource";
 import { assChart, ehpChart } from "./charts";
 import { update_ehp_chart } from "./ehpChart";
@@ -106,13 +106,13 @@ export function setAllDiffs(value: boolean) {
 }
 export function toggleAllDiffs() { setAllDiffs(!viewSettings.allDiffs); }
 
-export function setShowFakeData(value: boolean) {
-    viewSettings.showFakeData = value;
-    const checkbox = byId<HTMLInputElement>("show-fake-checkbox");
-    if (checkbox) checkbox.checked = value;
+function setFakeDataMode(mode: FakeDataMode) {
+    viewSettings.fakeDataMode = mode;
+    const select = byId<HTMLSelectElement>("fake-data-mode");
+    if (select) select.value = mode;
     updateActiveChart();
 }
-export function toggleShowFakeData() { setShowFakeData(!viewSettings.showFakeData); }
+export function toggleShowFakeData() { setFakeDataMode(viewSettings.fakeDataMode === "none" ? "all" : "none"); }
 
 /** Flip the data-source switch and run its change handler (keyboard `s`). */
 export function toggleDataSource() {
@@ -219,18 +219,11 @@ export function toggleBottomTruncation() {
 export function syncViewControlsForDataSource(updateChart = true) {
     const truncationControls = byId<HTMLDivElement>("truncation-controls");
     const sphereControls = byId<HTMLDivElement>("sphere-controls");
-    const fakeControls = byId<HTMLDivElement>("fake-controls");
-    const showFakeCheckbox = byId<HTMLInputElement>("show-fake-checkbox");
     const controls = getTruncationControls();
 
-    if (!truncationControls || !sphereControls || !fakeControls || !showFakeCheckbox || !controls) {
+    if (!truncationControls || !sphereControls || !controls) {
         return;
     }
-
-    fakeControls.style.display = "flex";
-    fakeControls.style.opacity = "1";
-    fakeControls.style.pointerEvents = "auto";
-    showFakeCheckbox.disabled = false;
 
     if (usingAhss()) {
         truncationControls.style.display = "flex";
@@ -273,8 +266,11 @@ export function setupUIControls() {
     const allDiffCheckbox = byId<HTMLInputElement>("all-diff-checkbox");
     allDiffCheckbox?.addEventListener("change", () => setAllDiffs(allDiffCheckbox.checked));
 
-    const showFakeCheckbox = byId<HTMLInputElement>("show-fake-checkbox");
-    showFakeCheckbox?.addEventListener("change", () => setShowFakeData(showFakeCheckbox.checked));
+    const fakeDataSelect = byId<HTMLSelectElement>("fake-data-mode");
+    if (fakeDataSelect) {
+        fakeDataSelect.value = viewSettings.fakeDataMode;
+        fakeDataSelect.addEventListener("change", () => setFakeDataMode(fakeDataSelect.value as FakeDataMode));
+    }
 
     const pageSelect = byId<HTMLSelectElement>("ss-page");
     pageSelect?.addEventListener("change", () => setPage(parseInt(pageSelect.value)));

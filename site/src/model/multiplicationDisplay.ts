@@ -48,11 +48,13 @@ function firstTableSphere(table: MultiplicationTable, tag: string, result: Multi
     return table.checkpoints.get(tag)?.find((entry) => resultKey(entry.result) === resultKey(result))?.sphere ?? table.maxSphere;
 }
 
-/** Query at a sphere; the file's coverage limit is only an internal lookup bound. */
-function productAtSphere(table: MultiplicationTable, tag: string | undefined, sphere: number): {
+interface MultiplicationProduct {
     result: MultiplicationResult | undefined;
     inheritedFrom?: { tag: string; sphere: number };
-} {
+}
+
+/** Query at a sphere; the file's coverage limit is only an internal lookup bound. */
+function productAtSphere(table: MultiplicationTable, tag: string | undefined, sphere: number): MultiplicationProduct {
     if (tag === undefined) return { result: undefined };
     if (!Number.isSafeInteger(sphere) || sphere < 0) {
         throw new Error("Lookup sphere must be a nonnegative safe integer");
@@ -75,6 +77,33 @@ function productAtSphere(table: MultiplicationTable, tag: string | undefined, sp
         }
     }
     return { result: lookupMultiplicationCheckpoint(entries, sphere) };
+}
+
+/** Lift the closest recorded tail's earlier products for use on the original row. */
+function inheritedRowProducts(table: MultiplicationTable, tag: string | undefined, sphere: number):
+    (MultiplicationProduct & { sphere: number })[] {
+    if (tag === undefined || sphere > table.maxSphere) return [];
+
+    const tokens = tag.split(" ");
+    for (let start = 1; start < tokens.length; start++) {
+        const tail = tokens.slice(start).join(" ");
+        const checkpoints = table.checkpoints.get(tail);
+        if (!checkpoints) continue;
+
+        const prefix = tokens.slice(0, start).join(" ");
+        const products: (MultiplicationProduct & { sphere: number })[] = [];
+        for (const checkpoint of checkpoints) {
+            if (checkpoint.sphere > sphere) break;
+            if (checkpoint.result.kind !== "sum") continue;
+            products.push({
+                sphere: checkpoint.sphere,
+                result: { kind: "sum", targets: checkpoint.result.targets.map((target) => `${prefix} ${target}`) },
+                inheritedFrom: { tag: tail, sphere: checkpoint.sphere },
+            });
+        }
+        return products;
+    }
+    return [];
 }
 
 /** Earliest support for this product with the current endpoint representatives. */
@@ -203,13 +232,12 @@ export function resolveDisplayMultiplications(
             // multiplication on the original row while its dots remain alive.
             const originalTag = tagFromName(source.name);
             const checkpoints = originalTag === undefined ? undefined : table.checkpoints.get(originalTag);
-            const rowProducts: {
-                sphere: number;
-                result: MultiplicationResult | undefined;
-                inheritedFrom?: { tag: string; sphere: number };
-            }[] = checkpoints
+            const rowProducts: (MultiplicationProduct & { sphere?: number })[] = checkpoints
                 ? checkpoints.filter((entry) => entry.sphere <= n)
-                : [{ sphere: n, ...productAtSphere(table, originalTag, n) }];
+                : [
+                    ...(operator === 0 ? inheritedRowProducts(table, originalTag, n) : []),
+                    productAtSphere(table, originalTag, n),
+                ];
             for (const rowProduct of rowProducts) {
                 const { result } = rowProduct;
                 if (result?.kind !== "sum") continue;
@@ -221,7 +249,8 @@ export function resolveDisplayMultiplications(
                     && visibleNames.has(target.name) && target.stem === expectedStem
                     && rowOf(target) === rowOf(source));
                 const proofs = new Map<string, TauMult[]>();
-                if (operator === 0 && tauRelations.length) {
+                const inheritedCheckpoint = rowProduct.inheritedFrom !== undefined && rowProduct.sphere !== undefined;
+                if (operator === 0 && tauRelations.length && !inheritedCheckpoint) {
                     for (let i = 0; i < result.targets.length; i++) {
                         const originalTarget = rowTargets[i];
                         if (!originalTarget || rowOf(originalTarget) === rowOf(source)
@@ -242,7 +271,7 @@ export function resolveDisplayMultiplications(
                     }
                 }
                 if (!targets.length) continue;
-                const support = checkpoints
+                const support = rowProduct.sphere !== undefined
                     ? Math.max(rowProduct.sphere, source.born, ...targets.map((target) => target.born))
                     : firstSupportingSphere(table, { ...source, induced_name: [] }, n, result, targets);
                 const inheritedFrom = rowProduct.inheritedFrom;
@@ -300,12 +329,19 @@ export function resolveDisplayMultiplications(
                     }
                     matches = [...new Set(aliasedMatches)];
                 }
+                const resolvedTargets = matches.length === 1 ? matches : [];
                 if (operator === 0 && matches.length > 1) {
+                    // Retain a uniquely resolved row term alongside any
+                    // permanent representative used for the cross-row line.
+                    const sameRowMatches = matches.filter((gen) => rowOf(gen) === rowOf(source));
                     const permanentMatches = matches.filter((gen) => survivors.has(gen.name));
-                    if (permanentMatches.length === 1) matches = permanentMatches;
+                    if (sameRowMatches.length === 1) resolvedTargets.push(sameRowMatches[0]);
+                    if (permanentMatches.length === 1 && !resolvedTargets.includes(permanentMatches[0])) {
+                        resolvedTargets.push(permanentMatches[0]);
+                    }
                 }
-                if (matches.length !== 1) entry.unresolved.push(targetTag);
-                else targets.push(matches[0]);
+                if (resolvedTargets.length) targets.push(...resolvedTargets);
+                else entry.unresolved.push(targetTag);
             }
             entry.sphere = firstSupportingSphere(table, source, n, result, targets);
             if (operator !== 0 && entry.unresolved.length) continue;

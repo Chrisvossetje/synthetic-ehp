@@ -350,8 +350,7 @@ function buildSyntheticTimeline(
 /**
  * Single-slot memo for the synthetic timeline. Building it walks every page, so
  * we cache the most recent result and reuse it while the inputs are unchanged.
- * The key includes everything that affects the result — crucially including
- * `applyTauMults` and `showFakeData`, which the previous cache omitted.
+ * The key includes both `applyTauMults` and the Fakes filter.
  */
 let timelineCache: { data: SyntheticEHP; key: string; timeline: SyntheticTimeline } | null = null;
 
@@ -362,7 +361,7 @@ function getSyntheticTimeline(
     limitX: number | undefined,
     applyTauMults: boolean
 ): SyntheticTimeline {
-    const key = `${truncation}|${bottomTruncation}|${limitX}|${applyTauMults}|${viewSettings.showFakeData}`;
+    const key = `${truncation}|${bottomTruncation}|${limitX}|${applyTauMults}|${viewSettings.fakeDataMode}`;
     if (timelineCache && timelineCache.data === data && timelineCache.key === key) {
         return timelineCache.timeline;
     }
