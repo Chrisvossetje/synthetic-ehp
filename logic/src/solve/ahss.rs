@@ -12,7 +12,6 @@ use crate::{
     domain::{e1::E1, model::SyntheticSS, process::try_compute_pages, ss::SSPages},
     solve::{action::Action, issues::{
         Issue, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic,
-        synthetic_issue_is_tau_structure_issue,
     }}, types::Torsion,
 };
 
@@ -56,23 +55,13 @@ pub fn find_ahss_issues(data: &SyntheticSS, model: &E1, stem: i32) -> Result<(),
     ahss_synthetic_e1_issue(data, model, stem)?;
 
     for &(synthetic, bot_trunc, top_trunc) in rp_truncations() {
-        let pages = if synthetic {
-            let pages = try_compute_pages(data, model, bot_trunc, top_trunc, stem, stem, true)?;
-
-            verify_convergence(model, &pages, bot_trunc, top_trunc, stem).map_err(|x| {
-                println!(
-                    "Tau issues: {}",
-                    synthetic_issue_is_tau_structure_issue(&x).0
-                );
-                x
-            })?;
-            pages
+        let from_stem = if synthetic { stem } else { stem - 1 };
+        let pages = try_compute_pages(data, model, bot_trunc, top_trunc, from_stem, stem, true)?;
+        if synthetic {
+            verify_convergence(model, &pages, bot_trunc, top_trunc, stem)?;
         } else {
-            let pages = try_compute_pages(data, model, bot_trunc, top_trunc, stem - 1, stem, true)?;
-
             verify_algebraic_convergence(model, &pages, bot_trunc, top_trunc, stem)?;
-            pages
-        };
+        }
         compare_algebraic_spectral_sequence(data, model, &pages, stem, bot_trunc, top_trunc, true)?;
     }
 

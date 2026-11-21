@@ -92,8 +92,13 @@ lookup. The tag dropdown switches labels, tooltips, product and proof text,
 clipboard names, and TikZ exports between Adams and Curtis notation. A class
 whose displayed Adams filtration differs from its original value has a τ
 prefix with exponent equal to the original filtration minus the displayed one.
-Angle notation is escaped as text in both SVG labels and the info panel; TikZ
-exports convert it to `\langle` and `\rangle`.
+In clipboard text and TikZ exports, synthetic Adams tags place a wide tilde
+over each unbracketed part of the generator. The τ coefficient, angle indices, and square-bracketed factors sit
+outside the tilde. Clicking a generator copies its label. Clicking a
+differential copies `source \to \tau^{k} \cdot target`, where `k` is the
+differential’s Adams filtration shift minus one. A shift of 1 copies the target
+alone after the arrow. A shift of 2 prefixes the target with `\tau \cdot`. Copied Adams
+labels and TikZ exports use `\langle` and `\rangle` for angle brackets.
 
 Run `npm run test:names` for translation, unresolved cases, proof/product text,
 popup escaping, both datasets, and invariance of the page computations.

@@ -151,17 +151,6 @@ export function handleScreenshotPointerUp(event: PointerEvent, chart: Chart) {
     }
 }
 
-/**
- * Format generator name for LaTeX display
- */
-function formatNameForLatex(name: string): string {
-    // Spaces terminate the angle macros before adjacent letters or numbers.
-    const withLatexSymbols = name.replace(/∞/g, '\\infty')
-        .replace(/</g, '\\langle ').replace(/>/g, '\\rangle ');
-    // Escape square brackets for LaTeX by wrapping in braces
-    return withLatexSymbols.replace(/\[/g, '{[}').replace(/\]/g, '{]}');
-}
-
 function isVisibleSvgElement(element: SVGElement | null): boolean {
     return !!element && element.style.visibility !== "hidden" && element.style.display !== "none";
 }
@@ -323,7 +312,7 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
         const tagAnchor = tagDirection === -1 ? "east" : "west";
         const afAnchor = tagDirection === -1 ? "west" : "east";
         const power = chart.generator_tau_power(gen.name);
-        const tag = formatNameForLatex(chart.generator_tag(gen.name));
+        const tag = chart.generator_latex_tag(gen.name).replace(/\[/g, "{[}").replace(/\]/g, "{]}");
         const latexName = (power ? `\\tau^{${power}}\\,` : "") + tag;
         if (latexName && latexName.length > 0) {
             tikz += `\\node[anchor=${tagAnchor},scale=0.15,inner sep=0pt] at (${roundCoord(cx + 0.04 * tagDirection)},${roundCoord(cyFlip)}) {$${latexName}$};\n`;

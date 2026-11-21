@@ -1,4 +1,5 @@
 import { assChart } from "./charts";
+import { copyDifferential, copyGenerator } from "./clipboard";
 import { Differential, Generators } from "../types";
 import { Category, getSelectedGenerator, setSelectedGenerator } from "../model/settings";
 import { find, getActiveData } from "../model/dataSource";
@@ -39,13 +40,8 @@ export function handleAssDotClick(dot: string) {
 
     if (!gen) return;
 
-    // Copy generator name to clipboard
     const label = assChart.generator_label(dot);
-    navigator.clipboard.writeText(label).then(() => {
-        console.log('Copied to clipboard:', label);
-    }).catch(err => {
-        console.error('Failed to copy to clipboard:', err);
-    });
+    copyGenerator(assChart, dot);
 
     const sphereInfo = getSphereLifecycleInfo(gen);
     const lines = buildGeneratorInfoLines(gen, sphereInfo, {
@@ -77,9 +73,12 @@ export function handleAssLineClick(from: string, to: string) {
     const inferred = inferredAssDifferentials.get(key);
     if (!inferred) return;
 
+    const source = assChart.generator_label(from);
+    const target = assChart.generator_label(to);
+    copyDifferential(assChart, from, to, inferred.torsion);
     const lines = [
-        `From: ${assChart.generator_label(from)}`,
-        `To: ${assChart.generator_label(to)}`,
+        `From: ${source}`,
+        `To: ${target}`,
         `Page: d_${inferred.page}`,
         `Coefficient: ${inferred.torsion === 0 ? "1" : "τ^" + inferred.torsion}`,
     ];

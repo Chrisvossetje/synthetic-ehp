@@ -1,4 +1,5 @@
 import { ehpChart } from "./charts";
+import { copyDifferential, copyGenerator } from "./clipboard";
 import { Differential, Kind, SyntheticEHP } from "../types";
 import { Category, getSelectedGenerator, setSelectedGenerator, shouldIncludeKind, viewSettings } from "../model/settings";
 import { find, getActiveData } from "../model/dataSource";
@@ -20,7 +21,6 @@ import { displayName, displayText } from "../model/tagNames";
 
 // Resolved differentials for the line-click handler, keyed `from->to`.
 const computedDiffsByKey = new Map<string, Differential>();
-let differentialCoefficients: ReadonlyMap<Differential, number> = new Map();
 // The page-filtered [torsion, filtration] of every class currently drawn.
 let currentFilteredGenerators: Record<string, TorsionFiltration> = {};
 let chartData: SyntheticEHP | null = null;
@@ -87,6 +87,14 @@ export function getDisplayedGenerator(name: string): TorsionFiltration | undefin
     return currentFilteredGenerators[name];
 }
 
+function getDisplayedDiffCoeff(from: string, to: string): number | undefined {
+    const fromState = getDisplayedGenerator(from);
+    const toState = getDisplayedGenerator(to);
+    if (!fromState || !toState) return undefined;
+    if (viewSettings.category !== Category.Synthetic) return 0;
+    return toState[1] - fromState[1] - 1;
+}
+
 export function handleDotClick(dot: string) {
     console.log('Dot clicked:', dot);
     const gen = find(dot);
@@ -97,13 +105,8 @@ export function handleDotClick(dot: string) {
     setSelectedGenerator(dot);
     applyEhpSelectionHighlight();
 
-    // Copy generator name to clipboard
     const label = ehpChart.generator_label(dot);
-    navigator.clipboard.writeText(label).then(() => {
-        console.log('Copied to clipboard:', label);
-    }).catch(err => {
-        console.error('Failed to copy to clipboard:', err);
-    });
+    copyGenerator(ehpChart, dot);
 
     const sphereInfo = getSphereLifecycleInfo(gen);
     const lines = buildGeneratorInfoLines(gen, sphereInfo, {
@@ -153,15 +156,19 @@ export function handleLineClick(from: string, to: string) {
 
     if (!rawDiff && !computedDiff) return;
 
-    const coeff = rawDiff ? differentialCoefficients.get(rawDiff) ?? 0 : 0;
+    const coeff = getDisplayedDiffCoeff(from, to);
+    if (coeff === undefined) return;
     const page = rawDiff?.d ?? computedDiff?.d ?? 0;
 
+    const source = ehpChart.generator_label(from);
+    const target = ehpChart.generator_label(to);
+    copyDifferential(ehpChart, from, to, coeff);
     const lines = [
-        `From: ${ehpChart.generator_label(from)}`,
-        `To: ${ehpChart.generator_label(to)}`,
+        `From: ${source}`,
+        `To: ${target}`,
         `Kind: ${rawDiff?.kind}`,
         `Page: E${page}`,
-        `Coefficient: ${coeff === 0 ? '1' : 'τ^' + coeff}`,
+        `Coefficient: ${coeff ? 'τ^' + coeff : '1'}`,
     ];
 
     const extraLines: string[] = [];
@@ -255,7 +262,6 @@ export function update_ehp_chart() {
     const permView = query.page === 1000 ? currentView : computePage(activeData, { ...query, page: 1000 });
     const perm_classes = permView.generators;
     cacheComputedDiffs(permView.differentials);
-    differentialCoefficients = currentView.differentialCoefficients;
 
     const eligibleDiffs = activeData.differentials.filter((d) => {
         if (!shouldIncludeKind(d.kind)) {
@@ -296,7 +302,7 @@ export function update_ehp_chart() {
         if (viewSettings.category === Category.Algebraic && d.kind !== "Algebraic") {
             return;
         }
-        ehpChart.display_diff(d.from, d.to, true, differentialCoefficients.get(d));
+        ehpChart.display_diff(d.from, d.to, true, getDisplayedDiffCoeff(d.from, d.to));
     });
 
     // Multiplications: only when both endpoints are alive.

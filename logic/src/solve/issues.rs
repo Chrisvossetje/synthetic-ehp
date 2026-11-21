@@ -88,6 +88,10 @@ pub enum Issue {
         to_name: String,
     },
 
+    IncompatibleTauChain {
+        relations: Vec<(String, String)>,
+    },
+
     UselessDifferential {
         from: usize,
         to: usize,

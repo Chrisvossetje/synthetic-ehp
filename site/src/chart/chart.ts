@@ -2,11 +2,11 @@ import { ToStringMap } from "./stringMap";
 import { SvgChart } from "./svgChart";
 import { Differential, DisplayMultiplication, ExternalTauMult, Generators, InternalTauMult, Multiplication } from "../types";
 import { displayName } from "../model/tagNames";
-import { viewSettings } from "../model/settings";
+import { Category, viewSettings } from "../model/settings";
 import { ChartMode } from "./chartMode";
 import { svgNS } from "./svgChart";
 import { escapeHtml } from "./text";
-import { renderAdamsTag } from "./tagMath";
+import { adamsTagLatex, renderAdamsTag } from "./tagMath";
 
 type Point = [number, number];
 
@@ -201,6 +201,13 @@ export class Chart {
         const gen = this.generatorsByName.get(name);
         const representative = this.mode === ChartMode.ASS ? gen?.induced_name?.[0]?.[1] : undefined;
         return displayName(representative ?? name, gen?.alg_name);
+    }
+
+    generator_latex_tag(name: string): string {
+        const tag = this.generator_tag(name);
+        if (viewSettings.tagNotation === "curtis") return tag;
+        const synthetic = this.mode === ChartMode.ASS || viewSettings.category === Category.Synthetic;
+        return adamsTagLatex(tag, synthetic);
     }
 
     generator_tau_power(name: string): number {

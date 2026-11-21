@@ -138,25 +138,28 @@ pub fn find_ehp_issues(
             continue;
         }
 
-        let pages = if sphere - 2 == stem {
-            // Stable
-            let pages = try_compute_pages(ehp, ehp_model, 0, sphere - 1, stem, stem, true)?;
-            ehp_stable_verify(ehp, ehp_model, ahss, &pages, stem)?;
-            pages
-        } else {
-            // Unstable
-            let pages = try_compute_pages(ehp, ehp_model, 0, sphere - 1, stem - 1, stem, true)?;
-            verify_algebraic_convergence(ehp_model, &pages, sphere, stem)?;
-            pages
-        };
-
-        compare_algebraic_spectral_sequence(ehp, ehp_model, &pages, stem, 0, sphere - 1, false)?;
-        compare_ehp_ahss(ehp, ahss, map, stem, sphere - 1)?;
+        verify_ehp_cell(ehp, ehp_model, ahss, map, stem, sphere)?;
     }
 
     Ok(())
 }
 
+
+pub(crate) fn verify_ehp_cell(
+    ehp: &SyntheticSS, ehp_model: &E1, ahss: &SyntheticSS, map: &SyntheticSSMap,
+    stem: i32, sphere: i32,
+) -> Result<(), Vec<Issue>> {
+    let stable = sphere - 2 == stem;
+    let from_stem = if stable { stem } else { stem - 1 };
+    let pages = try_compute_pages(ehp, ehp_model, 0, sphere - 1, from_stem, stem, true)?;
+    if stable {
+        ehp_stable_verify(ehp, ehp_model, ahss, &pages, stem)?;
+    } else {
+        verify_algebraic_convergence(ehp_model, &pages, sphere, stem)?;
+    }
+    compare_algebraic_spectral_sequence(ehp, ehp_model, &pages, stem, 0, sphere - 1, false)?;
+    compare_ehp_ahss(ehp, ahss, map, stem, sphere - 1)
+}
 
 /// Orders of the classical homotopy groups pi_{stem+k}(S^k), copied from a
 /// spreadsheet. One row per stem (0..=`CLASSICAL_MAX_STEM`), tab-separated, one

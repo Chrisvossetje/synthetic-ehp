@@ -10,10 +10,12 @@
 use crate::{
     MAX_STEM,
     data::naming::{add_sphere_to_tag, generating_tag},
-    domain::{e1::E1, model::SyntheticSS, ss::SSPages},
+    domain::{e1::E1, model::SyntheticSS, ss::SSPages, tau::apply_tau},
     solve::issues::Issue,
     types::{Kind, Torsion},
 };
+
+pub use super::tau::compute_ext_taus;
 
 /// Seed every generator with its E1 state, keeping only those that fall within
 /// the requested truncation window (`bot_trunc..=top_trunc` in y, plus a
@@ -209,62 +211,6 @@ fn apply_diff(
     Ok(())
 }
 
-/// Apply one tau-multiplication `from -> to` (internal or external), extending
-/// `to`'s torsion from `from` where the bidegree allows it. `af` gates external
-/// taus: the multiplication only fires once `from` has reached that AF.
-fn apply_tau(
-    model: &E1,
-    pages: &mut SSPages,
-    page: i32,
-    af: i32,
-    from: usize,
-    to: usize,
-) -> Result<(), Issue> {
-    let from_g = pages.element_final(from);
-    let to_g = pages.element_final(to);
-
-    if from_g.1.alive() && to_g.1.alive() && from_g.0 >= af {
-        if let Some(from_torsion) = from_g.1.0 {
-            let af_diff = from_g.0 - to_g.0;
-
-            let (new_from_torsion, new_to_torsion) = match to_g.1.0 {
-                Some(to_torsion) => {
-                    if from_torsion >= to_torsion + af_diff {
-                        // This means the targeted generator is completely "inside" the torsion of from
-                        // And thus cannot extend anything
-                        return Ok(());
-                    } else {
-                        (
-                            Torsion::new(to_torsion + af_diff),
-                            Torsion::new(from_torsion - af_diff),
-                        )
-                    }
-                }
-                None => (Torsion::default(), Torsion::new(from_torsion - af_diff)),
-            };
-
-
-            // TODO : EHP requires >= and AHSS requires > ......
-            if from_g.0 - from_torsion <= to_g.0 && af_diff >= 0 {
-                pages.push(from, page, (from_g.0, new_from_torsion));
-                pages.push(to, page, (to_g.0, new_to_torsion));
-            } else if from_g.0 - from_torsion > to_g.0 {
-                let (from_name, to_name) = model.get_names(from, to);
-                return Err(Issue::InvalidTauMult {
-                    from,
-                    to,
-                    from_name,
-                    to_name,
-                });
-            }
-        } else {
-            // This means we have a "free" generator as source
-            // And the tau multiplication should not happen at this "truncation"
-        }
-    }
-    Ok(())
-}
-
 pub fn try_compute_pages(
     data: &SyntheticSS,
     model: &E1,
@@ -318,31 +264,6 @@ pub fn compute_diffs_int_taus(
     (pages, issues)
 }
 
-pub fn compute_ext_taus(
-    pages: &mut SSPages,
-    model: &E1,
-    data: &SyntheticSS,
-    _bot_trunc: i32,
-    _top_trunc: i32,
-    from_stem: i32,
-    to_stem: i32,
-) -> Vec<Issue> {
-    let mut issues = vec![];
-    for e in data.external_taus() {
-        if pages.element_in_pages(e.from)
-            && pages.element_in_pages(e.to)
-            && from_stem <= model.stem(e.from)
-            && model.stem(e.from) <= to_stem
-        {
-            if let Err(i) = apply_tau(model, pages, 500, e.af, e.from, e.to) {
-                issues.push(i);
-            }
-        }
-    }
-
-    issues
-}
-
 pub fn compute_pages(
     data: &SyntheticSS,
     model: &E1,
@@ -352,13 +273,11 @@ pub fn compute_pages(
     to_stem: i32,
     include_tau: bool,
 ) -> (SSPages, Vec<Issue>) {
-
-
-    let (mut pages, mut issues) = compute_diffs_int_taus(data, model, bot_trunc, top_trunc, from_stem, to_stem);
+    let (mut pages, mut issues) =
+        compute_diffs_int_taus(data, model, bot_trunc, top_trunc, from_stem, to_stem);
 
     if include_tau {
-        let mut issues2 = compute_ext_taus(&mut pages, model, data, bot_trunc, top_trunc, from_stem, to_stem);
-        issues.append(&mut issues2);
+        issues.extend(compute_ext_taus(&mut pages, model, data, bot_trunc, top_trunc, from_stem, to_stem));
     }
 
     (pages, issues)
@@ -429,5 +348,47 @@ pub fn ehp_recursion(ehp: &mut SyntheticSS, model: &E1, sphere: i32, stem: i32) 
         return Err(issues);
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod replay_tests {
+    use crate::{
+        MAX_EXPORT_STEM, MAX_VERIFY_STEM,
+        data::curtis::{DATA, MODEL, STABLE_DATA, STABLE_MODEL},
+        io::import::get_log,
+        solve::{
+            action::revert_log_and_remake,
+            ahss::find_ahss_issues,
+            ehp::verify_ehp_cell,
+            ehp_ahss::{ehp_to_ahss_map, set_metastable_range},
+        },
+    };
+
+    #[test]
+    #[ignore = "replay both saved logs and check completed stems against the reference data"]
+    fn check_saved_tau_replay() {
+        let mut log = get_log(false, true).unwrap();
+        let ahss = revert_log_and_remake(0, &mut log, &STABLE_MODEL, &STABLE_DATA, true);
+        let mut failures = vec![];
+        for stem in 2..MAX_VERIFY_STEM {
+            if let Err(issues) = find_ahss_issues(&ahss, &STABLE_MODEL, stem) {
+                failures.push(format!("AHSS stem {stem}: {issues:?}"));
+            }
+        }
+
+        let mut seed = DATA.clone();
+        set_metastable_range(&mut seed, &ahss).unwrap();
+        let mut log = get_log(false, false).unwrap();
+        let ehp = revert_log_and_remake(0, &mut log, &MODEL, &seed, false);
+        let map = ehp_to_ahss_map();
+        for stem in 2..=MAX_EXPORT_STEM {
+            for sphere in 2..=stem + 2 {
+                if let Err(issues) = verify_ehp_cell(&ehp, &MODEL, &ahss, &map, stem, sphere) {
+                    failures.push(format!("EHP stem {stem}, sphere {sphere}: {issues:?}"));
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
     }
 }

@@ -9,8 +9,22 @@ function mathAtom(value: string): string {
     if (value === "\\Delta") return "<mi>Δ</mi>";
     if (value === "\\infty") return "<mo>∞</mo>";
     if (/^[A-Za-zτ]$/.test(value)) return "<mi>" + value + "</mi>";
-    const symbol = value === "<" ? "⟨" : value === ">" ? "⟩" : value;
-    return "<mo>" + escapeHtml(symbol) + "</mo>";
+    return "<mo>" + escapeHtml(value) + "</mo>";
+}
+
+/** Angle indices and square-bracketed factors stay outside the synthetic lift. */
+function syntheticAdamsTag(tag: string): string {
+    return tag.split(/(<[^>]*>|\[[^\]]*\])/).map((part, index) =>
+        part && index % 2 === 0 ? "\\widetilde{" + part + "}" : part
+    ).join("");
+}
+
+export function adamsTagLatex(tag: string, synthetic: boolean): string {
+    return (synthetic ? syntheticAdamsTag(tag) : tag)
+        .replace(/∞/g, "\\infty")
+        .replace(/</g, "\\langle ")
+        .replace(/>(?=[A-Za-z])/g, "\\rangle ")
+        .replace(/>/g, "\\rangle");
 }
 
 /** Render the generated Adams tag notation, including grouped scripts. */
