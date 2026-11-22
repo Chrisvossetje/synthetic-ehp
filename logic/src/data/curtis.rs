@@ -15,8 +15,8 @@ use crate::{
     types::{Generator, Kind},
 };
 
-static CURTIS_TXT: &str = include_str!("../../../curtis_table.txt");
-static STABLE_CURTIS_TXT: &str = include_str!("../../../curtis_table_stable.txt");
+static CURTIS_TXT: &str = include_str!("../../../ALG_DATA/curtis_table.txt");
+static STABLE_CURTIS_TXT: &str = include_str!("../../../ALG_DATA/curtis_table_stable.txt");
 
 pub static MODEL: LazyLock<E1> = LazyLock::new(|| generate_algebraic_model(false).0);
 
@@ -68,11 +68,11 @@ fn name_to_tag_origin(name: &str) -> (i32, String) {
     }
 }
 
-fn parse_curtis_table() -> (Vec<Untagged>, Vec<Tagged>) {
+fn parse_curtis_table(txt: &str) -> (Vec<Untagged>, Vec<Tagged>) {
     let mut untagged = Vec::new();
     let mut tagged = Vec::new();
 
-    for line in CURTIS_TXT.lines() {
+    for line in txt.lines() {
         let line = line.trim_end_matches(")\n").trim_start_matches("((");
         let parts: Vec<&str> = line.split('#').collect();
 
@@ -138,13 +138,13 @@ fn stable_name_to_tag_origin(name: &str) -> (i32, String) {
     (y, second.trim().to_string())
 }
 
-fn parse_stable_curtis_table() -> (Vec<Untagged>, Vec<Tagged>) {
+fn parse_stable_curtis_table(txt: &str) -> (Vec<Untagged>, Vec<Tagged>) {
     let mut untagged = Vec::new();
     let mut tagged = Vec::new();
 
     let mut current_degree = (0, 0);
 
-    for line in STABLE_CURTIS_TXT.lines() {
+    for line in txt.lines() {
         if line.len() == 0 {
             continue;
         }
@@ -270,9 +270,10 @@ fn build_data(model: &E1, differentials: Vec<Differential>) -> SyntheticSS {
 /// its seeded algebraic spectral sequence. `ahss` selects the stable table.
 fn generate_algebraic_model(ahss: bool) -> (E1, SyntheticSS) {
     let (untagged, tagged) = if ahss {
-        parse_stable_curtis_table()
+        // parse_stable_curtis_table(STABLE_CURTIS_TXT)
+        parse_curtis_table(STABLE_CURTIS_TXT)
     } else {
-        parse_curtis_table()
+        parse_curtis_table(CURTIS_TXT)
     };
     let (generators, differentials) = parse_algebraic(&untagged, &tagged);
     let model = E1::new(generators);

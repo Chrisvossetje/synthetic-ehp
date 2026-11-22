@@ -1,17 +1,17 @@
-import type { DisplayMultiplication, ExternalTauMult, Generators, InternalTauMult } from "../types";
+import type { DisplayMultiplication, ExternalTauMult, Generators, InternalTauMult, MultiplicationLocation } from "../types";
 import type { MultiplicationTables } from "./multiplicationSource";
-import { lookupMultiplicationCheckpoint, MultiplicationOperator, MultiplicationResult, MultiplicationTable, normalizeMultiplicationTag } from "./multiplicationTable";
+import { getGeneratorIndex } from "./generatorIndex";
+import { findMultiplicationCheckpoint, lookupMultiplicationCheckpoint, MultiplicationOperator, MultiplicationResult, MultiplicationTable, normalizeMultiplicationTag } from "./multiplicationTable";
 import { displayMultiplicationTag } from "./tagNames";
 
-export interface DisplayMultiplicationInfo {
+export type DisplayMultiplicationInfo = MultiplicationLocation & {
     source: string;
     operator: MultiplicationOperator;
-    sphere: number;
     result: MultiplicationResult | undefined;
     unresolved: string[];
     inheritedFrom?: { tag: string; sphere: number };
     tauExtensions?: DisplayMultiplication["tauExtensions"];
-}
+};
 
 /** The leading Curtis index is stored in the EHP name's brackets. */
 export function multiplicationTag(gen: Generators, sphere: number): string | undefined {
@@ -41,11 +41,13 @@ function tagFromName(name: string): string | undefined {
 }
 
 function resultKey(result: MultiplicationResult | undefined): string {
-    return result?.kind === "sum" ? [...result.targets].sort().join(";") : result?.kind ?? "missing";
+    if (result?.kind !== "sum") return result?.kind ?? "missing";
+    return result.targets.length === 1 ? result.targets[0] : [...result.targets].sort().join(";");
 }
 
 function firstTableSphere(table: MultiplicationTable, tag: string, result: MultiplicationResult): number {
-    return table.checkpoints.get(tag)?.find((entry) => resultKey(entry.result) === resultKey(result))?.sphere ?? table.maxSphere;
+    const expected = resultKey(result);
+    return table.checkpoints.get(tag)?.find((entry) => entry.result === result || resultKey(entry.result) === expected)?.index ?? table.maxIndex;
 }
 
 interface MultiplicationProduct {
@@ -53,52 +55,53 @@ interface MultiplicationProduct {
     inheritedFrom?: { tag: string; sphere: number };
 }
 
+const unavailableProduct: MultiplicationProduct = { result: undefined };
+
 /** Query at a sphere; the file's coverage limit is only an internal lookup bound. */
 function productAtSphere(table: MultiplicationTable, tag: string | undefined, sphere: number): MultiplicationProduct {
-    if (tag === undefined) return { result: undefined };
+    if (tag === undefined) return unavailableProduct;
     if (!Number.isSafeInteger(sphere) || sphere < 0) {
         throw new Error("Lookup sphere must be a nonnegative safe integer");
     }
-    if (sphere > table.maxSphere) return { result: undefined };
+    if (sphere > table.maxIndex) return unavailableProduct;
     const entries = table.checkpoints.get(tag);
     if (!entries) {
         // Missing full tags inherit stable tail products, keeping outer indices.
         // Explicit zero/unknown entries and uncovered checkpoints always win.
-        const tokens = tag.split(" ");
-        for (let start = 1; start < tokens.length; start++) {
-            const tail = tokens.slice(start).join(" ");
-            const stable = lookupMultiplicationCheckpoint(table.checkpoints.get(tail), table.maxSphere);
+        for (let split = tag.indexOf(" "); split !== -1; split = tag.indexOf(" ", split + 1)) {
+            const tail = tag.slice(split + 1);
+            const stable = lookupMultiplicationCheckpoint(table.checkpoints.get(tail), table.maxIndex);
             if (stable?.kind !== "sum") continue;
-            const prefix = tokens.slice(0, start).join(" ");
+            const prefix = tag.slice(0, split);
             return {
                 result: { kind: "sum", targets: stable.targets.map((target) => `${prefix} ${target}`) },
                 inheritedFrom: { tag: tail, sphere: firstTableSphere(table, tail, stable) },
             };
         }
     }
-    return { result: lookupMultiplicationCheckpoint(entries, sphere) };
+    const result = lookupMultiplicationCheckpoint(entries, sphere);
+    return result === undefined ? unavailableProduct : { result };
 }
 
 /** Lift the closest recorded tail's earlier products for use on the original row. */
 function inheritedRowProducts(table: MultiplicationTable, tag: string | undefined, sphere: number):
     (MultiplicationProduct & { sphere: number })[] {
-    if (tag === undefined || sphere > table.maxSphere) return [];
+    if (tag === undefined || sphere > table.maxIndex) return [];
 
-    const tokens = tag.split(" ");
-    for (let start = 1; start < tokens.length; start++) {
-        const tail = tokens.slice(start).join(" ");
+    for (let split = tag.indexOf(" "); split !== -1; split = tag.indexOf(" ", split + 1)) {
+        const tail = tag.slice(split + 1);
         const checkpoints = table.checkpoints.get(tail);
         if (!checkpoints) continue;
 
-        const prefix = tokens.slice(0, start).join(" ");
+        const prefix = tag.slice(0, split);
         const products: (MultiplicationProduct & { sphere: number })[] = [];
         for (const checkpoint of checkpoints) {
-            if (checkpoint.sphere > sphere) break;
-            if (checkpoint.result.kind !== "sum") continue;
+            if (checkpoint.index > sphere) break;
+            if (checkpoint.result?.kind !== "sum") continue;
             products.push({
-                sphere: checkpoint.sphere,
+                sphere: checkpoint.index,
                 result: { kind: "sum", targets: checkpoint.result.targets.map((target) => `${prefix} ${target}`) },
-                inheritedFrom: { tag: tail, sphere: checkpoint.sphere },
+                inheritedFrom: { tag: tail, sphere: checkpoint.index },
             });
         }
         return products;
@@ -116,12 +119,35 @@ function firstSupportingSphere(
     const entries = sourceTag === undefined ? undefined : table.checkpoints.get(sourceTag);
     const expected = resultKey(result);
     const targetTags = targets.map((target) => multiplicationTag(target, querySphere));
-    const lowerBound = Math.max(1, source.born, ...targets.map((target) => target.born));
-    for (let sphere = lowerBound; sphere <= Math.min(querySphere, table.maxSphere); sphere++) {
-        if (multiplicationTag(source, sphere) !== sourceTag) continue;
-        if (targets.some((target, index) => multiplicationTag(target, sphere) !== targetTags[index])) continue;
+    let lowerBound = Math.max(1, source.born);
+    for (const target of targets) lowerBound = Math.max(lowerBound, target.born);
+    const upperBound = Math.min(querySphere, table.maxIndex);
+    if (!(lowerBound <= upperBound)) return querySphere;
+
+    const supportsAt = (sphere: number) => {
+        if (multiplicationTag(source, sphere) !== sourceTag) return false;
+        if (targets.some((target, index) => multiplicationTag(target, sphere) !== targetTags[index])) return false;
         // An inherited product is constant while the source tag is unchanged.
-        if (!entries || resultKey(lookupMultiplicationCheckpoint(entries, sphere)) === expected) return sphere;
+        if (!entries) return true;
+        const current = lookupMultiplicationCheckpoint(entries, sphere);
+        return current === result || resultKey(current) === expected;
+    };
+    if (supportsAt(lowerBound)) return lowerBound;
+
+    // Validity stays constant between changes to the product or a representative.
+    // Include earlier matching intervals even when the representative changes back later.
+    const changes: number[] = [];
+    const addChange = (index: number) => {
+        if (index > lowerBound && index <= upperBound) changes.push(index);
+    };
+    for (const entry of entries ?? []) addChange(entry.index);
+    for (const [index] of source.induced_name ?? []) addChange(index);
+    for (const target of targets) {
+        for (const [index] of target.induced_name ?? []) addChange(index);
+    }
+    changes.sort((a, b) => a - b);
+    for (const [i, sphere] of changes.entries()) {
+        if (sphere !== changes[i - 1] && supportsAt(sphere)) return sphere;
     }
     return querySphere;
 }
@@ -149,11 +175,13 @@ export function resolveDisplayMultiplications(
         rows?: ReadonlyMap<string, number>;
         /** Real extensions support products hidden by later algebraic zeros. */
         tauMults?: readonly (InternalTauMult | ExternalTauMult)[];
+        /** Skip metadata for zero, unknown and missing products when only sums are shown. */
+        includeUnavailableInfo?: boolean;
     } = {}
 ): { lines: DisplayMultiplication[]; info: DisplayMultiplicationInfo[] } {
     const lines: DisplayMultiplication[] = [];
     const info: DisplayMultiplicationInfo[] = [];
-    const generatorsByName = new Map(generators.map((gen) => [gen.name, gen]));
+    const generatorsByName = getGeneratorIndex(generators).byName;
     const survivors = options.survivingNames ?? visibleNames;
     const rowOf = (gen: Generators) => options.rows?.get(gen.name) ?? (mode === "ehp" ? gen.y : gen.af);
     type TauMult = InternalTauMult | ExternalTauMult;
@@ -220,9 +248,10 @@ export function resolveDisplayMultiplications(
 
     for (const source of generators) {
         if (!visibleNames.has(source.name)) continue;
+        const originalTag = tagFromName(source.name);
         for (const operator of operators) {
             const table = tables[operator];
-            const n = sphere ?? table.maxSphere;
+            const n = sphere ?? table.maxIndex;
             // Multiplication by h_i shifts stem by 2^i - 1.
             const expectedStem = source.stem + 2 ** operator - 1;
             const eligible = (gen: Generators) => gen.stem === expectedStem
@@ -230,13 +259,14 @@ export function resolveDisplayMultiplications(
                     || (survivors.has(source.name) && survivors.has(gen.name)));
             // A later zero or changed representative does not remove the
             // multiplication on the original row while its dots remain alive.
-            const originalTag = tagFromName(source.name);
             const checkpoints = originalTag === undefined ? undefined : table.checkpoints.get(originalTag);
+            const originalProduct = checkpoints ? undefined : productAtSphere(table, originalTag, n);
             const rowProducts: (MultiplicationProduct & { sphere?: number })[] = checkpoints
-                ? checkpoints.filter((entry) => entry.sphere <= n)
+                ? checkpoints.filter((entry) => entry.index <= n)
+                    .map(({ index, result }) => ({ sphere: index, result }))
                 : [
                     ...(operator === 0 ? inheritedRowProducts(table, originalTag, n) : []),
-                    productAtSphere(table, originalTag, n),
+                    originalProduct!,
                 ];
             for (const rowProduct of rowProducts) {
                 const { result } = rowProduct;
@@ -306,8 +336,11 @@ export function resolveDisplayMultiplications(
                         sphere: support, targets });
                 }
             }
-            const product = productAtSphere(table, multiplicationTag(source, n), n);
+            const effectiveTag = multiplicationTag(source, n);
+            const product = effectiveTag === originalTag && originalProduct
+                ? originalProduct : productAtSphere(table, effectiveTag, n);
             const { result } = product;
+            if (result?.kind !== "sum" && options.includeUnavailableInfo === false) continue;
             const entry: DisplayMultiplicationInfo = { source: source.name, operator,
                 sphere: n, ...product, unresolved: [] };
             info.push(entry);
@@ -359,6 +392,47 @@ export function resolveDisplayMultiplications(
         [...entry.unresolved].sort(),
     ]), entry]));
     return { lines: [...uniqueLines.values()], info: [...uniqueInfo.values()] };
+}
+
+/** Resolve the current AHSS product against the visible stable Curtis tags. */
+export function resolveAhssMultiplications(
+    tables: MultiplicationTables,
+    generators: readonly Generators[],
+    visibleNames: ReadonlySet<string>,
+    operators: readonly MultiplicationOperator[],
+    topCell: number | undefined
+): { lines: DisplayMultiplication[]; info: DisplayMultiplicationInfo[] } {
+    const lines: DisplayMultiplication[] = [];
+    const info: DisplayMultiplicationInfo[] = [];
+    const byTag = new Map<string, Generators>();
+    for (const gen of generators) {
+        if (!visibleNames.has(gen.name)) continue;
+        const tag = tagFromName(gen.name);
+        if (tag !== undefined) byTag.set(tag, gen);
+    }
+
+    for (const [tag, source] of byTag) {
+        for (const operator of operators) {
+            const table = tables[operator];
+            const index = topCell ?? table.maxIndex;
+            if (index > table.maxIndex) continue;
+            const checkpoint = findMultiplicationCheckpoint(table.checkpoints.get(tag), index);
+            if (checkpoint?.result?.kind !== "sum") continue;
+            const { index: cell, result } = checkpoint;
+            const expectedStem = source.stem + 2 ** operator - 1;
+            const unresolved: string[] = [];
+            for (const targetTag of new Set(result.targets)) {
+                const target = byTag.get(targetTag);
+                if (target?.stem !== expectedStem) {
+                    unresolved.push(targetTag);
+                    continue;
+                }
+                lines.push({ from: source.name, to: target.name, operator, cell, targets: result.targets });
+            }
+            info.push({ source: source.name, operator, cell, result, unresolved });
+        }
+    }
+    return { lines, info };
 }
 
 export function formatMultiplicationResult(result: MultiplicationResult | undefined): string {

@@ -7,13 +7,13 @@ export type MultiplicationResult =
     | { readonly kind: "unknown" };
 
 export interface MultiplicationCheckpoint {
-    readonly sphere: number;
-    readonly result: MultiplicationResult;
+    readonly index: number;
+    readonly result: MultiplicationResult | undefined;
 }
 
 export interface MultiplicationTable {
     readonly operator: MultiplicationOperator;
-    readonly maxSphere: number;
+    readonly maxIndex: number;
     /** Keys and target terms are normalized Curtis tags, e.g. "3 2 1". */
     readonly checkpoints: ReadonlyMap<string, readonly MultiplicationCheckpoint[]>;
 }
@@ -34,17 +34,20 @@ export function normalizeMultiplicationTag(tag: string): string {
 }
 
 /**
- * Parse the root h_0mult/h_1mult/h_2mult files without resolving their tags to
- * chart generators. A result applies from its checkpoint through the sphere
- * preceding the next checkpoint, inclusive, and never beyond max_sphere.
+ * Parse multiplication files without resolving their tags to chart generators.
+ * A result applies until the next checkpoint or the last covered index.
  * Malformed input fails with a filename and line number rather than being lost.
  */
 export function parseMultiplicationTable(
     text: string,
     operator: MultiplicationOperator,
-    sourceName = `h_${operator}mult.txt`
+    sourceName = `h_${operator}mult.txt`,
+    axis: "sphere" | "cell" = "sphere"
 ): MultiplicationTable {
-    let maxSphere: number | undefined;
+    const headerName = `max_${axis}`;
+    const headerPattern = new RegExp(`^#\\s*${headerName}\\s*=\\s*(\\d+)\\s*$`);
+    const minIndex = axis === "cell" ? 0 : 1;
+    let maxIndex: number | undefined;
     const checkpoints = new Map<string, MultiplicationCheckpoint[]>();
     const lineNumbers = new Map<string, number>();
 
@@ -52,38 +55,39 @@ export function parseMultiplicationTable(
         const line = rawLine.trim();
         if (!line) return;
         try {
-            const header = /^#\s*max_sphere\s*=\s*(\d+)\s*$/.exec(line);
+            const header = headerPattern.exec(line);
             if (header) {
-                if (maxSphere !== undefined) throw new Error("Duplicate max_sphere header");
-                maxSphere = Number(header[1]);
-                if (!Number.isSafeInteger(maxSphere) || maxSphere < 1) {
-                    throw new Error("max_sphere must be a positive safe integer");
+                if (maxIndex !== undefined) throw new Error(`Duplicate ${headerName} header`);
+                maxIndex = Number(header[1]);
+                if (!Number.isSafeInteger(maxIndex) || maxIndex < minIndex) {
+                    throw new Error(`${headerName} must be a safe integer at least ${minIndex}`);
                 }
                 return;
             }
             if (line.startsWith("#") && !line.startsWith("#(")) {
-                if (/^#\s*max_sphere\b/.test(line)) throw new Error("Invalid max_sphere header");
+                if (/^#\s*max_(sphere|cell)\b/.test(line)) throw new Error(`Expected a valid ${headerName} header`);
                 return;
             }
             const row = /^#\(([^()]*)\)\s*:\s*(.+)$/.exec(line);
-            if (!row) throw new Error("Expected #(source): sphere=result; …");
+            if (!row) throw new Error(`Expected #(source): ${axis}=result; …`);
             const source = normalizeMultiplicationTag(row[1]);
             if (checkpoints.has(source)) throw new Error(`Duplicate source: ${source}`);
             const entries: MultiplicationCheckpoint[] = [];
             for (const part of row[2].split(";")) {
                 const checkpoint = /^\s*(\d+)\s*=\s*(.*?)\s*$/.exec(part);
                 if (!checkpoint) throw new Error(`Invalid checkpoint: ${part}`);
-                const sphere = Number(checkpoint[1]);
-                if (!Number.isSafeInteger(sphere) || sphere < 1) {
-                    throw new Error("Checkpoint sphere must be a positive safe integer");
+                const checkpointIndex = Number(checkpoint[1]);
+                if (!Number.isSafeInteger(checkpointIndex) || checkpointIndex < minIndex) {
+                    throw new Error(`Checkpoint ${axis} must be a safe integer at least ${minIndex}`);
                 }
-                if (entries.length && sphere <= entries[entries.length - 1].sphere) {
-                    throw new Error("Checkpoint spheres must be strictly increasing");
+                if (entries.length && checkpointIndex <= entries[entries.length - 1].index) {
+                    throw new Error(`Checkpoint ${axis}s must be strictly increasing`);
                 }
                 const rhs = checkpoint[2];
-                let result: MultiplicationResult;
-                if (rhs === "") result = { kind: "zero" };
+                let result: MultiplicationResult | undefined;
+                if (rhs === (axis === "cell" ? "0" : "")) result = { kind: "zero" };
                 else if (rhs === "?") result = { kind: "unknown" };
+                else if (axis === "cell" && rhs === "-") result = undefined;
                 else {
                     const targets = rhs.split("+").map((term) => {
                         if (!/^#\([^()]*\)$/.test(term.trim())) {
@@ -95,7 +99,7 @@ export function parseMultiplicationTable(
                     // a separate display concern, as is any algebra on sums.
                     result = { kind: "sum", targets };
                 }
-                entries.push({ sphere, result });
+                entries.push({ index: checkpointIndex, result });
             }
             checkpoints.set(source, entries);
             lineNumbers.set(source, index + 1);
@@ -104,45 +108,49 @@ export function parseMultiplicationTable(
         }
     });
 
-    if (maxSphere === undefined) throw new Error(`${sourceName}: Missing max_sphere header`);
+    if (maxIndex === undefined) throw new Error(`${sourceName}: Missing ${headerName} header`);
     for (const [source, entries] of checkpoints) {
-        if (entries[entries.length - 1].sphere > maxSphere) {
-            throw new Error(`${sourceName}:${lineNumbers.get(source)}: Checkpoint exceeds max_sphere=${maxSphere}`);
+        if (entries[entries.length - 1].index > maxIndex) {
+            throw new Error(`${sourceName}:${lineNumbers.get(source)}: Checkpoint exceeds ${headerName}=${maxIndex}`);
         }
     }
-    return { operator, maxSphere, checkpoints };
+    return { operator, maxIndex, checkpoints };
 }
 
 /**
- * undefined means no data (missing source, before its first checkpoint, or
- * beyond the file's coverage). It is distinct from an explicit `unknown`.
- * Sphere is the table's actual sphere number, not the chart's bracket index.
+ * Look up an EHP sphere or AHSS top cell. Unavailable products return undefined.
  */
 export function lookupMultiplication(
     table: MultiplicationTable,
     sourceTag: string,
-    sphere: number
+    index: number
 ): MultiplicationResult | undefined {
-    if (!Number.isSafeInteger(sphere) || sphere < 0) {
-        throw new Error("Lookup sphere must be a nonnegative safe integer");
+    if (!Number.isSafeInteger(index) || index < 0) {
+        throw new Error("Lookup index must be a nonnegative safe integer");
     }
-    if (sphere > table.maxSphere) return undefined;
-    return lookupMultiplicationCheckpoint(table.checkpoints.get(normalizeMultiplicationTag(sourceTag)), sphere);
+    if (index > table.maxIndex) return undefined;
+    return lookupMultiplicationCheckpoint(table.checkpoints.get(normalizeMultiplicationTag(sourceTag)), index);
 }
 
 /** Read an already selected series of checkpoints within the table's coverage. */
 export function lookupMultiplicationCheckpoint(
     entries: readonly MultiplicationCheckpoint[] | undefined,
-    sphere: number
+    index: number
 ): MultiplicationResult | undefined {
+    return findMultiplicationCheckpoint(entries, index)?.result;
+}
+
+export function findMultiplicationCheckpoint(
+    entries: readonly MultiplicationCheckpoint[] | undefined,
+    index: number
+): MultiplicationCheckpoint | undefined {
     if (!entries) return undefined;
-    // Find the final checkpoint <= sphere.
     let low = 0;
     let high = entries.length;
     while (low < high) {
         const mid = Math.floor((low + high) / 2);
-        if (entries[mid].sphere <= sphere) low = mid + 1;
+        if (entries[mid].index <= index) low = mid + 1;
         else high = mid;
     }
-    return low === 0 ? undefined : entries[low - 1].result;
+    return entries[low - 1];
 }

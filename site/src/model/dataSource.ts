@@ -1,5 +1,7 @@
 import { Generators, SyntheticEHP } from "../types";
-import { setStableTagNames, withAlgebraicNames } from "./tagNames";
+import { getGeneratorIndex } from "./generatorIndex";
+import { loadMultiplicationTables } from "./multiplicationSource";
+import { populateAlgebraicNames, setStableTagNames } from "./tagNames";
 
 /**
  * Data source management.
@@ -8,8 +10,8 @@ import { setStableTagNames, withAlgebraicNames } from "./tagNames";
  *   - `data.ts`         — the synthetic EHP spectral sequence (the default)
  *   - `data_stable.ts`  — the stable AHSS
  *
- * Both are large, so the stable dataset is loaded lazily (and only once) the
- * first time it is needed. Everything else in the app asks this module for
+ * The stable dataset loads once, after the initial chart renders or when the
+ * user asks for it. Everything else in the app asks this module for
  * "the active data" rather than importing the datasets directly, which keeps
  * the EHP/AHSS switch a one-line state change.
  */
@@ -23,28 +25,33 @@ export function setUseStableData(value: boolean) {
 
 let mainData: SyntheticEHP | null = null;
 let stableData: SyntheticEHP | null = null;
-let stableDataLoadPromise: Promise<void> | null = null;
-const generatorsByDataset = new WeakMap<SyntheticEHP, Map<string, Generators>>();
+let stableDataLoadPromise: Promise<SyntheticEHP> | null = null;
 
 /** Load the primary dataset. */
 export async function initializeData() {
+    if (mainData) return;
     const mainModule = await import("../data.js");
-    mainData = withAlgebraicNames(mainModule.data);
+    if (!mainData) {
+        populateAlgebraicNames(mainModule.data);
+        mainData = mainModule.data;
+    }
 }
 
 /**
  * Begin loading the stable dataset if it isn't already loaded/loading.
- * Returns a promise that resolves once `stableData` is available. Safe to call
- * repeatedly — the import only happens once.
+ * Returns a promise that resolves once the stable data and multiplication
+ * tables are available. Safe to call repeatedly.
  */
-export function ensureStableDataLoading(): Promise<void> {
+export function ensureStableDataLoading(): Promise<SyntheticEHP> {
     if (stableData) {
-        return Promise.resolve();
+        return Promise.resolve(stableData);
     }
     if (!stableDataLoadPromise) {
-        stableDataLoadPromise = import("../data_stable.js")
-            .then((stableModule) => {
-                stableData = withAlgebraicNames(stableModule.data_stable, true);
+        stableDataLoadPromise = Promise.all([import("../data_stable.js"), loadMultiplicationTables("ahss")])
+            .then(([stableModule]) => {
+                populateAlgebraicNames(stableModule.data_stable, true);
+                stableData = stableModule.data_stable;
+                return stableData;
             })
             .catch((error) => {
                 // Allow a later retry if the import failed.
@@ -72,13 +79,6 @@ export function getMainData(): SyntheticEHP | null {
 export function find(name: string): Generators | undefined {
     const data = getActiveData();
     if (!data) return undefined;
-    let generators = generatorsByDataset.get(data);
-    if (!generators) {
-        generators = new Map();
-        for (const generator of data.generators) {
-            if (!generators.has(generator.name)) generators.set(generator.name, generator);
-        }
-        generatorsByDataset.set(data, generators);
-    }
-    return generators.get(name);
+    const { byName, firstDuplicates } = getGeneratorIndex(data.generators);
+    return firstDuplicates?.get(name) ?? byName.get(name);
 }

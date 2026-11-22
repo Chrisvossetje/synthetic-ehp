@@ -41,11 +41,11 @@ use crate::{
 
 /// Depth up to which speculative branches are explored in parallel (via rayon)
 /// rather than sequentially.
-pub const PARALLEL_DEPTH: i32 = 6;
+pub const PARALLEL_DEPTH: i32 = 5;
 /// When true, every solver step prints, not just the top-level (depth 0) ones.
 pub const ALWAYS_PRINT: bool = false;
 /// Maximum recursion depth before a branch gives up and reports `Open`.
-pub const MAX_DEPTH: i32 = 10;
+pub const MAX_DEPTH: i32 = 11;
 
 /// Which flavour of convergence problem a batch of issues represents, and hence
 /// which `suggest_tau_solution_*` routine should try to repair it.

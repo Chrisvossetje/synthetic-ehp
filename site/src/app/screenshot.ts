@@ -309,13 +309,15 @@ function generateTikzCode(x1: number, x2: number, y1: number, y2: number, chart:
         tikz += `\\filldraw[draw=${border},fill=${fill},line width=0.4pt] ${shape};\n`;
 
         const tagDirection = tagLabelDirection(gen.y);
-        const tagAnchor = tagDirection === -1 ? "east" : "west";
         const afAnchor = tagDirection === -1 ? "west" : "east";
-        const power = chart.generator_tau_power(gen.name);
-        const tag = chart.generator_latex_tag(gen.name).replace(/\[/g, "{[}").replace(/\]/g, "{]}");
-        const latexName = (power ? `\\tau^{${power}}\\,` : "") + tag;
-        if (latexName && latexName.length > 0) {
-            tikz += `\\node[anchor=${tagAnchor},scale=0.15,inner sep=0pt] at (${roundCoord(cx + 0.04 * tagDirection)},${roundCoord(cyFlip)}) {$${latexName}$};\n`;
+        if (viewSettings.showTags) {
+            const tagAnchor = tagDirection === -1 ? "east" : "west";
+            const power = chart.generator_tau_power(gen.name);
+            const tag = chart.generator_latex_tag(gen.name).replace(/\[/g, "{[}").replace(/\]/g, "{]}");
+            const latexName = (power ? `\\tau^{${power}}\\,` : "") + tag;
+            if (latexName) {
+                tikz += `\\node[anchor=${tagAnchor},scale=0.15,inner sep=0pt] at (${roundCoord(cx + 0.04 * tagDirection)},${roundCoord(cyFlip)}) {$${latexName}$};\n`;
+            }
         }
 
         tikz += `\\node[anchor=${afAnchor},scale=0.15,gray,inner sep=0pt] at (${roundCoord(cx - 0.04 * tagDirection)},${roundCoord(cyFlip)}) {${af}};\n`;

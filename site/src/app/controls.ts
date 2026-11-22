@@ -1,7 +1,7 @@
 import { Category, FakeDataMode, viewSettings } from "../model/settings";
 import { ensureStableDataLoading, isStableDataReady, isUsingStableData, setUseStableData } from "../model/dataSource";
 import { assChart, ehpChart } from "./charts";
-import { update_ehp_chart } from "./ehpChart";
+import { prepareFirstAhssChart, update_ehp_chart } from "./ehpChart";
 import { update_ass_chart } from "./assChart";
 import { applyTruncationFromControls, syncSphereControlsFromState, TruncationControls } from "./truncation";
 
@@ -280,9 +280,14 @@ export function setupUIControls() {
 
     const tagSelect = byId<HTMLSelectElement>("tag-notation");
     if (tagSelect) {
-        tagSelect.value = viewSettings.tagNotation;
+        tagSelect.value = viewSettings.showTags ? viewSettings.tagNotation : "none";
         tagSelect.addEventListener("change", () => {
-            viewSettings.tagNotation = tagSelect.value === "curtis" ? "curtis" : "adams";
+            const notation = tagSelect.value;
+            viewSettings.showTags = notation !== "none";
+            ehpChart.svgchart.toggleAttribute("hide-generator-tags", !viewSettings.showTags);
+            if ((notation !== "adams" && notation !== "curtis") || notation === viewSettings.tagNotation) return;
+
+            viewSettings.tagNotation = notation;
             const infoPanel = byId("floatingBox");
             if (infoPanel) infoPanel.style.display = "none";
             updateActiveChart();
@@ -320,6 +325,10 @@ export function setupUIControls() {
         try {
             if (toAhss && !isStableDataReady()) {
                 await ensureStableDataLoading();
+            }
+            if (toAhss && _isEHPActive) {
+                const preparation = prepareFirstAhssChart(true);
+                if (preparation) await preparation.catch((error) => console.error("Failed to prepare AHSS", error));
             }
             setUseStableData(toAhss);
             syncViewControlsForDataSource();

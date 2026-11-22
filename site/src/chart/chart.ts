@@ -2,6 +2,7 @@ import { ToStringMap } from "./stringMap";
 import { SvgChart } from "./svgChart";
 import { Differential, DisplayMultiplication, ExternalTauMult, Generators, InternalTauMult, Multiplication } from "../types";
 import { displayName } from "../model/tagNames";
+import { getGeneratorIndex } from "../model/generatorIndex";
 import { Category, viewSettings } from "../model/settings";
 import { ChartMode } from "./chartMode";
 import { svgNS } from "./svgChart";
@@ -9,6 +10,22 @@ import { escapeHtml } from "./text";
 import { adamsTagLatex, renderAdamsTag } from "./tagMath";
 
 type Point = [number, number];
+
+type ChartSeries = {
+    generators: readonly Generators[];
+    differentials: readonly Differential[];
+    multiplications: readonly Multiplication[];
+    tau_mults: readonly (InternalTauMult | ExternalTauMult)[];
+};
+
+export type PreparedChartContent = {
+    markup: string | Uint8Array;
+    locations: Map<string, Point>;
+    maxStem: number;
+    tauPowers: Map<string, number>;
+    styledDots: boolean;
+    styledDifferentials: boolean;
+};
 
 export const MULTIPLICATION_COLOR = "#b0b0b0";
 
@@ -36,12 +53,23 @@ function torsionColor(order: number | undefined): string {
     return order && order > 0 ? TORSION_COLORS[(order - 1) % TORSION_COLORS.length] : "black";
 }
 
+function curtisLabelMarkup(tag: string, power: number): string {
+    const prefix = power ? `τ<sup>${power}</sup> ` : "";
+    return `<span>${prefix}${escapeHtml(tag)}</span>`;
+}
+
 type DotDisplay = {
     currentTorsion?: number;
     /** Zero means the class dies. Undefined means it survives as a free module. */
     finalTorsion?: number;
     filtration?: number;
     initialFiltration?: number;
+};
+
+type InitialPresentation = {
+    notation: typeof viewSettings.tagNotation;
+    dot(name: string): DotDisplay | undefined;
+    differential(from: string, to: string): { coeff: number | undefined } | undefined;
 };
 
 export class Chart {
@@ -53,7 +81,7 @@ export class Chart {
 
     // All generators and differentials (complete data set)
     public generators: Generators[] = [];
-    private generatorsByName = new Map<string, Generators>();
+    private generatorsByName: ReadonlyMap<string, Generators> = new Map();
     private tauPowers = new Map<string, number>();
     public differentials: Differential[] = [];
     public multiplications: Multiplication[] = [];
@@ -109,62 +137,42 @@ export class Chart {
         const contents = this.svgchart.shadowRoot?.getElementById("contents");
         if (!contents) return;
         contents.querySelector(".h-multiplications")?.remove();
-        const layer = document.createElementNS(svgNS, "g");
-        layer.setAttribute("class", "h-multiplications");
-        for (const relation of relations) {
+        const groups: string[] = [];
+        for (const [index, relation] of relations.entries()) {
             const from = this.name_to_location.get(relation.from);
             const to = this.name_to_location.get(relation.to);
             if (!from || !to) continue;
-            const group = document.createElementNS(svgNS, "g");
-            group.setAttribute("class", `h-multiplication h-multiplication-${relation.operator}`);
-            group.setAttribute("data-from", relation.from);
-            group.setAttribute("data-to", relation.to);
-            group.setAttribute("data-sphere", String(relation.sphere));
-            const title = document.createElementNS(svgNS, "title");
-            title.textContent = `h_${relation.operator} · ${this.generator_label(relation.from)} = ${(relation.displayTargets ?? [this.generator_label(relation.to)]).join(" + ")} (sphere ${relation.sphere})`;
-            group.append(title);
-            const line = document.createElementNS(svgNS, relation.operator === 0 ? "path" : "line");
+            const { cell, sphere } = relation;
+            const location = cell === undefined ? `sphere ${sphere}` : `top cell ${cell}`;
+            const title = `h_${relation.operator} · ${this.generator_label(relation.from)} = ${(relation.displayTargets ?? [this.generator_label(relation.to)]).join(" + ")} (${location})`;
+            let geometry: string;
             if (relation.operator === 0) {
                 const [c1, c2] = h0MultiplicationControls(from, to,
                     this.generator_row(relation.from) === this.generator_row(relation.to));
-                line.setAttribute("d", `M ${from[0]} ${from[1]} C ${c1[0]} ${c1[1]} ${c2[0]} ${c2[1]} ${to[0]} ${to[1]}`);
-                line.setAttribute("fill", "none");
+                geometry = `path d="M ${from[0]} ${from[1]} C ${c1[0]} ${c1[1]} ${c2[0]} ${c2[1]} ${to[0]} ${to[1]}" fill="none"`;
             } else {
-                line.setAttribute("x1", String(from[0]));
-                line.setAttribute("y1", String(from[1]));
-                line.setAttribute("x2", String(to[0]));
-                line.setAttribute("y2", String(to[1]));
+                geometry = `line x1="${from[0]}" y1="${from[1]}" x2="${to[0]}" y2="${to[1]}"`;
             }
-            const color = this.mode === ChartMode.ASS ? "black" : MULTIPLICATION_COLOR;
-            line.setAttribute("stroke", color);
-            const width = this.mode === ChartMode.ASS ? 0.02 : 0.01;
-            line.setAttribute("stroke-width", String(width));
-            line.setAttribute("pointer-events", "none");
-            const hit = line.cloneNode(true) as SVGPathElement | SVGLineElement;
-            hit.setAttribute("class", "h-multiplication-hit");
-            hit.setAttribute("stroke", "transparent");
-            // Keep the clickable stroke usable at every zoom level.
-            hit.setAttribute("stroke-width", "8");
-            hit.setAttribute("vector-effect", "non-scaling-stroke");
-            hit.setAttribute("stroke-linecap", "round");
-            hit.setAttribute("pointer-events", "stroke");
-            hit.style.cursor = "pointer";
-            group.append(line, hit);
-            group.addEventListener("click", (event) => {
-                event.stopPropagation();
-                this.multiplicationCallback?.(relation);
-            });
-            group.addEventListener("pointerenter", () => {
-                line.setAttribute("stroke", this.mode === ChartMode.ASS ? "black" : "#555");
-                line.setAttribute("stroke-width", String(width * 2.5));
-            });
-            group.addEventListener("pointerleave", () => {
-                line.setAttribute("stroke", color);
-                line.setAttribute("stroke-width", String(width));
-            });
-            layer.append(group);
+            groups.push(
+                `<g class="h-multiplication h-multiplication-${relation.operator}" data-index="${index}"`
+                + ` data-from="${escapeHtml(relation.from)}" data-to="${escapeHtml(relation.to)}"`
+                + ` data-${cell === undefined ? "sphere" : "cell"}="${cell ?? sphere}">`
+                + `<title>${escapeHtml(title)}</title><${geometry} class="h-multiplication-line"/>`
+                + `<${geometry} class="h-multiplication-hit" vector-effect="non-scaling-stroke"/></g>`
+            );
         }
-        contents.prepend(layer);
+        const color = this.mode === ChartMode.ASS ? "black" : MULTIPLICATION_COLOR;
+        const hoverColor = this.mode === ChartMode.ASS ? color : "#555";
+        const width = this.mode === ChartMode.ASS ? 0.02 : 0.01;
+        contents.insertAdjacentHTML("afterbegin", `<g class="h-multiplications"
+            style="--product-color:${color};--product-hover-color:${hoverColor};--product-width:${width};--product-hover-width:${width * 2.5}">${groups.join("")}</g>`);
+        contents.firstElementChild?.addEventListener("click", (event) => {
+            if (!(event.target instanceof Element)) return;
+            const index = event.target.closest(".h-multiplication")?.getAttribute("data-index");
+            if (index == null) return;
+            event.stopPropagation();
+            this.multiplicationCallback?.(relations[Number(index)]);
+        });
     }
 
     /**
@@ -192,9 +200,8 @@ export class Chart {
     // Set all generators (complete data set)
     set_all_generators(generators: Generators[]) {
         this.generators = generators;
-        this.generatorsByName = new Map(generators.map((gen) => [gen.name, gen]));
+        this.generatorsByName = getGeneratorIndex(generators).byName;
         this.tauPowers.clear();
-        this.maxStem = this.computeMaxStem();
     }
 
     generator_tag(name: string): string {
@@ -384,9 +391,10 @@ export class Chart {
         return name.replace(/[^a-zA-Z0-9_-]/g, '_');
     }
 
-    generate_dot(x: number, y: number, name: string, style: string = "") {
+    private generate_dot(x: number, y: number, generator: Generators, style = "") {
         const radius = this.get_dot_radius();
-        const label = /^(1|h_0)\[(\d+)\]$/.exec(this.generatorsByName.get(name)?.alg_name ?? name);
+        const { name, alg_name } = generator;
+        const label = /^(1|h_0)\[(\d+)\]$/.exec(alg_name ?? name);
         const square = label && Number(label[2]) % 2 === (label[1] === "1" ? 0 : 1);
         const shape = square
             ? `rect x="${x - radius}" y="${y - radius}" width="${2 * radius}" height="${2 * radius}"`
@@ -409,43 +417,40 @@ export class Chart {
 
     private generator_label_markup(name: string, label: string): string {
         if (viewSettings.tagNotation === "adams") return renderAdamsTag(label);
-        const power = this.generator_tau_power(name);
-        const prefix = power ? `τ<sup>${power}</sup> ` : "";
-        return `<span>${prefix}${escapeHtml(this.generator_tag(name))}</span>`;
+        return curtisLabelMarkup(this.generator_tag(name), this.generator_tau_power(name));
     }
 
-    generate_label(x: number, y: number, name: string, direction: -1 | 1, visible: boolean) {
+    private generate_label(x: number, y: number, name: string, direction: -1 | 1,
+        tag: string | undefined, notation: typeof viewSettings.tagNotation, power: number) {
         const labelX = x + 0.05 * direction;
         const width = 288;
         const left = direction === -1;
-        const label = visible ? this.generator_label(name) : "";
-        const labelAttribute = visible ? `aria-label="${escapeHtml(label)}"` : 'style="display:none"';
-        const markup = visible ? this.generator_label_markup(name, label) : "";
+        const label = tag === undefined ? "" : (power ? `τ^${power} ` : "") + tag;
+        const labelAttribute = tag === undefined ? 'style="display:none"' : `aria-label="${escapeHtml(label)}"`;
+        const markup = tag === undefined ? "" : notation === "adams" ? renderAdamsTag(label) : curtisLabelMarkup(tag, power);
         // Lay out the math at normal CSS font sizes, then scale it into chart units.
         return `<foreignObject class="generator-label" id="label-${name}" x="${left ? -width : 0}" y="-14" width="${width}" height="28" transform="translate(${labelX},${y}) scale(0.0033333333)" ${labelAttribute} onclick="window.chartInstance.handleDotClickEvent('${name}')"><div xmlns="http://www.w3.org/1999/xhtml" class="generator-label-content${left ? " align-left" : ""}">${markup}</div></foreignObject>`;
     }
 
-    generate_filtration_label(x: number, y: number, name: string, filtration: number, tagDirection: -1 | 1) {
+    generate_filtration_label(x: number, y: number, name: string, filtration: number, tagDirection: -1 | 1, hidden = false) {
         const labelX = x - 0.05 * tagDirection;
         const anchor = tagDirection === -1 ? "start" : "end";
-        return `<text class="generator-filtration-label" id="filtration-${name}" x="${labelX}" y="${y}" text-anchor="${anchor}" dominant-baseline="middle" onclick="window.chartInstance.handleDotClickEvent('${name}')">${filtration}</text>`;
+        const style = hidden ? ' style="display:none"' : "";
+        return `<text class="generator-filtration-label" id="filtration-${name}" x="${labelX}" y="${y}" text-anchor="${anchor}" dominant-baseline="middle"${style} onclick="window.chartInstance.handleDotClickEvent('${name}')">${filtration}</text>`;
     }
 
-    generate_stable_line(): string {
+    generate_stable_line(maxStem: number): string {
         // Only generate for EHP mode
         if (this.mode !== ChartMode.EHP) {
             return "";
         }
-
-        // Use MAX_STEM for bounds
-        let maxX = this.maxStem;
 
         // Build the path: starts at y=1, goes right 3 units, down 1 unit, repeat
         let pathData = "M 0 1"; // Start at (0, 1)
         let currentX = 0;
         let currentY = 1;
 
-        while (currentX < maxX + 3) {
+        while (currentX < maxStem + 3) {
             // Go right 3 units
             currentX += 3;
             pathData += ` L ${currentX} ${currentY}`;
@@ -467,36 +472,49 @@ export class Chart {
         let maxX = this.maxStem + 3;
         let maxY = this.maxStem + 3;
 
-        let cells = "";
-
-        // Generate crossed-out cells for:
-        // 1. First row (y = 0), except for (0, 0)
-        // 2. Below diagonal (x < y)
-        for (let x = 1; x <= maxX*2 + 10; x++) {
-            cells += `<rect x="${x}" y="${0}" width="1" height="1" fill="url(#crossPattern)" pointer-events="none"/>\n`;
-        }
+        // The pattern repeats in chart coordinates, so one rectangle can fill each row.
+        let cells = `<g fill="url(#crossPattern)" pointer-events="none"><rect x="1" y="0" width="${maxX * 2 + 10}" height="1"/>`;
         for (let y = 1; y <= maxY; y++) {
-            for (let x = 0; x <= maxX; x++) {
-                // Skip the (0, 0) cell
-                if (x === 0 && y === 0) {
-                    continue;
-                }
-                // Check if this cell should be crossed out
-                if (x < y) {
-                    cells += `<rect x="${x}" y="${y}" width="1" height="1" fill="url(#crossPattern)" pointer-events="none"/>\n`;
-                }
-            }
+            cells += `<rect x="0" y="${y}" width="${y}" height="1"/>`;
         }
-
-        return cells;
+        return cells + "</g>";
     }
 
-    init(visibleNames?: ReadonlySet<string>) {
-        let dots = this.init_dots(visibleNames);
-        let lines = this.init_diffs();
-        let mults = this.init_multiplications();
-        let tauMults = this.init_tau_mults();
-        let stableLine = this.generate_stable_line();
+    /** Compute SVG and positions without reading or changing the live SVG. */
+    *prepareContent(series: ChartSeries, visibleNames?: ReadonlySet<string>, presentation?: InitialPresentation): Generator<void, PreparedChartContent> {
+        const maxStem = this.computeMaxStem(series.generators);
+        const locations = new Map<string, Point>();
+        const tauPowers = new Map<string, number>();
+        // Updates address the first element for a name, so use the normal path if IDs repeat.
+        const dotDisplay = presentation && getGeneratorIndex(series.generators).byName.size === series.generators.length
+            ? presentation.dot : undefined;
+        const dots = yield* this.prepareDots(series.generators, maxStem, locations, tauPowers,
+            presentation?.notation ?? viewSettings.tagNotation, visibleNames, dotDisplay);
+        const lines = this.init_diffs(series.differentials, locations, presentation?.differential);
+        const mults = this.init_multiplications(series.multiplications, locations);
+        const tauMults = this.init_tau_mults(series.tau_mults, locations);
+        // Render relations behind dots and labels, as on the live chart.
+        let markup: PreparedChartContent["markup"] = [this.generate_stable_line(maxStem), lines, mults, tauMults, dots].join("");
+        if (presentation && typeof TextEncoder === "function" && typeof TextDecoder === "function") {
+            // A few non-ASCII tags can make the entire pending SVG a two-byte string.
+            yield;
+            markup = new TextEncoder().encode(markup);
+        }
+        return { markup, locations, maxStem, tauPowers, styledDots: dotDisplay !== undefined,
+            styledDifferentials: presentation !== undefined };
+    }
+
+    init(visibleNames?: ReadonlySet<string>, prepared?: PreparedChartContent) {
+        let content = prepared;
+        if (!content) {
+            const work = this.prepareContent(this, visibleNames);
+            let step = work.next();
+            while (!step.done) step = work.next();
+            content = step.value;
+        }
+        this.maxStem = content.maxStem;
+        this.name_to_location = content.locations;
+        this.tauPowers = content.tauPowers;
 
         // Use fixed bounds for predictable zoom/pan behavior.
         // ASS has much smaller y-range (Adams filtration), while EHP uses full stem range.
@@ -520,8 +538,8 @@ export class Chart {
             }
         }
 
-        // Render in order: stable line (background), lines, mults, tau mults, dots (foreground)
-        this.svgchart.replace_inner(stableLine + lines + mults + tauMults + dots);
+        const markup = typeof content.markup === "string" ? content.markup : new TextDecoder().decode(content.markup);
+        this.svgchart.replace_inner(markup);
 
         // Cache element references after SVG is populated
         this.cacheElementReferences();
@@ -581,13 +599,13 @@ export class Chart {
         });
     }
 
-    init_dots(visibleNames?: ReadonlySet<string>): string {
-        this.name_to_location.clear();
-
+    private *prepareDots(generators: readonly Generators[], maxStem: number, locations: Map<string, Point>,
+        tauPowers: Map<string, number>, notation: typeof viewSettings.tagNotation, visibleNames?: ReadonlySet<string>,
+        dotDisplay?: (name: string) => DotDisplay | undefined): Generator<void, string> {
         // Group ALL generators by their (x,y) coordinates
         let temp: ToStringMap<Point, Generators[]> = new ToStringMap();
 
-        this.generators.forEach(gen => {
+        generators.forEach(gen => {
             let xy: Point = [gen.stem, gen.y];
             if (temp.has(xy)) {
                 temp.get(xy)?.push(gen);
@@ -607,10 +625,12 @@ export class Chart {
         let filtrationLabels = "";
 
         // For ASS, use a fixed vertical range so AF=0 is consistently at the bottom.
-        const maxY = isASS ? Math.ceil(this.maxStem / 2) + 2 : 0;
+        const maxY = isASS ? Math.ceil(maxStem / 2) + 2 : 0;
+        const { byName } = getGeneratorIndex(generators);
+        let processed = 0;
 
-        Object.values(temp.map).forEach((gens) => {
-            gens.forEach((gen, index) => {
+        for (const gens of Object.values(temp.map)) {
+            for (const [index, gen] of gens.entries()) {
                 const step = isASS ? 0.12 : 0.08;
                 const offset = -((gens.length - 1) / 2) * step;
 
@@ -628,56 +648,81 @@ export class Chart {
                     y = gen.y + yOffset - yOffsetAdjust;
                 }
 
-                this.name_to_location.set(gen.name, [x, y]);
+                locations.set(gen.name, [x, y]);
 
-                dots += this.generate_dot(x, y, gen.name, "") + "\n";
+                const namedGenerator = byName.get(gen.name)!;
+                const display = dotDisplay?.(gen.name);
+                const hidden = dotDisplay !== undefined && display === undefined;
+                const initialFiltration = display?.initialFiltration ?? namedGenerator.af;
+                const power = display?.filtration === undefined ? 0 : initialFiltration - display.filtration;
+                if (power) tauPowers.set(gen.name, power);
+                let style = hidden ? "visibility:hidden" : "";
+                if (display) {
+                    style = `fill:${display.finalTorsion === 0 ? "white" : torsionColor(display.finalTorsion)}`;
+                    if (!isASS) style += `;stroke:${torsionColor(display.currentTorsion)}`;
+                }
+                dots += this.generate_dot(x, y, namedGenerator, style) + "\n";
                 const tagDirection = tagLabelDirection(gen.y);
                 if (this.showNames) {
-                    labels += this.generate_label(x, y, gen.name, tagDirection, visibleNames?.has(gen.name) ?? true) + "\n";
+                    const representative = isASS ? namedGenerator.induced_name?.[0]?.[1] : undefined;
+                    const label = (visibleNames?.has(gen.name) ?? true)
+                        ? displayName(representative ?? gen.name, namedGenerator.alg_name, notation) : undefined;
+                    labels += this.generate_label(x, y, gen.name, tagDirection, label, notation, power) + "\n";
                 }
                 if (this.showFiltration) {
-                    filtrationLabels += this.generate_filtration_label(x, y, gen.name, gen.af, tagDirection) + "\n";
+                    filtrationLabels += this.generate_filtration_label(x, y, gen.name, display?.filtration ?? gen.af, tagDirection, hidden) + "\n";
                 }
-            });
-        });
+                if (++processed % 256 === 0) yield;
+            }
+        }
 
         // Labels should be rendered after dots so they appear on top
         return dots + labels + filtrationLabels;
     }
 
-    private computeMaxStem(): number {
+    private computeMaxStem(generators: readonly Generators[]): number {
         let maxStem = 0;
-        this.generators.forEach((gen) => {
+        generators.forEach((gen) => {
             maxStem = Math.max(maxStem, gen.stem, gen.y);
         });
         return maxStem || 32;
     }
 
-    init_diffs(): string {
+    private init_diffs(differentials: readonly Differential[], locations: ReadonlyMap<string, Point>,
+        display?: InitialPresentation["differential"]): string {
         // Draw ALL differentials
-        return this.differentials.map(diff => {
+        const styled = display && new Set<string>();
+        return differentials.map(diff => {
             if (!diff.from || !diff.to) return "";
 
-            let from_loc = this.name_to_location.get(diff.from);
-            let to_loc = this.name_to_location.get(diff.to);
+            let from_loc = locations.get(diff.from);
+            let to_loc = locations.get(diff.to);
 
             if (!from_loc || !to_loc) {
                 console.warn(`Differential ${diff.from} -> ${diff.to} missing location`);
                 return "";
             }
 
-            const style = (diff.kind !== "Real" && diff.kind !== "Algebraic") && this.mode !== ChartMode.ASS ? "stroke-dasharray: 0.025,0.02;" : "";
+            let style = (diff.kind !== "Real" && diff.kind !== "Algebraic") && this.mode !== ChartMode.ASS ? "stroke-dasharray: 0.025,0.02;" : "";
+            if (styled) {
+                const key = `${diff.from}-${diff.to}`;
+                if (!styled.has(key)) {
+                    styled.add(key);
+                    const relation = display(diff.from, diff.to);
+                    style += relation ? `stroke:${torsionColor(relation.coeff)};` : "visibility:hidden;";
+                }
+            }
             return this.generate_diff(from_loc[0], from_loc[1], to_loc[0], to_loc[1], diff.from, diff.to, style);
         }).join("\n");
     }
 
-    init_multiplications(): string {
+    private init_multiplications(multiplications: readonly Multiplication[], locations: ReadonlyMap<string, Point>): string {
         // Draw ALL multiplications
-        return this.multiplications.map(mult => {
+        return multiplications.map(mult => {
             if (!mult.from || !mult.to) return "";
 
-            let from_loc = this.name_to_location.get(mult.from);
-            let to_loc = this.name_to_location.get(mult.to);
+            let from_loc = locations.get(mult.from);
+            let to_loc = locations.get(mult.to);
 
             if (!from_loc || !to_loc) {
                 console.warn(`Multiplication ${mult.from} -> ${mult.to} missing location`);
@@ -689,13 +734,13 @@ export class Chart {
         }).join("\n");
     }
 
-    init_tau_mults(): string {
+    private init_tau_mults(tauMults: ChartSeries["tau_mults"], locations: ReadonlyMap<string, Point>): string {
         // Draw ALL tau multiplications
-        return this.tau_mults.map(tauMult => {
+        return tauMults.map(tauMult => {
             if (!tauMult.from || !tauMult.to) return "";
 
-            let from_loc = this.name_to_location.get(tauMult.from);
-            let to_loc = this.name_to_location.get(tauMult.to);
+            let from_loc = locations.get(tauMult.from);
+            let to_loc = locations.get(tauMult.to);
 
             if (!from_loc || !to_loc) {
                 console.warn(`TauMult ${tauMult.from} -> ${tauMult.to} missing location`);

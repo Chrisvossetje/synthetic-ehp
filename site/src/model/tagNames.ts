@@ -34,8 +34,8 @@ export function algebraicName(name: string): string {
     return translateName(name, activeTranslations);
 }
 
-export function displayName(name: string, translated?: string): string {
-    return viewSettings.tagNotation === "curtis"
+export function displayName(name: string, translated?: string, notation = viewSettings.tagNotation): string {
+    return notation === "curtis"
         ? name.replace(/__ass_(src|tgt)$/, "")
         : translated ?? algebraicName(name);
 }
@@ -63,10 +63,10 @@ export function displayText(text: string): string {
     );
 }
 
-export function withAlgebraicNames(data: SyntheticEHP, stable: boolean = false): SyntheticEHP {
+/** Attach display names once to the generators owned by the loaded dataset. */
+export function populateAlgebraicNames(data: SyntheticEHP, stable: boolean = false) {
     const translations = stable ? STABLE_TAG_TRANSLATIONS : TAG_TRANSLATIONS;
-    return {
-        ...data,
-        generators: data.generators.map((gen) => ({ ...gen, alg_name: translateName(gen.name, translations) })),
-    };
+    for (const generator of data.generators) {
+        generator.alg_name = translateName(generator.name, translations);
+    }
 }

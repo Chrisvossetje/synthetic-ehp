@@ -28,12 +28,15 @@ export type Multiplication = {
     "to": string,
 }
 
+export type MultiplicationLocation =
+    | { sphere: number; cell?: never }
+    | { cell: number; sphere?: never };
+
 /** A resolved display overlay, independent of spectral-sequence computation. */
-export type DisplayMultiplication = {
+export type DisplayMultiplication = MultiplicationLocation & {
     from: string;
     to: string;
     operator: 0 | 1 | 2;
-    sphere: number;
     targets: readonly string[];
     displayTargets?: readonly string[];
     inheritedFrom?: { tag: string; sphere: number };

@@ -488,13 +488,22 @@ fn is_tau_issue(
     top_trunc: i32,
     bot_trunc: i32,
 ) -> Result<Option<(TauIssue, Vec<Issue>)>, String> {
-    match check_issue(data, model, stem, bot_trunc, top_trunc) {
-        Ok(_) => Ok(None),
-        Err(issues) => {
-            let context = format!("For RP{bot_trunc}_{top_trunc}");
-            classify_tau_issue(issues, &context, &context)
+    if (top_trunc == stem + 1 && bot_trunc & 1 == 1) || (top_trunc != stem + 1 && bot_trunc == 1 && top_trunc & 1 == 0) 
+        || (bot_trunc == 2 && top_trunc == 4) 
+        || (bot_trunc == 3 && top_trunc == 5) 
+        || (bot_trunc == 3 && top_trunc == 6) 
+        {
+        match check_issue(data, model, stem, bot_trunc, top_trunc) {
+            Ok(_) => Ok(None),
+            Err(issues) => {
+                let context = format!("For RP{bot_trunc}_{top_trunc}");
+                classify_tau_issue(issues, &context, &context)
+            }
         }
+    } else {
+        Ok(None)
     }
+
 }
 
 fn try_tau(

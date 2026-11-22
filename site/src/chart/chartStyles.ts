@@ -4,6 +4,10 @@ const GENERATOR_LABEL_CSS = `
     overflow: visible;
 }
 
+:host([hide-generator-tags]) .generator-label {
+    display: none;
+}
+
 .generator-label-content {
     content-visibility: auto;
     display: flex;
@@ -28,8 +32,30 @@ const GENERATOR_LABEL_CSS = `
 }
 `;
 
+const MULTIPLICATION_CSS = `
+.h-multiplication-line {
+    stroke: var(--product-color);
+    stroke-width: var(--product-width);
+    pointer-events: none;
+}
+
+.h-multiplication:hover > .h-multiplication-line {
+    stroke: var(--product-hover-color);
+    stroke-width: var(--product-hover-width);
+}
+
+.h-multiplication-hit {
+    stroke: transparent;
+    stroke-width: 8;
+    stroke-linecap: round;
+    pointer-events: stroke;
+    cursor: pointer;
+}
+`;
+
 export const EHP_CHART_CSS = `
 ${GENERATOR_LABEL_CSS}
+${MULTIPLICATION_CSS}
 :host { display: block; }
 .struct { stroke: black; fill: none; stroke-width: 0.03; }
 
@@ -110,6 +136,7 @@ ${GENERATOR_LABEL_CSS}
 
 export const ASS_CHART_CSS = `
 ${GENERATOR_LABEL_CSS}
+${MULTIPLICATION_CSS}
 :host { display: block; }
 .struct { stroke: black; fill: none; stroke-width: 0.04; }
 

@@ -28,6 +28,7 @@ export const viewSettings = {
     page: 1,
     category: Category.Synthetic,
     tagNotation: "adams" as "adams" | "curtis",
+    showTags: true,
     /** Top truncation (inclusive max `y`); `undefined` means "no top cutoff". */
     truncation: undefined as number | undefined,
     /** Bottom truncation (inclusive min `y`); `undefined` means "no bottom cutoff". */

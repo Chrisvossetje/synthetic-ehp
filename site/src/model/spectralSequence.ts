@@ -1,5 +1,6 @@
-import { Differential, ExternalTauMult, InternalTauMult, SyntheticEHP } from "../types";
+import { Differential, Generators, InternalTauMult, SyntheticEHP } from "../types";
 import { MAX_STEM } from "../data";
+import { getGeneratorIndex } from "./generatorIndex";
 import { Category, shouldIncludeKind, viewSettings } from "./settings";
 
 /**
@@ -52,14 +53,17 @@ export interface PageQuery {
 export interface PageView {
     generators: Record<string, TorsionFiltration>;
     differentials: Differential[];
+    /** First page on which a generator is absent after dying. */
+    deathPages: ReadonlyMap<string, number>;
 }
 
 type GeneratorState = {
-    af: number;
-    torsion: number | undefined;
+    readonly af: number;
+    readonly torsion?: number;
 };
 
 type GeneratorPageState = { page: number; state: GeneratorState };
+const EXTERNAL_TAU_PAGE = 500;
 
 /**
  * The forward run of the synthetic SS, computed once and reused: for each
@@ -67,9 +71,11 @@ type GeneratorPageState = { page: number; state: GeneratorState };
  * effect, plus the complete list of differentials (tagged with their page).
  */
 type SyntheticTimeline = {
-    generatorNames: string[];
-    pagesByGenerator: Record<string, GeneratorPageState[]>;
+    generators: ReadonlyMap<string, Generators>;
+    changesByGenerator: Map<string, GeneratorPageState[]>;
     allDiffs: Differential[];
+    deathPages: Map<string, number>;
+    external?: { states: Map<string, GeneratorState>; deaths: string[] };
 };
 
 // ---------------------------------------------------------------------------
@@ -174,34 +180,53 @@ function applyTauMultiplication(
     };
 }
 
-function buildYByName(data: SyntheticEHP): Record<string, number> {
-    const yByName: Record<string, number> = {};
-    data.generators.forEach((g) => {
-        yByName[g.name] = g.y;
-    });
-    return yByName;
-}
+type PageData = {
+    sortedDifferentials: { diff: Differential; page: number }[];
+    internalTauByPage: InternalTauMult[][];
+};
 
-/** Process lower source AF first, breaking ties with lower target AF. */
-function differentialsByAF(data: SyntheticEHP): Differential[] {
-    const afByName = new Map(data.generators.map((g) => [g.name, g.af]));
-    const af = (name: string) => afByName.get(name) ?? Infinity;
-    return [...data.differentials].sort((a, b) =>
-        af(a.from) - af(b.from) || af(a.to) - af(b.to)
+const pageDataCache = new WeakMap<SyntheticEHP, PageData>();
+
+function getPageData(data: SyntheticEHP): PageData {
+    const cached = pageDataCache.get(data);
+    if (cached) return cached;
+    const { byName } = getGeneratorIndex(data.generators);
+    const af = (name: string) => byName.get(name)?.af ?? Infinity;
+    const sortedDifferentials: PageData["sortedDifferentials"] = [];
+    for (const diff of data.differentials) {
+        const page = getDiffPage(diff, byName);
+        if (page !== undefined && Number.isFinite(page)) sortedDifferentials.push({ diff, page });
+    }
+    // Within each page, process lower source AF first, then lower target AF.
+    sortedDifferentials.sort((a, b) =>
+        a.page - b.page || af(a.diff.from) - af(b.diff.from) || af(a.diff.to) - af(b.diff.to)
     );
+    const internalTauByPage: InternalTauMult[][] = Array.from({ length: MAX_STEM + 1 }, () => []);
+    for (const tm of data.internal_tau_mults) {
+        if (tm.kind === "Real" && Number.isInteger(tm.page) && tm.page >= 0 && tm.page <= MAX_STEM) {
+            internalTauByPage[tm.page].push(tm);
+        }
+    }
+    const pageData = { sortedDifferentials, internalTauByPage };
+    pageDataCache.set(data, pageData);
+    return pageData;
 }
 
 /** The page a differential fires on: explicit `d`, else inferred from `y`s. */
-function getDiffPage(diff: Differential, yByName: Record<string, number>): number | undefined {
+function getDiffPage(diff: Differential, byName: ReadonlyMap<string, Generators>): number | undefined {
     if (Number.isFinite(diff.d)) {
         return diff.d;
     }
-    const fromY = yByName[diff.from];
-    const toY = yByName[diff.to];
-    if (!Number.isFinite(fromY) || !Number.isFinite(toY)) {
+    const fromY = byName.get(diff.from)?.y;
+    const toY = byName.get(diff.to)?.y;
+    if (fromY === undefined || toY === undefined || !Number.isFinite(fromY) || !Number.isFinite(toY)) {
         return undefined;
     }
     return fromY - toY;
+}
+
+export function getDifferentialPage(data: SyntheticEHP, diff: Differential): number | undefined {
+    return Number.isFinite(diff.d) ? diff.d : getDiffPage(diff, getGeneratorIndex(data.generators).byName);
 }
 
 /** Whether a generator passes the current truncation / stem window. */
@@ -222,86 +247,81 @@ function passesFilters(
 // ---------------------------------------------------------------------------
 
 /** The recorded state of a generator on the requested page. */
-function getStateAtPage(states: GeneratorPageState[], page: number): GeneratorState {
-    let idx = 0;
-    while (idx + 1 < states.length && states[idx + 1].page <= page) {
-        idx += 1;
+function getStateAtPage(
+    timeline: SyntheticTimeline, generator: Generators, page: number, externalState?: GeneratorState
+): GeneratorState {
+    const changes = timeline.changesByGenerator.get(generator.name);
+    let state: GeneratorState = generator;
+    if (changes) {
+        for (const change of changes) {
+            if (!(change.page <= page)) return state;
+            state = change.state;
+        }
     }
-    return states[idx].state;
+    return externalState ?? state;
+}
+
+function getLatestState(timeline: SyntheticTimeline, name: string): GeneratorState | undefined {
+    const changes = timeline.changesByGenerator.get(name);
+    if (changes) return changes[changes.length - 1].state;
+    const generator = timeline.generators.get(name);
+    // Older generated data can explicitly use null for a free module.
+    return generator?.torsion === null ? { af: generator.af, torsion: undefined } : generator;
+}
+
+function selectTimelineGenerators(
+    data: SyntheticEHP, truncation: number | undefined, bottomTruncation: number | undefined, limitX: number | undefined
+): ReadonlyMap<string, Generators> {
+    if (!truncation && bottomTruncation === undefined && !limitX && !data.generators.some((g) => g.torsion === 0)) {
+        return getGeneratorIndex(data.generators).byName;
+    }
+    const generators = new Map<string, Generators>();
+    for (const generator of data.generators) {
+        if (generator.torsion !== 0 && passesFilters(generator, truncation, bottomTruncation, limitX)) {
+            generators.set(generator.name, generator);
+        }
+    }
+    return generators;
 }
 
 function buildSyntheticTimeline(
     data: SyntheticEHP,
     truncation: number | undefined,
     bottomTruncation: number | undefined,
-    limitX: number | undefined,
-    applyTauMults: boolean
+    limitX: number | undefined
 ): SyntheticTimeline {
-    const yByName = buildYByName(data);
-    const pagesByGenerator: Record<string, GeneratorPageState[]> = {};
-    const currentState: Record<string, GeneratorState> = {};
-    const generatorNames: string[] = [];
-
-    // Seed every surviving generator with its E1 state.
-    data.generators.forEach((g) => {
-        if (!passesFilters(g, truncation, bottomTruncation, limitX)) {
-            return;
-        }
-        const initialTorsion = normalizeTorsion(g.torsion);
-        if (initialTorsion === 0) {
-            return;
-        }
-        const initialState = { af: g.af, torsion: initialTorsion };
-        pagesByGenerator[g.name] = [{ page: 1, state: initialState }];
-        currentState[g.name] = { ...initialState };
-        generatorNames.push(g.name);
-    });
-
-    // Bucket differentials and internal τ-multiplications by the page they act.
-    const diffsByPage: Differential[][] = Array.from({ length: MAX_STEM + 1 }, () => []);
-    differentialsByAF(data).forEach((diff) => {
-        if (!shouldIncludeKind(diff.kind)) return;
-        const diffPage = getDiffPage(diff, yByName);
-        if (diffPage === undefined || !Number.isFinite(diffPage)) return;
-        if (diffPage < 0 || diffPage > MAX_STEM) return;
-        diffsByPage[diffPage].push(diff);
-    });
-
-    const internalTauByPage: InternalTauMult[][] = Array.from({ length: MAX_STEM + 1 }, () => []);
-    data.internal_tau_mults.forEach((tm) => {
-        if (!shouldIncludeKind(tm.kind)) return;
-        if (tm.kind !== "Real") return;
-        if (!Number.isFinite(tm.page)) return;
-        if (tm.page < 0 || tm.page > MAX_STEM) return;
-        internalTauByPage[tm.page].push(tm);
-    });
-
-    const externalTaus: ExternalTauMult[] = [];
-    data.external_tau_mults.forEach((tm) => {
-        if (!shouldIncludeKind(tm.kind)) return;
-        if (tm.kind !== "Real") return;
-        externalTaus.push(tm);
-    });
-
-    const allDiffs: Differential[] = [];
+    const { sortedDifferentials, internalTauByPage } = getPageData(data);
+    // The original generator already stores the E1 state. Record only later changes.
+    const timeline: SyntheticTimeline = {
+        generators: selectTimelineGenerators(data, truncation, bottomTruncation, limitX),
+        changesByGenerator: new Map(), allDiffs: [], deathPages: new Map(),
+    };
+    const recordState = (name: string, page: number, state: GeneratorState) => {
+        const changes = timeline.changesByGenerator.get(name);
+        const change = { page, state };
+        if (changes) changes.push(change);
+        else timeline.changesByGenerator.set(name, [change]);
+        if (state.torsion === 0 && !timeline.deathPages.has(name)) timeline.deathPages.set(name, page);
+    };
 
     // Walk the pages in order, applying τ-multiplications then differentials.
+    let diffIndex = 0;
     for (let p = 0; p <= MAX_STEM; p++) {
         for (const tm of internalTauByPage[p]) {
-            const fromState = currentState[tm.from];
-            const toState = currentState[tm.to];
+            const fromState = getLatestState(timeline, tm.from);
+            const toState = getLatestState(timeline, tm.to);
             if (!fromState || !toState) continue;
             const updated = applyTauMultiplication(fromState, toState);
             if (!updated) continue;
-            currentState[tm.from] = updated.from;
-            currentState[tm.to] = updated.to;
-            pagesByGenerator[tm.from]?.push({ page: p, state: updated.from });
-            pagesByGenerator[tm.to]?.push({ page: p, state: updated.to });
+            recordState(tm.from, p, updated.from);
+            recordState(tm.to, p, updated.to);
         }
 
-        for (const diff of diffsByPage[p]) {
-            const fromState = currentState[diff.from];
-            const toState = currentState[diff.to];
+        while (diffIndex < sortedDifferentials.length && sortedDifferentials[diffIndex].page <= p) {
+            const { diff, page } = sortedDifferentials[diffIndex++];
+            if (page !== p || !shouldIncludeKind(diff.kind)) continue;
+            const fromState = getLatestState(timeline, diff.from);
+            const toState = getLatestState(timeline, diff.to);
             if (!fromState || !toState) continue;
 
             const mapped = mapBetweenGenerators(fromState, toState);
@@ -310,53 +330,54 @@ function buildSyntheticTimeline(
             // Only real/algebraic differentials actually mutate the page state;
             // others are recorded for display but don't kill classes.
             if (diff.kind == "Real" || diff.kind == "Algebraic") {
-                currentState[diff.from] = mapped.from;
-                currentState[diff.to] = mapped.to;
-                pagesByGenerator[diff.from]?.push({ page: p + 1, state: mapped.from });
-                pagesByGenerator[diff.to]?.push({ page: p + 1, state: mapped.to });
+                recordState(diff.from, p + 1, mapped.from);
+                recordState(diff.to, p + 1, mapped.to);
             }
-            allDiffs.push({ ...diff, d: p });
+            timeline.allDiffs.push({ ...diff, d: p });
         }
     }
+    return timeline;
+}
 
-    // External τ-multiplications resolve "at the very end" (E∞), if requested.
-    if (applyTauMults) {
-        for (const tm of externalTaus) {
-            const fromState = currentState[tm.from];
-            const toState = currentState[tm.to];
-            if (!fromState || !toState) continue;
-            const updated = applyTauMultiplication(fromState, toState, tm.af);
-            if (!updated) continue;
-            currentState[tm.from] = updated.from;
-            currentState[tm.to] = updated.to;
-            pagesByGenerator[tm.from]?.push({ page: 500, state: updated.from });
-            pagesByGenerator[tm.to]?.push({ page: 500, state: updated.to });
-        }
+/** External τ extensions share the base timeline and store only their endpoint changes. */
+function getExternalStates(data: SyntheticEHP, timeline: SyntheticTimeline) {
+    if (timeline.external) return timeline.external;
+    const states = new Map<string, GeneratorState>();
+    for (const tm of data.external_tau_mults) {
+        if (tm.kind !== "Real") continue;
+        const fromState = states.get(tm.from) ?? getLatestState(timeline, tm.from);
+        const toState = states.get(tm.to) ?? getLatestState(timeline, tm.to);
+        if (!fromState || !toState) continue;
+        const updated = applyTauMultiplication(fromState, toState, tm.af);
+        if (!updated) continue;
+        states.set(tm.from, updated.from);
+        states.set(tm.to, updated.to);
     }
-
-    return { generatorNames, pagesByGenerator, allDiffs };
+    const deaths: string[] = [];
+    for (const [name, state] of states) {
+        if (state.torsion === 0) deaths.push(name);
+    }
+    timeline.external = { states, deaths };
+    return timeline.external;
 }
 
 /**
- * Single-slot memo for the synthetic timeline. Building it walks every page, so
- * we cache the most recent result and reuse it while the inputs are unchanged.
- * The key includes both `applyTauMults` and the Fakes filter.
+ * Keep one timeline per dataset. A new cutoff or Fakes setting replaces it.
  */
-let timelineCache: { data: SyntheticEHP; key: string; timeline: SyntheticTimeline } | null = null;
+type CachedTimeline = { key: string; timeline: SyntheticTimeline };
+const timelinesByDataset = new WeakMap<SyntheticEHP, CachedTimeline>();
 
 function getSyntheticTimeline(
     data: SyntheticEHP,
     truncation: number | undefined,
     bottomTruncation: number | undefined,
-    limitX: number | undefined,
-    applyTauMults: boolean
+    limitX: number | undefined
 ): SyntheticTimeline {
-    const key = `${truncation}|${bottomTruncation}|${limitX}|${applyTauMults}|${viewSettings.fakeDataMode}`;
-    if (timelineCache && timelineCache.data === data && timelineCache.key === key) {
-        return timelineCache.timeline;
-    }
-    const timeline = buildSyntheticTimeline(data, truncation, bottomTruncation, limitX, applyTauMults);
-    timelineCache = { data, key, timeline };
+    const key = `${truncation}|${bottomTruncation}|${limitX}|${viewSettings.fakeDataMode}`;
+    const cached = timelinesByDataset.get(data);
+    if (cached?.key === key) return cached.timeline;
+    const timeline = buildSyntheticTimeline(data, truncation, bottomTruncation, limitX);
+    timelinesByDataset.set(data, { key, timeline });
     return timeline;
 }
 
@@ -365,20 +386,31 @@ function computeSyntheticPage(data: SyntheticEHP, query: PageQuery): PageView {
         data,
         query.truncation,
         query.bottomTruncation,
-        query.limitX,
-        query.applyTauMults ?? false
+        query.limitX
     );
-
+    const external = query.applyTauMults ? getExternalStates(data, timeline) : undefined;
+    const externalStates = query.page >= EXTERNAL_TAU_PAGE ? external?.states : undefined;
     const generators: Record<string, TorsionFiltration> = {};
-    timeline.generatorNames.forEach((name) => {
-        const states = timeline.pagesByGenerator[name];
-        if (!states) return;
-        const st = getStateAtPage(states, query.page);
-        generators[name] = [st.torsion, st.af];
-    });
+    for (const [name, generator] of timeline.generators) {
+        const state = getStateAtPage(timeline, generator, query.page, externalStates?.get(name));
+        generators[name] = [normalizeTorsion(state.torsion), state.af];
+    }
 
-    const differentials = timeline.allDiffs.filter((d) => d.d !== undefined && d.d < query.page);
-    return { generators, differentials };
+    // The recorded differentials are in page order. Copy only the visible prefix.
+    let low = 0;
+    let high = timeline.allDiffs.length;
+    while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+        if (timeline.allDiffs[mid].d! < query.page) low = mid + 1;
+        else high = mid;
+    }
+    const differentials = timeline.allDiffs.slice(0, low);
+    let deathPages = timeline.deathPages;
+    if (external?.deaths.length) {
+        deathPages = new Map(deathPages);
+        for (const name of external.deaths) deathPages.set(name, EXTERNAL_TAU_PAGE);
+    }
+    return { generators, differentials, deathPages };
 }
 
 // ---------------------------------------------------------------------------
@@ -392,7 +424,7 @@ function computeSyntheticPage(data: SyntheticEHP, query: PageQuery): PageView {
  */
 function computeClassicalPage(data: SyntheticEHP, query: PageQuery): PageView {
     const { category, truncation, bottomTruncation, page, limitX } = query;
-    const yByName = buildYByName(data);
+    const { sortedDifferentials } = getPageData(data);
     const generators: Record<string, TorsionFiltration> = {};
 
     data.generators.forEach((g) => {
@@ -413,39 +445,26 @@ function computeClassicalPage(data: SyntheticEHP, query: PageQuery): PageView {
     });
 
     const differentials: Differential[] = [];
-    for (const diff of differentialsByAF(data)) {
-        if (diff.kind !== "Real" && diff.kind !== "Algebraic") {
-            continue;
-        }
-        const diffPage = getDiffPage(diff, yByName);
-        if (diffPage === undefined || !Number.isFinite(diffPage)) {
-            continue;
-        }
-        const coeff = diff.coeff ?? 0;
+    const deathPages = new Map<string, number>();
+    for (const { diff, page: diffPage } of sortedDifferentials) {
+        if (diffPage >= page) break;
+        if (diff.kind !== "Algebraic" && (category !== Category.Geometric || diff.kind !== "Real")) continue;
+        if (!generators[diff.from] || !generators[diff.to]) continue;
 
-        // Both endpoints must exist and the differential must fire before `page`.
-        if (!generators[diff.from] || !generators[diff.to] || diffPage >= page) {
-            continue;
-        }
+        const fromDeath = deathPages.get(diff.from) ?? Infinity;
+        const toDeath = deathPages.get(diff.to) ?? Infinity;
+        if (fromDeath <= diffPage || toDeath <= diffPage) continue;
+        // The geometric view keeps a single hit for each target on a page.
+        if (category === Category.Geometric && toDeath === diffPage + 1) continue;
 
-        if (category == Category.Algebraic) {
-            if (diff.kind === "Algebraic") {
-                generators[diff.from][0] = 0;
-                generators[diff.to][0] = 0;
-                differentials.push({ ...diff, d: diffPage, coeff });
-            }
-        } else {
-            // Geometric: a class can already be dead (it happens here), so only
-            // record the differential when the target is still alive.
-            if (generators[diff.to][0] || generators[diff.to][0] != 0) {
-                generators[diff.from][0] = 0;
-                generators[diff.to][0] = 0;
-                differentials.push({ ...diff, d: diffPage, coeff });
-            }
-        }
+        generators[diff.from][0] = 0;
+        generators[diff.to][0] = 0;
+        deathPages.set(diff.from, diffPage + 1);
+        deathPages.set(diff.to, diffPage + 1);
+        differentials.push({ ...diff, d: diffPage, coeff: diff.coeff ?? 0 });
     }
 
-    return { generators, differentials };
+    return { generators, differentials, deathPages };
 }
 
 // ---------------------------------------------------------------------------

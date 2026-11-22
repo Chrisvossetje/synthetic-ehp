@@ -22,15 +22,15 @@ mod routines;
 
 // AHSS CURTIS DATA IS VALID UNTIL STEM 48
 // EHP curtis data is also valid until STEM 48
-const MAX_STEM: i32 = 48;
-const MAX_EXPORT_STEM: i32 = 44;
-const MAX_VERIFY_STEM: i32 = 47;
+const MAX_STEM: i32 = 60;
+const MAX_EXPORT_STEM: i32 = 60;
+const MAX_VERIFY_STEM: i32 = 59;
 
 
 fn main() {
     if 1 != 1 {
-        interactive_ahss();
-        interactive_ehp();
+        interactive_ahss(true);
+        interactive_ehp(true);
 
         automated_ahss(true);    
 
@@ -42,13 +42,16 @@ fn main() {
         export_tag_translation();
     }
 
+    // interactive_ahss(false);
+    // interactive_ehp(false);
+
     // let (ahss, _) = interactive_ahss();
 
     // interactive_ehp();
 
-    // automated_ahss(true);
+    automated_ahss(true);
+    // let ehp = automated_ehp(false);
     
-    let ehp = automated_ehp(true);
     // interactive_ehp();
 
     // let mut ehp = get_log(false, false).unwrap();

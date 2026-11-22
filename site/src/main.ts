@@ -1,8 +1,9 @@
 import type { Chart } from "./chart/chart";
-import { initializeData, ensureStableDataLoading } from "./model/dataSource";
+import { initializeData } from "./model/dataSource";
 import { loadMultiplicationTables } from "./model/multiplicationSource";
 import { ehpChart } from "./app/charts";
 import { setupUIControls } from "./app/controls";
+import { prepareFirstAhssChart } from "./app/ehpChart";
 import { setupKeyboardControls } from "./app/keyboard";
 import {
     cancelScreenshot,
@@ -40,9 +41,10 @@ async function bootstrap() {
     setupUIControls();
     setupScreenshotHandlers();
 
-    ensureStableDataLoading().catch((error) => {
-        console.error("Failed to preload stable data", error);
-    });
+    // Give the initial EHP chart a frame to paint before starting AHSS work.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        prepareFirstAhssChart()?.catch((error) => console.error("Failed to prepare AHSS", error));
+    }));
 }
 
 /** Forward pointer events on the EHP chart to the screenshot selection logic. */

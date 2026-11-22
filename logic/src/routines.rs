@@ -17,15 +17,18 @@ use crate::{
     }
 };
 
-pub fn interactive_ahss() -> (SyntheticSS, Duration) {
+pub fn interactive_ahss(import_log: bool) -> (SyntheticSS, Duration) {
     let original_data = &STABLE_DATA.clone();
 
-    let mut log = match get_log(false, true) {
+    let mut log = if import_log { match get_log(false, true) {
         Ok(log) => log,
         Err(_) => {
-            panic!("Log importing was not succesful");
+            panic!("Log importing was not succesful")
         }
-    };
+    }} else { vec![] };
+
+    println!("{:?}", log);
+
     let mut data = revert_log_and_remake(0, &mut log, &STABLE_MODEL, &STABLE_DATA, true);
 
     write_all(&data, &STABLE_MODEL, &log, true);
@@ -125,7 +128,7 @@ pub fn interactive_ahss() -> (SyntheticSS, Duration) {
     return (data, total_input_time);
 }
 
-pub fn interactive_ehp() -> (SyntheticSS, Duration) {
+pub fn interactive_ehp(import_log: bool) -> (SyntheticSS, Duration) {
 
     let mut original_data = DATA.clone();
 
@@ -141,13 +144,13 @@ pub fn interactive_ehp() -> (SyntheticSS, Duration) {
 
     set_metastable_range(&mut original_data, &ahss).unwrap();
 
-    let mut log = match get_log(false, false) {
+    let mut log = if import_log  { match get_log(false, false) {
         Ok(log) => log,
         Err(_) => {
             println!("Log importing was not succesful");
             vec![]
         }
-    };
+    }} else { vec![] };
     let mut data = revert_log_and_remake(0, &mut log, &MODEL, &original_data, false);
 
     write_all(&data, &MODEL, &log, false);
@@ -322,9 +325,11 @@ pub fn export_tag_translation() {
         (1300, "h_0^2d_0e_0".to_owned()),
         (1385, "h_0^9h_5".to_owned()),
         (1301, "h_1P^2d_0".to_owned()),
-        (1354, "h_0^12h_5 + h_1P^2d_0".to_owned()),
-
-        // Stem 37 and rest TODO        
+        (1354, "h_0^{12}h_5 + h_1P^2d_0".to_owned()),
+        
+        // Stem 37 and rest TODO  
+        (2205, "h_1t".to_owned()),
+        (2253, "h_0^2x + h_1t".to_owned()),
     ]);
 
     for (index, m) in MODEL.enumerate() {

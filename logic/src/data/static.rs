@@ -42,7 +42,7 @@ pub static RP_TRUNCATIONS: LazyLock<Vec<(i32, i32)>> = LazyLock::new(|| {
     chain![
         vec![(1, 2), (2, 4), (3, 5), (3, 6)],
         (2..=MAX_STEM).step_by(2).map(|x| (1, x)),
-        (3..=MAX_STEM)
+        (1..=MAX_STEM)
             .rev()
             .filter(|x| x % 2 == 1)
             .map(|x| (x, 256))
@@ -81,7 +81,7 @@ pub static TRUNCS: LazyLock<Vec<(bool, i32, i32)>> = LazyLock::new(|| {
                 })
             })
             .sorted_by_key(|x| (!x.0, x.2 - x.1)),
-        (3..=MAX_STEM)
+        (1..=MAX_STEM)
             .rev()
             .filter(|x| x % 2 == 1)
             .map(|x| (true, x, 256)),
@@ -209,7 +209,7 @@ pub static ALGEBRAIC_SPHERE_PAGES: LazyLock<[SSPages; (MAX_STEM + 1) as usize]> 
 fn ahss_data_path(file_name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
-        .join("AHSS_DATA")
+        .join("ASS_DATA")
         .join(file_name)
 }
 
