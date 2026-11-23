@@ -127,7 +127,7 @@ To measure SAHSS discovery through stem 28 from the minimal AHSS action log,
 run the release benchmark from `logic/`.
 
 ```sh
-RAYON_NUM_THREADS=4 cargo test --release benchmark_sahss_stem_28 -- --ignored --nocapture
+RAYON_NUM_THREADS=3 cargo test --release benchmark_sahss_stem_28 -- --ignored --nocapture
 ```
 
 The benchmark requires the sweep to finish stem 28 and reports elapsed time,
