@@ -7,8 +7,9 @@
 //! `filter_*` helpers shortcut differentials whose status is forced by theory
 //! (James periodicity / minimal length / additive structure).
 
-use std::sync::{
-    Arc, Mutex,
+use std::{
+    cell::Cell,
+    sync::{Arc, Mutex},
 };
 
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -128,6 +129,7 @@ fn iterate_e1_issues(
             top_trunc,
             bot_trunc,
             depth + 1,
+            None,
         )
         .assuming(depth + 1, choice(index))
     };
@@ -193,6 +195,11 @@ fn iterate_e1_issues(
     }
 }
 
+struct SweepLimit {
+    stop_before_stem: i32,
+    reached: Cell<bool>,
+}
+
 fn ahss_iterate(
     mut data: SyntheticSS,
     model: &E1,
@@ -205,6 +212,7 @@ fn ahss_iterate(
     mut top_trunc: i32,
     mut bot_trunc: i32,
     depth: i32,
+    sweep_limit: Option<&SweepLimit>,
 ) -> BranchResult {
     let mut trace = ProofTrace::default();
     // The solver sweeps (stem, top_trunc) outward. Each iteration tries to make
@@ -349,6 +357,12 @@ fn ahss_iterate(
         getout.position += 1;
         if top_trunc == stem + 1 {
             stem += 1;
+            if let Some(limit) = sweep_limit
+                && stem == limit.stop_before_stem
+            {
+                limit.reached.set(true);
+                return BranchResult::Open(trace.open(depth));
+            }
             top_trunc = 2;
             bot_trunc = top_trunc - 1;
 
@@ -453,6 +467,7 @@ fn try_diff(
             top_trunc,
             bot_trunc,
             depth + 1,
+            None,
         )
     };
 
@@ -553,6 +568,7 @@ fn try_tau(
             top_trunc,
             bot_trunc,
             depth + 1,
+            None,
         )
     };
 
@@ -639,6 +655,13 @@ pub fn ahss_solve_e1_issues(ahss: &SyntheticSS, model: &E1, log: &mut Vec<Action
 /// Entry point: run the automated AHSS solver from an optional starting log,
 /// returning the full action log it produced and the resulting spectral sequence.
 pub fn ahss_solver(log: Option<Vec<Action>>) -> (Vec<Action>, SyntheticSS) {
+    ahss_solver_until(log, None)
+}
+
+fn ahss_solver_until(
+    log: Option<Vec<Action>>,
+    sweep_limit: Option<&SweepLimit>,
+) -> (Vec<Action>, SyntheticSS) {
     let alg_ahss = STABLE_DATA.clone();
     let model: &E1 = &STABLE_MODEL;
     let mut partial_ahss = SyntheticSS::empty(model.clone());
@@ -679,8 +702,20 @@ pub fn ahss_solver(log: Option<Vec<Action>>) -> (Vec<Action>, SyntheticSS) {
 
     // Drive the search from the very first cell (stem 2, RP^1_2). It appends
     // every committed fact to the shared `log`.
-    let res = ahss_iterate(ahss, model, &alg_ahss, &alg_data, &e1_issues, empty_getout(), log.clone(),
-    2, 2, 1, 0);
+    let res = ahss_iterate(
+        ahss,
+        model,
+        &alg_ahss,
+        &alg_data,
+        &e1_issues,
+        empty_getout(),
+        log.clone(),
+        2,
+        2,
+        1,
+        0,
+        sweep_limit,
+    );
 
     // Rebuild the final sequence from the produced log on top of the algebraic
     // differentials, so the result is exactly what replaying the log yields.
@@ -693,4 +728,52 @@ pub fn ahss_solver(log: Option<Vec<Action>>) -> (Vec<Action>, SyntheticSS) {
     let mut log = Arc::try_unwrap(log).unwrap().into_inner().unwrap();
     let ahss = revert_log_and_remake(0, &mut log, model, &partial_ahss, true);
     (log, ahss)
+}
+
+#[cfg(test)]
+mod benchmark {
+    use std::{
+        hash::{DefaultHasher, Hash, Hasher},
+        time::Instant,
+    };
+
+    use super::*;
+    use crate::io::import::get_log;
+
+    #[test]
+    #[ignore = "release-mode SAHSS discovery benchmark"]
+    fn benchmark_sahss_stem_28() {
+        let seed = get_log(true, true).expect("load the minimal AHSS log");
+        let limit = SweepLimit {
+            stop_before_stem: 29,
+            reached: Cell::new(false),
+        };
+
+        let start = Instant::now();
+        let (log, _) = ahss_solver_until(Some(seed), Some(&limit));
+        let elapsed = start.elapsed();
+        assert!(limit.reached.get(), "search stopped before completing stem 28");
+
+        let action_count = log.len();
+        let mut facts: Vec<_> = log
+            .into_iter()
+            .map(|mut action| {
+                match &mut action {
+                    Action::AddDiff { proof, .. } | Action::AddExt { proof, .. } => *proof = None,
+                    Action::AddInt { proof, .. }
+                    | Action::SetE1 { proof, .. }
+                    | Action::SetInducedName { proof, .. } => proof.clear(),
+                    Action::Revert { .. } => {}
+                }
+                serde_json::to_string(&action).unwrap()
+            })
+            .collect();
+        facts.sort_unstable();
+        let mut digest = DefaultHasher::new();
+        facts.hash(&mut digest);
+        println!(
+            "SAHSS through stem 28: {elapsed:?}; {action_count} actions; facts {:016x}",
+            digest.finish()
+        );
+    }
 }

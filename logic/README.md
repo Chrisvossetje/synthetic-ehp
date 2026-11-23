@@ -123,6 +123,17 @@ Prefix the command with `EHP_SHOW_PROOF=1` to print both views of an example
 stem 25 differential proof. The benchmark also checks all produced facts against
 the saved verdicts.
 
+To measure SAHSS discovery through stem 28 from the minimal AHSS action log,
+run the release benchmark from `logic/`.
+
+```sh
+RAYON_NUM_THREADS=4 cargo test --release benchmark_sahss_stem_28 -- --ignored --nocapture
+```
+
+The benchmark requires the sweep to finish stem 28 and reports elapsed time,
+action count, and a fingerprint of the actions with proof text removed. It
+leaves the input logs and website data alone.
+
 ## How it fits together (`src/`)
 
 The crate is split into four areas, each with module-level docs:
