@@ -44,17 +44,23 @@ fn make_ext_tau(
 }
 
 pub fn get_a_diff(data: &SyntheticSS, model: &E1, top_trunc: i32, bot_trunc: i32, stem: i32) -> Option<Diff> {
-    // We can look at targets in RP1_256 as we have not added the adams diffs yet!
-    // let (targets, _) = compute_pages(data, 0, top_trunc, stem, stem, false);
+    let targets = model.gens_id_in_stem_y(stem, bot_trunc);
+    let sources_at_y = model.gens_id_in_stem_y(stem + 1, top_trunc);
+    if !targets.iter().any(|&id| data.generators[id].alive())
+        || !sources_at_y.iter().any(|&id| data.generators[id].alive())
+    {
+        return None;
+    }
+
     let (sources, _) = compute_pages(data, model, 0, 256, stem, stem + 1, false);
 
     let d_y = top_trunc - bot_trunc;
 
-    for &t_id in model.gens_id_in_stem_y(stem, bot_trunc) {
+    for &t_id in targets {
         if let Some((t_af, t_torsion)) = sources.try_element_final(t_id)
             && t_torsion.alive()
         {
-            for &s_id in model.gens_id_in_stem_y(stem + 1, top_trunc) {
+            for &s_id in sources_at_y {
                 if let Some((s_af_final, s_torsion)) = sources.try_element_final(s_id)
                 && s_torsion.alive()
                 {

@@ -306,9 +306,9 @@ pub fn revert_log_and_remake(
     // SetE1 actions must run before everything else (later actions depend on the
     // E1 torsion they establish), so replay the log in two passes.
     let apply = |data: &mut SyntheticSS, action: &Action| {
-        process_action(data, model, action, ahss).expect(&format!(
-            "There was an invalid action in the log. That should not be possible :( {action:?}"
-        ));
+        process_action(data, model, action, ahss).unwrap_or_else(|_| {
+            panic!("There was an invalid action in the log. That should not be possible :( {action:?}")
+        });
     };
 
     for action in log {

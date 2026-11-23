@@ -40,7 +40,7 @@ pub fn set_metastable_range(
                     &MODEL,
                     g_from.name.clone(),
                     g_to.name.clone(),
-                    proof.clone().map(|x| format!("(Metastable) - {x} ")),
+                    proof.as_deref().map(|x| format!("(Metastable) - {x} ")),
                     *kind,
                 )?;
             }
@@ -59,7 +59,7 @@ pub fn set_metastable_range(
                     g_from.name.clone(),
                     g_to.name.clone(),
                     page as i32,
-                    proof.clone().map(|x| format!("(Metastable) - {x}")),
+                    proof.as_deref().map(|x| format!("(Metastable) - {x}")),
                     *kind, // TODO! <<
                 )?;
             }
@@ -77,7 +77,7 @@ pub fn set_metastable_range(
                 g_from.name.clone(),
                 g_to.name.clone(),
                 e.af,
-                proof.clone().map(|x| format!("(Metastable) - {x}")),
+                proof.as_deref().map(|x| format!("(Metastable) - {x}")),
                 *kind, // TODO! <<
             )?;
         }

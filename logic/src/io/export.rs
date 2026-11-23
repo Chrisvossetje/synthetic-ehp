@@ -299,18 +299,9 @@ fn add_final_diagonal(model: &mut E1, data: &mut SyntheticSS ) {
         model.push(Generator::new(from_name.clone(), n + 1, n + 1, 1, 0, None));
         model.push(Generator::new(to_name.clone(), n, n, 2, 0, None));
         
-        data.generators.push(Torsion::default());
-        data.generators.push(Torsion::default());
+        data.push_generator(Torsion::default());
+        data.push_generator(Torsion::default());
 
-        data.in_diffs.push(vec![]);
-        data.in_diffs.push(vec![]);
-        
-        data.out_diffs.push(vec![]);
-        data.out_diffs.push(vec![]);
-        
-        data.out_taus.push(vec![]);
-        data.out_taus.push(vec![]);
-        
         data.add_diff(model, size, size+1, None, Kind::Algebraic);
     }
 }

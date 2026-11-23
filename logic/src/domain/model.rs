@@ -4,7 +4,7 @@
 //! to dedupe, and additionally bucketed or sorted so that
 //! [`crate::domain::process`] can apply them in the right order.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Index, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
@@ -39,15 +39,56 @@ pub struct ExtTauMult {
     pub af: i32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct OrderedExtTauMult {
     // Matches the former bucket traversal: source y, AF, then y difference.
     key: (i32, i32, i32),
     tau: ExtTauMult,
 }
 
+/// Generator-indexed adjacency lists. Search worlds share the untouched chunks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Adjacency {
+    chunks: Vec<Arc<Vec<Vec<usize>>>>,
+}
+
+impl Adjacency {
+    const CHUNK_SIZE: usize = 128;
+
+    fn new(len: usize) -> Self {
+        let whole_chunks = len / Self::CHUNK_SIZE;
+        let remainder = len % Self::CHUNK_SIZE;
+        let empty = Arc::new(vec![Vec::new(); Self::CHUNK_SIZE]);
+        let mut chunks = vec![empty; whole_chunks];
+        if remainder != 0 {
+            chunks.push(Arc::new(vec![Vec::new(); remainder]));
+        }
+        Self { chunks }
+    }
+
+    fn push_edge(&mut self, id: usize, neighbor: usize) {
+        let chunk = Arc::make_mut(&mut self.chunks[id / Self::CHUNK_SIZE]);
+        chunk[id % Self::CHUNK_SIZE].push(neighbor);
+    }
+
+    fn push_empty(&mut self) {
+        match self.chunks.last_mut() {
+            Some(chunk) if chunk.len() < Self::CHUNK_SIZE => Arc::make_mut(chunk).push(Vec::new()),
+            _ => self.chunks.push(Arc::new(vec![Vec::new()])),
+        }
+    }
+}
+
+impl Index<usize> for Adjacency {
+    type Output = [usize];
+
+    fn index(&self, id: usize) -> &Self::Output {
+        &self.chunks[id / Self::CHUNK_SIZE][id % Self::CHUNK_SIZE]
+    }
+}
+
 // This should always implicitly reference some Model
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyntheticSS {
     pub generators: Vec<Torsion>,
     pub induced_name: Option<Vec<Vec<(i32, String)>>>,
@@ -62,13 +103,13 @@ pub struct SyntheticSS {
     // rather than allocating a mostly empty cubic array of buckets.
     external_taus: Vec<OrderedExtTauMult>,
 
-    pub from_to: HashMap<FromTo, (Kind, Option<String>)>,
+    pub from_to: HashMap<FromTo, (Kind, Option<Arc<str>>)>,
 
     // Remember incoming/outgoing stuff
-    pub in_diffs: Vec<Vec<usize>>,
-    pub out_diffs: Vec<Vec<usize>>,
+    pub in_diffs: Adjacency,
+    pub out_diffs: Adjacency,
 
-    pub out_taus: Vec<Vec<usize>>,
+    pub out_taus: Adjacency,
 }
 
 impl SyntheticSS {
@@ -81,9 +122,19 @@ impl SyntheticSS {
             internal_tau_page: vec![vec![]; (MAX_STEM + 1) as usize],
             external_taus: Vec::new(),
             from_to: HashMap::default(),
-            in_diffs: vec![vec![]; len],
-            out_diffs: vec![vec![]; len],
-            out_taus: vec![vec![]; len],
+            in_diffs: Adjacency::new(len),
+            out_diffs: Adjacency::new(len),
+            out_taus: Adjacency::new(len),
+        }
+    }
+
+    pub fn push_generator(&mut self, torsion: Torsion) {
+        self.generators.push(torsion);
+        self.in_diffs.push_empty();
+        self.out_diffs.push_empty();
+        self.out_taus.push_empty();
+        if let Some(names) = &mut self.induced_name {
+            names.push(Vec::new());
         }
     }
 
@@ -91,12 +142,12 @@ impl SyntheticSS {
         let d_y = model.y(from) - model.y(to);
 
         if !self.from_to.contains_key(&(from, to)) {
-            self.from_to.insert((from, to), (kind, proof));
+            self.from_to.insert((from, to), (kind, proof.map(Arc::from)));
             match kind {
                 Kind::Real | Kind::Algebraic => {
                     self.diffs_page[d_y as usize].push(Diff { from, to });
-                    self.in_diffs[to].push(from);
-                    self.out_diffs[from].push(to);
+                    self.in_diffs.push_edge(to, from);
+                    self.out_diffs.push_edge(from, to);
                 },
                 _ => {}
             }
@@ -112,7 +163,7 @@ impl SyntheticSS {
         kind: Kind,
     ) {
         if !self.from_to.contains_key(&(from, to)) {
-            self.from_to.insert((from, to), (kind, proof));
+            self.from_to.insert((from, to), (kind, proof.map(Arc::from)));
             match kind {
                 Kind::Real => {
                     self.internal_tau_page[page as usize].push(IntTauMult { from, to });
@@ -132,7 +183,7 @@ impl SyntheticSS {
         kind: Kind,
     ) {
         if !self.from_to.contains_key(&(from, to)) {
-            self.from_to.insert((from, to), (kind, proof));
+            self.from_to.insert((from, to), (kind, proof.map(Arc::from)));
             match kind {
                 Kind::Real => {
                     let y_from = model.y(from);
@@ -148,7 +199,7 @@ impl SyntheticSS {
                             tau: ExtTauMult { from, to, af },
                         },
                     );
-                    self.out_taus[from].push(to);
+                    self.out_taus.push_edge(from, to);
                 }
                 _ => {}
             }
@@ -250,6 +301,24 @@ impl SyntheticSS {
 mod tests {
     use super::*;
     use crate::{domain::process::compute_pages, types::Generator};
+
+    #[test]
+    fn fork_writes_and_appends_keep_adjacency_chunks_isolated() {
+        let last = Adjacency::CHUNK_SIZE - 1;
+        let mut original = Adjacency::new(last + 1);
+        original.push_edge(last, 3);
+
+        let mut fork = original.clone();
+        fork.push_edge(last, 7);
+        fork.push_empty();
+        fork.push_edge(last + 1, 5);
+        original.push_empty();
+
+        assert_eq!(original[last], [3]);
+        assert_eq!(fork[last], [3, 7]);
+        assert!(original[last + 1].is_empty());
+        assert_eq!(fork[last + 1], [5]);
+    }
 
     fn model(ys: &[i32]) -> E1 {
         E1::new(
