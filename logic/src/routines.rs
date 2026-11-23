@@ -327,9 +327,29 @@ pub fn export_tag_translation() {
         (1301, "h_1P^2d_0".to_owned()),
         (1354, "h_0^{12}h_5 + h_1P^2d_0".to_owned()),
         
-        // Stem 37 and rest TODO  
+        // Stem 37,38,39
         (2205, "h_1t".to_owned()),
         (2253, "h_0^2x + h_1t".to_owned()),
+        (2217, "e_0g + h_0^3x".to_owned()),
+        (2231, "h_0^3x".to_owned()),
+        (2510, "e_1".to_owned()),
+        (2525, "h_0^2h_3h_5".to_owned()),
+        (2383, "h_1x".to_owned()),
+        (2449, "x_{38,6}".to_owned()),
+        (2579, "h_1P^3d_0".to_owned()),
+        (2658, "h_0^2P^2i + h_1P^3d_0".to_owned()),
+        
+        // Stem 40, 45
+        (2896, "f_1".to_owned()),
+        (2839, "h_0f_1".to_owned()),
+        (2812, "h_0^2f_1".to_owned()),
+        (2935, "h_1^2h_3h_5".to_owned()),
+        (2931, "h_1c_0h_5".to_owned()),
+        (2922, "Ph_1h_5".to_owned()),
+        (4165, "h_1g_2".to_owned()),
+        (4206, "d_0h_5".to_owned()),
+
+        
     ]);
 
     for (index, m) in MODEL.enumerate() {

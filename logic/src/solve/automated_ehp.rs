@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     MAX_STEM, MAX_VERIFY_STEM, data::{
-        r#static::{ALGEBRAIC_SPHERE_PAGES, EHP_TO_AHSS, S0, algebraic_spheres},
+        global::{ALGEBRAIC_SPHERE_PAGES, EHP_TO_AHSS, S0, algebraic_spheres},
         curtis::{DATA, MODEL, STABLE_MODEL},
     }, domain::{
         e1::E1, model::{Diff, ExtTauMult, SyntheticSS}, process::{compute_pages, ehp_recursion, try_compute_pages}, ss::SSPages

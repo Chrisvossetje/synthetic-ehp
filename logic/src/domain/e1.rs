@@ -12,7 +12,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    data::{r#static::EMPTY_LIST_USIZE, naming::name_get_tag},
+    data::{global::EMPTY_LIST_USIZE, naming::name_get_tag},
     types::{Generator, Torsion},
 };
 

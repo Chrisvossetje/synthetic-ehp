@@ -7,7 +7,7 @@ use std::{iter::FilterMap, ops::RangeInclusive};
 
 use crate::{
     MAX_STEM, MAX_VERIFY_STEM,
-    data::{curtis::MODEL, r#static::{S0, algebraic_spheres}},
+    data::{curtis::MODEL, global::{S0, algebraic_spheres}},
     domain::{
         e1::E1,
         model::SyntheticSS,

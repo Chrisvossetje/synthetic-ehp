@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use itertools::Itertools;
 
 use crate::{
-    data::{naming::name_get_tag, r#static::{S0_ZEROES, algebraic_rp, rp_truncations, synthetic_rp}},
+    data::{naming::name_get_tag, global::{S0_ZEROES, algebraic_rp, rp_truncations, synthetic_rp}},
     domain::{e1::E1, model::SyntheticSS, process::try_compute_pages, ss::SSPages},
     solve::{action::Action, issues::{
         Issue, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic,

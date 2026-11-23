@@ -49,7 +49,7 @@ fn main() {
 
     // interactive_ehp();
 
-    automated_ahss(true);
+    // automated_ahss(true);
     // let ehp = automated_ehp(false);
     
     // interactive_ehp();
@@ -62,5 +62,5 @@ fn main() {
     
     // verify_geometric(&ehp);
     // export_order_table(&ehp);
-    // export_tag_translation();
+    export_tag_translation();
 }

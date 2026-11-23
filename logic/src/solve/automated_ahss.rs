@@ -8,35 +8,27 @@
 //! (James periodicity / minimal length / additive structure).
 
 use std::{
-    cell::Cell,
-    sync::{Arc, Mutex},
+    cell::Cell, println, sync::{Arc, Mutex},
 };
 
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     MAX_STEM, MAX_VERIFY_STEM, data::{
-        curtis::{STABLE_DATA, STABLE_MODEL}, naming::generate_names_from_tag, r#static::{algebraic_rp, rp_truncations, synthetic_rp}
+        curtis::{STABLE_DATA, STABLE_MODEL}, global::{algebraic_rp, rp_truncations, synthetic_rp}, naming::generate_names_from_tag
     }, domain::{
         e1::E1,
         model::{Diff, ExtTauMult, SyntheticSS},
         process::compute_pages,
     }, solve::{
-        action::{Action, D_R_REPEATS, process_action, revert_log_and_remake},
-        ahss::{ahss_synthetic_e1_issue, get_all_e1_solutions},
-        automated::{
+        action::{Action, D_R_REPEATS, process_action, revert_log_and_remake}, ahss::{ahss_synthetic_e1_issue, get_all_e1_solutions}, automated::{
             ALWAYS_PRINT, Commitment, PARALLEL_DEPTH, TauIssue, classify_tau_issue,
             commit_diff_choice, commit_tau_choice, filter_diff,
-        },
-        generate::get_a_diff,
-        issues::{
+        }, generate::get_a_diff, issues::{
             Issue, compare_algebraic, compare_algebraic_spectral_sequence, compare_synthetic,
-        },
-        proof::{ProofChoice, ProofTrace, SearchProof},
-        search::{
-            BranchResult, ChoiceResult, GetOut, SpeculativeBranchOutcome, discover_choice, check_getout, create_getout, empty_getout, signal_parent_getout
-        },
-        solve::{
+        }, proof::{ProofChoice, ProofTrace, SearchProof, reduce_proof_tree}, search::{
+            BranchResult, ChoiceResult, GetOut, SpeculativeBranchOutcome, check_getout, create_getout, discover_choice, empty_getout, signal_parent_getout
+        }, solve::{
             auto_deduce, suggest_tau_solution_algebraic, suggest_tau_solution_generator_synthetic,
         },
     }, types::{Kind, Torsion}
@@ -722,8 +714,21 @@ fn ahss_solver_until(
     for (&(from, to), (kind, _)) in &alg_ahss.from_to {
         partial_ahss.add_diff(model, from, to, None, *kind);
     }
-
-    println!("{res:?}");
+    
+    match res {
+        BranchResult::Contradiction(search_proof) => {
+            println!("{:?}", reduce_proof_tree(&search_proof));
+            println!("Contradiction");
+        },
+        BranchResult::Open(search_proof) => {
+            println!("{:?}", reduce_proof_tree(&search_proof));
+            println!("Open");
+        },
+        BranchResult::Cancelled(search_proof) => {
+            println!("{:?}", reduce_proof_tree(&search_proof));
+            println!("Cancelled");
+        },
+    }
 
     let mut log = Arc::try_unwrap(log).unwrap().into_inner().unwrap();
     let ahss = revert_log_and_remake(0, &mut log, model, &partial_ahss, true);
