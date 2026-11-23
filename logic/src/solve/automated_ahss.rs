@@ -743,7 +743,14 @@ mod benchmark {
     #[test]
     #[ignore = "release-mode SAHSS discovery benchmark"]
     fn benchmark_sahss_stem_28() {
-        let seed = get_log(true, true).expect("load the minimal AHSS log");
+        let seed: Vec<Action> = match std::env::var_os("SAHSS_BENCHMARK_SEED") {
+            Some(path) => {
+                let bytes = std::fs::read(path).expect("read the SAHSS checkpoint");
+                serde_json::from_slice(&bytes).expect("parse the SAHSS checkpoint")
+            }
+            None => get_log(true, true).expect("load the minimal AHSS log"),
+        };
+        let seed_count = seed.len();
         let limit = SweepLimit {
             stop_before_stem: 29,
             reached: Cell::new(false),
@@ -772,7 +779,7 @@ mod benchmark {
         let mut digest = DefaultHasher::new();
         facts.hash(&mut digest);
         println!(
-            "SAHSS through stem 28: {elapsed:?}; {action_count} actions; facts {:016x}",
+            "SAHSS through stem 28: {elapsed:?}; {action_count} actions ({seed_count} seed); facts {:016x}",
             digest.finish()
         );
     }

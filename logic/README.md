@@ -133,6 +133,8 @@ RAYON_NUM_THREADS=4 cargo test --release benchmark_sahss_stem_28 -- --ignored --
 The benchmark requires the sweep to finish stem 28 and reports elapsed time,
 action count, and a fingerprint of the actions with proof text removed. It
 leaves the input logs and website data alone.
+Set `SAHSS_BENCHMARK_SEED` to the path of a saved JSON action log to use it as
+the starting checkpoint.
 
 ## How it fits together (`src/`)
 
