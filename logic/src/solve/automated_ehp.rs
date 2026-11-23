@@ -98,7 +98,7 @@ fn check_issue(data: &SyntheticSS, model: &E1, ahss_pages: &[SSPages; (MAX_STEM 
         if let Some(t_id) = EHP_TO_AHSS[f_id]
             && ahss_pages[(sphere - 1) as usize].element_in_pages(t_id)
         {
-            if let Some(ps) = &pages.generators[f_id] {
+            if let Some(ps) = pages.checkpoints(f_id) {
                 for (f_page, (f_af, f_torsion)) in ps {
                     if f_torsion.alive() {
                         let (t_af, t_torsion) = ahss_pages[(sphere - 1) as usize]

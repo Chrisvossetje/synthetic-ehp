@@ -2,7 +2,12 @@
 //! by name, by stem, by (stem, AF), and by (stem, y). These never change during
 //! a solve — only the spectral-sequence facts layered on top of them do.
 
-use std::{collections::HashMap, iter::Enumerate, slice::Iter};
+use std::{
+    collections::HashMap,
+    iter::Enumerate,
+    ops::{Range, RangeInclusive},
+    slice::Iter,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -104,6 +109,20 @@ impl E1 {
         self.stem.get(&stem).unwrap()
     }
 
+    /// Bounds on generator IDs in a stem window. The model is normally sorted
+    /// by stem, but callers still filter exact stems for interleaved IDs.
+    pub(super) fn stem_window_bounds(&self, stems: RangeInclusive<i32>) -> Range<usize> {
+        let mut start = self.generators.len();
+        let mut end = 0;
+        for stem in stems {
+            if let Some(ids) = self.stem.get(&stem) {
+                start = start.min(ids[0]);
+                end = end.max(ids[ids.len() - 1] + 1);
+            }
+        }
+        start.min(end)..end
+    }
+
     pub fn gens_id_in_stem_af(&self, stem: i32, af: i32) -> &Vec<usize> {
         self.stem_af.get(&(stem, af)).unwrap()
     }
@@ -113,6 +132,11 @@ impl E1 {
     }
 
     pub fn push(&mut self, g: Generator) {
+        let id = self.generators.len();
+        self.index.entry(g.name.clone()).or_insert(id);
+        self.stem.entry(g.stem).or_default().push(id);
+        self.stem_af.entry((g.stem, g.af)).or_default().push(id);
+        self.stem_y.entry((g.stem, g.y)).or_default().push(id);
         self.generators.push(g);
     }
 

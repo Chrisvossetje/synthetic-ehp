@@ -1,36 +1,52 @@
 //! [`SSPages`]: the computed state of every generator across the spectral
-//! sequence's pages, produced by [`crate::domain::process`]. For each generator
-//! we store the sequence of (page, state) it passes through; `None` means the
-//! generator does not appear in this truncation.
+//! sequence's pages, produced by [`crate::domain::process`]. Store histories in
+//! the requested window and keep short histories inline.
 
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 
 use crate::{domain::e1::E1, types::Torsion};
 
 /// A generator's (AF, torsion) on a given page.
 pub type GeneratorState = (i32, Torsion);
-// TODO: Smallvec performance check ?
-/// The (page, state) checkpoints a generator passes through, in page order.
-pub type PagesGeneratorState = Vec<(i32, GeneratorState)>;
+type Checkpoint = (i32, GeneratorState);
+pub(super) type PageHistory = SmallVec<[Checkpoint; 2]>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SSPages {
     pub bot_trunc: i32,
     pub top_trunc: i32,
 
-    // Length of this should coincide with model and should always be filled
-    // Should i also add another Vec around this to filter on Stem ?
-    // TODO : SMALLVEC
-    pub generators: Vec<Option<PagesGeneratorState>>,
+    // An empty history marks a generator excluded by the truncation or E1 torsion.
+    first_id: usize,
+    histories: Vec<PageHistory>,
 }
 
 impl SSPages {
+    pub(super) fn new(
+        bot_trunc: i32,
+        top_trunc: i32,
+        first_id: usize,
+        histories: Vec<PageHistory>,
+    ) -> Self {
+        Self {
+            bot_trunc,
+            top_trunc,
+            first_id,
+            histories,
+        }
+    }
+
+    pub fn checkpoints(&self, elt: usize) -> Option<&[(i32, GeneratorState)]> {
+        let history = self.histories.get(elt.checked_sub(self.first_id)?)?;
+        (!history.is_empty()).then_some(history.as_slice())
+    }
+
     /// The generator's state as of `page`: the last checkpoint whose page is
     /// `<= page` (checkpoints are stored in increasing page order).
     pub fn element_at_page(&self, page: i32, elt: usize) -> GeneratorState {
-        let l = self.generators[elt].as_ref().unwrap();
+        let l = self.checkpoints(elt).unwrap();
         let mut id = 0;
 
         loop {
@@ -45,7 +61,7 @@ impl SSPages {
     }
 
     pub fn element_in_pages(&self, elt: usize) -> bool {
-        self.generators[elt].is_some()
+        self.checkpoints(elt).is_some()
     }
 
     pub fn element_final(&self, elt: usize) -> GeneratorState {
@@ -53,12 +69,13 @@ impl SSPages {
     }
 
     pub fn try_element_final(&self, elt: usize) -> Option<GeneratorState> {
-        let states = self.generators[elt].as_deref()?;
-        Some(states.last().unwrap().1)
+        self.checkpoints(elt)?.last().map(|&(_, state)| state)
     }
 
     pub fn push(&mut self, elt: usize, page: i32, g: GeneratorState) {
-        self.generators[elt].as_mut().unwrap().push((page, g));
+        let history = &mut self.histories[elt - self.first_id];
+        debug_assert!(!history.is_empty());
+        history.push((page, g));
     }
 
     pub fn convergence_at_stem(&self, model: &E1, stem: i32) -> HashMap<i32, Vec<Torsion>> {

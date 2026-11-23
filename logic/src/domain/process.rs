@@ -17,9 +17,8 @@ use crate::{
 
 pub use super::tau::compute_ext_taus;
 
-/// Seed every generator with its E1 state, keeping only those that fall within
-/// the requested truncation window (`bot_trunc..=top_trunc` in y, plus a
-/// one-stem margin around `from_stem..=to_stem`) and are still alive.
+/// Seed live generators within the requested truncation window (`bot_trunc..=top_trunc` in y, plus a
+/// one-stem margin around `from_stem..=to_stem`).
 fn instantiate_pages(
     data: &SyntheticSS,
     model: &E1,
@@ -28,29 +27,22 @@ fn instantiate_pages(
     from_stem: i32,
     to_stem: i32,
 ) -> SSPages {
-    let mut gens = vec![];
-
-    let mut max_stem = 0;
-
-    for (index, torsion) in data.generators.iter().enumerate() {
-        let g = model.get(index);
-        max_stem = max_stem.max(g.stem);
-
-        if from_stem - 1 <= g.stem && g.stem <= to_stem + 1 {
-            if bot_trunc <= g.y && g.y <= top_trunc && torsion.alive() {
-                gens.push(Some(vec![(1, (g.af, *torsion))]));
-                continue;
+    let stems = from_stem.saturating_sub(1)..=to_stem.saturating_add(1);
+    let window = model.stem_window_bounds(stems.clone());
+    let first_id = window.start;
+    let histories = window
+        .map(|id| {
+            let g = model.get(id);
+            let torsion = data.generators[id];
+            if stems.contains(&g.stem) && (bot_trunc..=top_trunc).contains(&g.y) && torsion.alive() {
+                smallvec::smallvec![(1, (g.af, torsion))]
+            } else {
+                smallvec::SmallVec::new()
             }
-        }
+        })
+        .collect();
 
-        gens.push(None);
-    }
-
-    SSPages {
-        bot_trunc,
-        top_trunc,
-        generators: gens,
-    }
+    SSPages::new(bot_trunc, top_trunc, first_id, histories)
 }
 
 /// Apply one differential `from -> to` on the given page, updating both
@@ -348,6 +340,43 @@ pub fn ehp_recursion(ehp: &mut SyntheticSS, model: &E1, sphere: i32, stem: i32) 
         return Err(issues);
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::Generator;
+
+    #[test]
+    fn page_window_keeps_global_ids_and_the_neighboring_stems() {
+        let generator = |name: &str, stem, y, af| {
+            Generator::new(name.into(), stem, y, af, 0, None)
+        };
+        let mut model = E1::new(vec![
+            generator("before", 8, 2, 3),
+            generator("lower neighbor", 9, 2, 3),
+            generator("interleaved outside stem", 15, 2, 3),
+            generator("target", 10, 2, 5),
+            generator("outside truncation", 10, 4, 3),
+            generator("dead on E1", 10, 2, 3),
+        ]);
+        let mut data = SyntheticSS::empty(model.clone());
+        data.generators[5] = Torsion::zero();
+        model.push(generator("upper neighbor", 11, 3, 4));
+        data.push_generator(Torsion::default());
+        data.add_diff(&model, 6, 3, None, Kind::Real);
+
+        let (pages, issues) = compute_pages(&data, &model, 2, 3, 10, 10, false);
+
+        assert!(issues.is_empty());
+        assert_eq!(pages.element_final(1), (3, Torsion::default()));
+        assert_eq!(pages.element_at_page(1, 3), (5, Torsion::default()));
+        assert_eq!(pages.element_at_page(2, 3), (5, Torsion::zero()));
+        assert_eq!(pages.element_final(6), (4, Torsion::zero()));
+        for id in [0, 2, 4, 5] {
+            assert_eq!(pages.checkpoints(id), None);
+        }
     }
 }
 
