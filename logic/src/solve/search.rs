@@ -6,7 +6,7 @@ use crate::solve::{
 };
 use std::sync::{
     Arc,
-    atomic::{AtomicI32, Ordering},
+    atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,6 +45,7 @@ pub enum SpeculativeBranchOutcome {
 #[derive(Clone)]
 pub struct GetOut {
     flags: [Option<Arc<AtomicI32>>; PARALLEL_DEPTH as usize],
+    cancelled: Option<Arc<AtomicBool>>,
     /// Absolute traversal cell number, inherited by cloned worlds. Resolving
     /// more choices within the same cell does not advance this cursor.
     pub position: usize,
@@ -52,6 +53,11 @@ pub struct GetOut {
     stop_after: Option<usize>,
 }
 impl GetOut {
+    pub fn with_cancellation(mut self, cancelled: Arc<AtomicBool>) -> Self {
+        self.cancelled = Some(cancelled);
+        self
+    }
+
     pub fn max_depth(&self) -> i32 {
         self.max_depth
     }
@@ -61,6 +67,7 @@ impl GetOut {
     fn companion(&self, proof: &SearchProof) -> Self {
         Self {
             flags: [const { None }; PARALLEL_DEPTH as usize],
+            cancelled: self.cancelled.clone(),
             position: self.position,
             max_depth: proof.max_depth,
             stop_after: Some(proof.frontier),
@@ -71,6 +78,7 @@ impl GetOut {
 pub fn empty_getout() -> GetOut {
     GetOut {
         flags: [const { None }; PARALLEL_DEPTH as usize],
+        cancelled: None,
         position: 0,
         max_depth: MAX_DEPTH,
         stop_after: None,
@@ -93,10 +101,10 @@ pub fn signal_parent_getout(getout: &mut GetOut, depth: i32) {
 }
 pub fn check_getout(getout: &GetOut) -> bool {
     getout
-        .flags
-        .iter()
-        .flatten()
-        .any(|g| g.load(Ordering::Relaxed) <= 0)
+        .cancelled
+        .as_ref()
+        .is_some_and(|flag| flag.load(Ordering::Relaxed))
+        || getout.flags.iter().flatten().any(|g| g.load(Ordering::Relaxed) <= 0)
 }
 
 pub fn resolve_speculative_branch_results(
@@ -262,6 +270,21 @@ mod tests {
                 other => panic!("Unexpected outcome: {other:?}"),
             }
         }
+    }
+
+    #[test]
+    fn sweep_cancellation_reaches_speculative_branches_and_the_companion() {
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let root = empty_getout().with_cancellation(cancelled.clone());
+        let branch = create_getout(&root, 2, 0);
+        let companion = branch.companion(&leaf(1, "rejected"));
+
+        assert!(!check_getout(&branch));
+        assert!(!check_getout(&companion));
+        cancelled.store(true, Ordering::Relaxed);
+        assert!(check_getout(&root));
+        assert!(check_getout(&branch));
+        assert!(check_getout(&companion));
     }
 
     #[test]

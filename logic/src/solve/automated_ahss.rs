@@ -1,5 +1,6 @@
-//! The automated AHSS solver. [`ahss_solver`] drives a recursive search
-//! ([`ahss_iterate`]) that walks every stem and RP^n truncation, proposing
+//! The automated AHSS solver. [`ahss_solver`] races two traversals of the same
+//! recursive search ([`ahss_iterate`]), restarting both after a differential
+//! verdict. Each traversal walks stems and RP^n truncations, proposing
 //! differentials and tau-multiplications and committing to each as Real or Fake
 //! by speculatively exploring both worlds (`try_diff`/`try_tau` via
 //! [`crate::solve::search`]). E1-page torsion ambiguities are resolved by
@@ -8,7 +9,12 @@
 //! (James periodicity / minimal length / additive structure).
 
 use std::{
-    cell::Cell, println, sync::{Arc, Mutex},
+    cell::Cell,
+    println,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -33,6 +39,17 @@ use crate::{
         },
     }, types::{Kind, Torsion}
 };
+
+struct SweepRound {
+    cancelled: Arc<AtomicBool>,
+    discovery: Mutex<Option<Vec<Action>>>,
+}
+
+struct AhssWorker<'a> {
+    descending: bool,
+    log: Arc<Mutex<Vec<Action>>>,
+    round: &'a SweepRound,
+}
 
 fn check_issue(
     data: &SyntheticSS,
@@ -79,7 +96,7 @@ fn iterate_e1_issues(
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
     e1_issues: &Vec<Vec<(Vec<(usize, Torsion)>, Vec<Action>)>>,
     getout: &mut GetOut,
-    log: &Arc<Mutex<Vec<Action>>>,
+    worker: &AhssWorker<'_>,
     stem: i32,
     top_trunc: i32,
     bot_trunc: i32,
@@ -116,7 +133,7 @@ fn iterate_e1_issues(
             alg_data,
             e1_issues,
             g.clone(),
-            log.clone(),
+            worker,
             stem,
             top_trunc,
             bot_trunc,
@@ -164,7 +181,7 @@ fn iterate_e1_issues(
                 {
                     *text = proof.describe(model);
                 }
-                log.lock().unwrap().push(action);
+                worker.log.lock().unwrap().push(action);
             }
         }
         for &(id, torsion) in &candidates[index].0 {
@@ -192,6 +209,35 @@ struct SweepLimit {
     reached: Cell<bool>,
 }
 
+fn advance_truncation(
+    stem: i32,
+    top_trunc: &mut i32,
+    bot_trunc: &mut i32,
+    descending: bool,
+) -> bool {
+    if descending {
+        if *top_trunc < stem + 1 {
+            *top_trunc += 1;
+        } else if *bot_trunc > 1 {
+            *bot_trunc -= 1;
+            let first_page = D_R_REPEATS
+                .partition_point(|&period| period < *bot_trunc as usize)
+                .max(1) as i32;
+            *top_trunc = (*bot_trunc + first_page).min(stem + 1);
+        } else {
+            return false;
+        }
+    } else if *bot_trunc > 1 {
+        *bot_trunc -= 1;
+    } else if *top_trunc < stem + 1 {
+        *bot_trunc = *top_trunc;
+        *top_trunc += 1;
+    } else {
+        return false;
+    }
+    true
+}
+
 fn ahss_iterate(
     mut data: SyntheticSS,
     model: &E1,
@@ -199,7 +245,7 @@ fn ahss_iterate(
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
     e1_issues: &Vec<Vec<(Vec<(usize, Torsion)>, Vec<Action>)>>,
     mut getout: GetOut,
-    log: Arc<Mutex<Vec<Action>>>,
+    worker: &AhssWorker<'_>,
     mut stem: i32,
     mut top_trunc: i32,
     mut bot_trunc: i32,
@@ -207,12 +253,13 @@ fn ahss_iterate(
     sweep_limit: Option<&SweepLimit>,
 ) -> BranchResult {
     let mut trace = ProofTrace::default();
-    // The solver sweeps (stem, top_trunc) outward. Each iteration tries to make
-    // progress at the current cell; once nothing is left to do there it advances
-    // the truncation/stem at the bottom of the loop. We never recurse here —
-    // recursion happens inside try_diff/try_tau when a choice must be guessed.
+    // Finish the current cell before advancing. Speculative choices recurse
+    // from the same cell and use this worker's direction and cancellation flag.
     loop {
         trace.at(getout.position);
+        if check_getout(&getout) {
+            return BranchResult::Cancelled(trace.cancelled(depth));
+        }
         // Depth-0 (the real run) stops once it has verified the whole range;
         // deeper speculative branches stop at MAX_DEPTH and report Open (no
         // contradiction found, so the guess that spawned them stays plausible).
@@ -227,14 +274,20 @@ fn ahss_iterate(
             return BranchResult::Open(trace.open(depth));
         }
 
-        // A sibling branch already decided this subtree; bail out early.
-        if check_getout(&getout) {
-            return BranchResult::Cancelled(trace.cancelled(depth));
+        let page = (top_trunc - bot_trunc) as usize;
+        // Install the deferred algebraic differentials when their window is
+        // reached in either traversal. Speculative branches inherit them.
+        for &(from, to) in &alg_data[stem as usize][page][top_trunc as usize] {
+            if depth == 0 && !data.from_to.contains_key(&(from, to)) {
+                let (from_name, to_name) = model.get_names(from, to);
+                println!("Applying Algebraic diff {from_name} -> {to_name}");
+            }
+            data.add_diff(model, from, to, None, Kind::Algebraic);
         }
 
         // 1. Propose the next plausible differential at this cell and try it.
         //    (Only within the James-periodicity window for this page length.)
-        if bot_trunc <= D_R_REPEATS[(top_trunc - bot_trunc) as usize] as i32 {
+        if bot_trunc as usize <= D_R_REPEATS[page] {
             let option = get_a_diff(&data, model, top_trunc, bot_trunc, stem);
 
             if let Some(d) = option {
@@ -242,7 +295,7 @@ fn ahss_iterate(
                     return BranchResult::Open(trace.open(depth));
                 }
                 match try_diff(
-                    &mut data, model, alg_ahss, alg_data, e1_issues, &getout, &log, stem,
+                    &mut data, model, alg_ahss, alg_data, e1_issues, &getout, worker, stem,
                     top_trunc, bot_trunc, depth, d, &mut trace,
                 ) {
                     ChoiceResult::Contradiction(proof) => {
@@ -303,7 +356,7 @@ fn ahss_iterate(
                     return BranchResult::Open(trace.open(depth));
                 }
                 match try_tau(
-                    &mut data, model, alg_ahss, alg_data, e1_issues, &getout, &log, stem,
+                    &mut data, model, alg_ahss, alg_data, e1_issues, &getout, worker, stem,
                     top_trunc, bot_trunc, depth, d, &mut trace,
                 ) {
                     ChoiceResult::Contradiction(proof) => {
@@ -326,28 +379,9 @@ fn ahss_iterate(
             }
         }
 
-        // 3. Nothing left to decide at this cell. Fold in the algebraic
-        //    differentials that belong to this page, then widen the truncation
-        //    window (bot_trunc down) and revisit.
-        if bot_trunc != 0 {
-            let d_y = top_trunc - bot_trunc + 1;
-            for &(from, to) in &alg_data[stem as usize][d_y as usize][top_trunc as usize] {
-                if depth == 0 {
-                    let (from_name, to_name) = model.get_names(from, to);
-                    println!("Applying Algebraic diff {from_name} -> {to_name}");
-                }
-                data.add_diff(model, from, to, None, Kind::Algebraic);
-            }
-            getout.position += 1;
-            bot_trunc -= 1;
-            continue;
-        }
-
-        // 4. This stem's truncations are exhausted. Advance: either climb to the
-        //    next top_trunc, or roll over to the next stem and first resolve any
-        //    E1-page torsion ambiguities it introduces.
+        // Advance the window, resolving E1 ambiguities at the start of each stem.
         getout.position += 1;
-        if top_trunc == stem + 1 {
+        if !advance_truncation(stem, &mut top_trunc, &mut bot_trunc, worker.descending) {
             stem += 1;
             if let Some(limit) = sweep_limit
                 && stem == limit.stop_before_stem
@@ -355,8 +389,12 @@ fn ahss_iterate(
                 limit.reached.set(true);
                 return BranchResult::Open(trace.open(depth));
             }
-            top_trunc = 2;
+            top_trunc = if worker.descending { stem + 1 } else { 2 };
             bot_trunc = top_trunc - 1;
+            if depth == 0 {
+                let direction = if worker.descending { "Descending" } else { "Ascending" };
+                println!("{direction} worker: stem {stem}");
+            }
 
             if let Some(r) = iterate_e1_issues(
                 &mut data,
@@ -365,7 +403,7 @@ fn ahss_iterate(
                 alg_data,
                 e1_issues,
                 &mut getout,
-                &log,
+                worker,
                 stem,
                 top_trunc,
                 bot_trunc,
@@ -374,13 +412,6 @@ fn ahss_iterate(
             ) {
                 return r;
             }
-        } else {
-            top_trunc += 1;
-            bot_trunc = top_trunc - 1;
-        }
-
-        if depth == 0 {
-            println!("Current stem: {stem} | top_trunc: {top_trunc}");
         }
     }
 }
@@ -392,7 +423,7 @@ fn try_diff(
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
     e1_issues: &Vec<Vec<(Vec<(usize, Torsion)>, Vec<Action>)>>,
     getout: &GetOut,
-    log: &Arc<Mutex<Vec<Action>>>,
+    worker: &AhssWorker<'_>,
     stem: i32,
     top_trunc: i32,
     bot_trunc: i32,
@@ -410,7 +441,7 @@ fn try_diff(
             println!("Finished diff by: {} | {} -> {kind:?}", from_name, to_name);
         }
         if depth == 0 {
-            log.lock().unwrap().push(Action::AddDiff {
+            worker.log.lock().unwrap().push(Action::AddDiff {
                 from: from_name,
                 to: to_name,
                 proof: None,
@@ -454,7 +485,7 @@ fn try_diff(
             alg_data,
             e1_issues,
             control,
-            log.clone(),
+            worker,
             stem,
             top_trunc,
             bot_trunc,
@@ -463,29 +494,43 @@ fn try_diff(
         )
     };
 
-    match discover_choice(
+    let (real, proof) = match discover_choice(
         depth,
         getout,
         [ProofChoice::Diff(d, true), ProofChoice::Diff(d, false)],
         run,
     ) {
-        SpeculativeBranchOutcome::Contradiction(proof) => ChoiceResult::Contradiction(proof),
-        SpeculativeBranchOutcome::ChooseRight(e) => {
-            trace.resolved(depth, ProofChoice::Diff(d, false), &e);
-            commit_diff_choice(data, model, log, depth, d, Commitment::Fake(e), true);
-            ChoiceResult::Chosen
+        SpeculativeBranchOutcome::Contradiction(proof) => {
+            return ChoiceResult::Contradiction(proof);
         }
-        SpeculativeBranchOutcome::ChooseLeft(e) => {
-            trace.resolved(depth, ProofChoice::Diff(d, true), &e);
-            commit_diff_choice(data, model, log, depth, d, Commitment::Real(e), true);
-            ChoiceResult::Chosen
-        }
+        SpeculativeBranchOutcome::ChooseRight(proof) => (false, proof),
+        SpeculativeBranchOutcome::ChooseLeft(proof) => (true, proof),
         SpeculativeBranchOutcome::BothOpen => {
-            commit_diff_choice(data, model, log, depth, d, Commitment::Unknown, true);
-            ChoiceResult::Open
+            commit_diff_choice(data, model, &worker.log, depth, d, Commitment::Unknown, true);
+            return ChoiceResult::Open;
         }
-        SpeculativeBranchOutcome::Cancelled => ChoiceResult::Cancelled,
+        SpeculativeBranchOutcome::Cancelled => return ChoiceResult::Cancelled,
+    };
+
+    // Only a verdict in the actual sequence can restart both sweeps. Nested
+    // verdicts depend on their world's assumptions and stay in that world.
+    if depth == 0 && worker.round.cancelled.swap(true, Ordering::Relaxed) {
+        return ChoiceResult::Cancelled;
     }
+    trace.resolved(depth, ProofChoice::Diff(d, real), &proof);
+    let commitment = if real {
+        Commitment::Real(proof)
+    } else {
+        Commitment::Fake(proof)
+    };
+    commit_diff_choice(data, model, &worker.log, depth, d, commitment, true);
+    if depth == 0 {
+        let actions = std::mem::take(&mut *worker.log.lock().unwrap());
+        *worker.round.discovery.lock().unwrap() = Some(actions);
+        let direction = if worker.descending { "Descending" } else { "Ascending" };
+        println!("{direction} worker settled a differential in stem {stem}. Restarting both workers.");
+    }
+    ChoiceResult::Chosen
 }
 
 fn is_tau_issue(
@@ -520,7 +565,7 @@ fn try_tau(
     alg_data: &Vec<Vec<Vec<Vec<(usize, usize)>>>>,
     e1_issues: &Vec<Vec<(Vec<(usize, Torsion)>, Vec<Action>)>>,
     getout: &GetOut,
-    log: &Arc<Mutex<Vec<Action>>>,
+    worker: &AhssWorker<'_>,
     stem: i32,
     top_trunc: i32,
     bot_trunc: i32,
@@ -555,7 +600,7 @@ fn try_tau(
             alg_data,
             e1_issues,
             control,
-            log.clone(),
+            worker,
             stem,
             top_trunc,
             bot_trunc,
@@ -573,16 +618,16 @@ fn try_tau(
         SpeculativeBranchOutcome::Contradiction(proof) => ChoiceResult::Contradiction(proof),
         SpeculativeBranchOutcome::ChooseRight(e) => {
             trace.resolved(depth, ProofChoice::Tau(d, false), &e);
-            commit_tau_choice(data, model, log, depth, d, Commitment::Fake(e), true);
+            commit_tau_choice(data, model, &worker.log, depth, d, Commitment::Fake(e), true);
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::ChooseLeft(e) => {
             trace.resolved(depth, ProofChoice::Tau(d, true), &e);
-            commit_tau_choice(data, model, log, depth, d, Commitment::Real(e), true);
+            commit_tau_choice(data, model, &worker.log, depth, d, Commitment::Real(e), true);
             ChoiceResult::Chosen
         }
         SpeculativeBranchOutcome::BothOpen => {
-            commit_tau_choice(data, model, log, depth, d, Commitment::Unknown, true);
+            commit_tau_choice(data, model, &worker.log, depth, d, Commitment::Unknown, true);
             if ALWAYS_PRINT || depth == 0 {
                 println!("BothOpen: {from_name} | {to_name} tau multiple");
             }
@@ -680,34 +725,70 @@ fn ahss_solver_until(
     }
 
 
-    let mut log = log.unwrap_or(vec![]);
+    let mut log = log.unwrap_or_default();
+    let stop_before_stem = sweep_limit.map_or(MAX_VERIFY_STEM, |limit| limit.stop_before_stem);
+    let res = loop {
+        // Replay the winning facts before starting either worker. E1 choices
+        // committed in a prior round no longer need to be explored.
+        let mut ahss = revert_log_and_remake(0, &mut log, model, &partial_ahss, true);
+        let previous_len = log.len();
+        let e1_issues = ahss_solve_e1_issues(&ahss, model, &mut log);
+        if log.len() != previous_len {
+            ahss = revert_log_and_remake(0, &mut log, model, &partial_ahss, true);
+        }
+        let round = SweepRound {
+            cancelled: Arc::new(AtomicBool::new(false)),
+            discovery: Mutex::new(None),
+        };
+        let run = |descending| {
+            let worker = AhssWorker {
+                descending,
+                log: Arc::new(Mutex::new(Vec::new())),
+                round: &round,
+            };
+            let limit = SweepLimit {
+                stop_before_stem,
+                reached: Cell::new(false),
+            };
+            let stem = 2;
+            let top_trunc = if descending { stem + 1 } else { 2 };
+            let bot_trunc = top_trunc - 1;
+            let result = ahss_iterate(
+                ahss.clone(),
+                model,
+                &alg_ahss,
+                &alg_data,
+                &e1_issues,
+                empty_getout().with_cancellation(round.cancelled.clone()),
+                &worker,
+                stem,
+                top_trunc,
+                bot_trunc,
+                0,
+                Some(&limit),
+            );
+            let actions = Arc::try_unwrap(worker.log).unwrap().into_inner().unwrap();
+            (result, actions, limit.reached.get())
+        };
+        let (ascending, descending) = rayon::join(|| run(false), || run(true));
+        if let Some(actions) = round.discovery.into_inner().unwrap() {
+            log.extend(actions);
+            continue;
+        }
 
-
-    // Replay any starting log (its SetE1 actions establish E1 torsion), then
-    // precompute the candidate E1 assignments the search will branch over.
-    let ahss = revert_log_and_remake(0, &mut log, model, &partial_ahss, true);
-    let e1_issues = ahss_solve_e1_issues(&ahss, model, &mut log);
-
-
-    let ahss = revert_log_and_remake(0, &mut log, model, &ahss, true);
-    let log = Arc::new(Mutex::new(log));
-
-    // Drive the search from the very first cell (stem 2, RP^1_2). It appends
-    // every committed fact to the shared `log`.
-    let res = ahss_iterate(
-        ahss,
-        model,
-        &alg_ahss,
-        &alg_data,
-        &e1_issues,
-        empty_getout(),
-        log.clone(),
-        2,
-        2,
-        1,
-        0,
-        sweep_limit,
-    );
+        // If neither worker discovers a differential, prefer a completed
+        // sweep. Otherwise keep the original ascending solver's terminal log.
+        let (result, actions, completed) = if descending.2 && !ascending.2 {
+            descending
+        } else {
+            ascending
+        };
+        log.extend(actions);
+        if let Some(limit) = sweep_limit {
+            limit.reached.set(completed);
+        }
+        break result;
+    };
 
     // Rebuild the final sequence from the produced log on top of the algebraic
     // differentials, so the result is exactly what replaying the log yields.
@@ -730,9 +811,65 @@ fn ahss_solver_until(
         },
     }
 
-    let mut log = Arc::try_unwrap(log).unwrap().into_inner().unwrap();
     let ahss = revert_log_and_remake(0, &mut log, model, &partial_ahss, true);
     (log, ahss)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn traversals_preserve_candidate_order_after_periodicity() {
+        let eligible = |&(top, bottom): &(i32, i32)| {
+            bottom as usize <= D_R_REPEATS[(top - bottom) as usize]
+        };
+        for stem in 2..MAX_STEM {
+            let ascending = (2..=stem + 1)
+                .flat_map(|top| (1..top).rev().map(move |bottom| (top, bottom)));
+            let descending = (1..=stem)
+                .rev()
+                .flat_map(|bottom| (bottom + 1..=stem + 1).map(move |top| (top, bottom)));
+            for (direction, expected) in [
+                (false, ascending.filter(eligible).collect::<Vec<_>>()),
+                (true, descending.filter(eligible).collect::<Vec<_>>()),
+            ] {
+                let mut top_trunc = if direction { stem + 1 } else { 2 };
+                let mut bot_trunc = top_trunc - 1;
+                let mut visited = Vec::new();
+                loop {
+                    if eligible(&(top_trunc, bot_trunc)) {
+                        visited.push((top_trunc, bot_trunc));
+                    }
+                    if !advance_truncation(stem, &mut top_trunc, &mut bot_trunc, direction) {
+                        break;
+                    }
+                }
+                assert_eq!(visited, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn dual_sweep_replays_a_discovery_and_finishes_the_stem() {
+        let limit = SweepLimit {
+            stop_before_stem: 10,
+            reached: Cell::new(false),
+        };
+        let (log, data) = ahss_solver_until(None, Some(&limit));
+        assert!(limit.reached.get());
+
+        let (from, to) = ("3 3[4]", "4 1 1 1[2]");
+        let verdicts = log.iter().filter(|action| {
+            matches!(action, Action::AddDiff { from: f, to: t, kind: Kind::Fake, proof: Some(_) }
+                if f == from && t == to)
+        });
+        assert_eq!(verdicts.count(), 1);
+        assert_eq!(
+            data.from_to[&(STABLE_MODEL.get_index(from), STABLE_MODEL.get_index(to))].0,
+            Kind::Fake,
+        );
+    }
 }
 
 #[cfg(test)]
